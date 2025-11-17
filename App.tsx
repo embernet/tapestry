@@ -1,29 +1,15 @@
-
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState } from './types';
 import { DEFAULT_COLOR_SCHEMES } from './constants';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
-import ElementDetailsPanel from './components/FactDetailsPanel';
+import ElementDetailsPanel from './components/ElementDetailsPanel';
 import RelationshipDetailsPanel from './components/RelationshipDetailsPanel';
 import AddRelationshipPanel from './components/AddRelationshipPanel';
 import MarkdownPanel from './components/MarkdownPanel';
 import FilterPanel from './components/FilterPanel';
-// Fix: Changed to a named import to resolve module resolution error.
 import { ReportPanel } from './components/ReportPanel';
-
-/**
- * A simple UUID v4 generator.
- * This is used to avoid potential TypeScript typing issues with `crypto.randomUUID()`
- * across different environments and `tsconfig.json` settings.
- */
-const generateUUID = (): string => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
+import ChatPanel from './components/ChatPanel';
+import { generateUUID, generateMarkdownFromGraph } from './utils';
 
 
 // --- Storage Keys ---
@@ -401,75 +387,6 @@ const OpenModelModal: React.FC<OpenModelModalProps> = ({ models, onLoad, onClose
 };
 
 
-const generateMarkdownFromGraph = (elements: Element[], relationships: Relationship[]): string => {
-  const elementMap = new Map(elements.map(f => [f.id, f]));
-  const handledElementIds = new Set<string>();
-  const lines: string[] = [];
-
-  const formatElement = (element: Element) => {
-    // Quote name if it contains characters that could be ambiguous for the parser.
-    const needsQuotes = /[():]/.test(element.name);
-    let str = needsQuotes ? `"${element.name}"` : element.name;
-
-    if (element.type && element.type !== 'Default') {
-      str += `(${element.type})`;
-    }
-    if (element.tags && element.tags.length > 0) {
-      str += `:${element.tags.join(',')}`;
-    }
-    return str;
-  };
-
-  // Group relationships by source, label, and direction to handle one-to-many syntax
-  const relGroups = new Map<string, string[]>(); // key: `sourceId:label:direction`, value: formatted target strings
-  relationships.forEach(rel => {
-      const source = elementMap.get(rel.source as string);
-      const target = elementMap.get(rel.target as string);
-      if (!source || !target) return;
-
-      const key = `${source.id}:${rel.label}:${rel.direction}`;
-      if (!relGroups.has(key)) {
-          relGroups.set(key, []);
-      }
-      relGroups.get(key)!.push(formatElement(target));
-
-      handledElementIds.add(source.id);
-      handledElementIds.add(target.id);
-  });
-
-  relGroups.forEach((targetStrs, key) => {
-      const [sourceId, label, direction] = key.split(':');
-      const source = elementMap.get(sourceId)!;
-      const sourceStr = formatElement(source);
-
-      let connector = '';
-      switch (direction as RelationshipDirection) {
-        case RelationshipDirection.From:
-          connector = ` <-[${label}]- `;
-          break;
-        case RelationshipDirection.None:
-          connector = ` -[${label}]- `;
-          break;
-        case RelationshipDirection.To:
-        default:
-          connector = ` -[${label}]-> `;
-          break;
-      }
-      lines.push(`${sourceStr}${connector}${targetStrs.join('; ')}`);
-  });
-
-
-  // Add elements that have no relationships
-  elements.forEach(element => {
-    if (!handledElementIds.has(element.id)) {
-      lines.push(formatElement(element));
-    }
-  });
-
-  return lines.join('\n');
-};
-
-
 // --- Main App Component ---
 
 export default function App() {
@@ -502,6 +419,7 @@ export default function App() {
   const [isMarkdownPanelOpen, setIsMarkdownPanelOpen] = useState(false);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isReportPanelOpen, setIsReportPanelOpen] = useState(false);
+  const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
   
   const [tagFilter, setTagFilter] = useState<{ included: Set<string>, excluded: Set<string> }>({
     included: new Set(),
@@ -1260,6 +1178,11 @@ export default function App() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
         </button>
+        <button onClick={() => setIsChatPanelOpen(prev => !prev)} title="AI Assistant" className="p-2 rounded-md hover:bg-gray-700 transition">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            </svg>
+        </button>
         <button onClick={handleZoomToFit} title="Zoom to Fit" className="p-2 rounded-md hover:bg-gray-700 transition">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
@@ -1304,6 +1227,14 @@ export default function App() {
             initialText={generateMarkdownFromGraph(elements, relationships)}
             onApply={handleApplyMarkdown}
             onClose={() => setIsMarkdownPanelOpen(false)}
+        />
+      )}
+      
+      {isChatPanelOpen && (
+        <ChatPanel
+            elements={elements}
+            relationships={relationships}
+            onClose={() => setIsChatPanelOpen(false)}
         />
       )}
 

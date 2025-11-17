@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Element, Relationship, RelationshipDirection } from '../types';
-import ElementEditor from './FactEditor';
+import ElementEditor from './ElementEditor';
 
 // Define a type for the data needed to create a new element.
 type NewElementData = Omit<Element, 'id' | 'createdAt' | 'updatedAt'>;

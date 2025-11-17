@@ -159,11 +159,13 @@ const createDragHandler = (
 
 const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>) => {
   function dragstarted(event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
-    // FIX: Correctly "reheat" the simulation on drag start. Chaining alphaTarget and restart
-    // is the idiomatic D3 pattern and also resolves a TypeScript error from faulty type
-    // definitions where restart() is incorrectly expected to have an argument.
+    // Correctly "reheat" the simulation on drag start. Chaining alphaTarget and restart
+    // is the idiomatic D3 pattern.
     if (!event.active) {
-      simulation.alphaTarget(0.3).restart();
+      // The type definitions for d3-force's restart() method are faulty in some versions of @types/d3,
+      // incorrectly expecting an argument. Casting the result of alphaTarget() to `any` before
+      // calling restart() bypasses the faulty type check and resolves the error.
+      (simulation.alphaTarget(0.3) as any).restart();
     }
     d.fx = d.x;
     d.fy = d.y;
@@ -428,8 +430,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       });
 
     // FIX: Using .each() with native element .remove() to work around a d3.selection.remove() typing issue
-    // that incorrectly expects an argument.
-    node.selectAll('*').each(function() { (this as Element).remove(); }); // Re-render content to reflect data changes
+    // that incorrectly expects an argument. The cast to `SVGElement` resolves name collision with the app's `Element` type.
+    node.selectAll('*').each(function() { (this as SVGElement).remove(); }); // Re-render content to reflect data changes
 
     node.append('rect')
         .attr('fill', d => {
@@ -506,9 +508,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .force('center', d3.forceCenter(width / 2, height / 2));
 
       node.style('cursor', 'grab');
-      // FIX: The restart() method has faulty type definitions, so we cast to 'any' to bypass the check.
-      // The previous code had a redundant drag handler definition. This is now cleaned up.
-      const physicsDragHandler = createPhysicsDragHandler(simulation as any);
+      // The restart() method has faulty type definitions, so we cast to 'any' to bypass the check.
+      const physicsDragHandler = createPhysicsDragHandler(simulation);
       node.call(physicsDragHandler as any);
     } else {
       simulation
@@ -541,7 +542,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       node.attr('transform', d => `translate(${d.x},${d.y})`);
     });
     
-    simulation.alpha(0.3).restart();
+    // Fix: The restart() method has faulty type definitions in @types/d3, expecting
+    // an argument. Casting the result of alpha() to `any` bypasses this check.
+    (simulation.alpha(0.3) as any).restart();
 
     const zoom = d3.zoom<SVGSVGElement, unknown>().on('zoom', (event) => {
       g.attr('transform', event.transform);
