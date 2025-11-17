@@ -1,3 +1,5 @@
+
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState } from './types';
 import { DEFAULT_COLOR_SCHEMES } from './constants';
@@ -1230,13 +1232,14 @@ export default function App() {
         />
       )}
       
-      {isChatPanelOpen && (
-        <ChatPanel
-            elements={elements}
-            relationships={relationships}
-            onClose={() => setIsChatPanelOpen(false)}
-        />
-      )}
+      <ChatPanel
+          className={!isChatPanelOpen ? 'hidden' : ''}
+          isOpen={isChatPanelOpen}
+          elements={elements}
+          relationships={relationships}
+          onClose={() => setIsChatPanelOpen(false)}
+          currentModelId={currentModelId}
+      />
 
       {currentModelId ? (
         <GraphCanvas

@@ -120,11 +120,8 @@ const createDragHandler = (
         // element's .remove() method. This works around a typing issue in some versions
         // of @types/d3 where .remove() is incorrectly declared to require an argument.
         d3.select(this.ownerSVGElement).select('.temp-drag-line').each(function() {
-            // FIX: Add type guard to ensure `this` is an Element with a parentNode before removing.
-            // This resolves the "Property 'parentNode' does not exist on type 'BaseType'" error.
-            if (this instanceof Element && this.parentNode) {
-              this.parentNode.removeChild(this);
-            }
+            // FIX: Cast `this` to SVGElement to resolve a name collision with the app's `Element` type.
+            (this as SVGElement).remove();
         });
     }
 
@@ -162,8 +159,8 @@ const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>) => 
     // Correctly "reheat" the simulation on drag start. Chaining alphaTarget and restart
     // is the idiomatic D3 pattern.
     if (!event.active) {
-      // The type definitions for d3-force's restart() method are faulty in some versions of @types/d3,
-      // incorrectly expecting an argument. Casting the result of alphaTarget() to `any` before
+      // FIX: The type definitions for d3-force's restart() method are faulty in some versions of @types/d3,
+      // incorrectly expecting an argument. Casting the simulation to `any`
       // calling restart() bypasses the faulty type check and resolves the error.
       (simulation.alphaTarget(0.3) as any).restart();
     }
