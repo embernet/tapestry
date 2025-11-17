@@ -870,7 +870,10 @@ export default function App() {
   };
 
   const handleApplyMarkdown = (markdown: string) => {
-    const lines = markdown.split('\n').filter(line => line.trim() !== '');
+    const lines = markdown.split('\n').filter(line => {
+      const trimmed = line.trim();
+      return trimmed !== '' && !trimmed.startsWith('#');
+    });
     
     const parsedElements = new Map<string, { type: string, tags: string[] }>();
     const parsedRels: { sourceName: string, targetName: string, label: string, direction: RelationshipDirection }[] = [];
@@ -1229,6 +1232,7 @@ export default function App() {
             initialText={generateMarkdownFromGraph(elements, relationships)}
             onApply={handleApplyMarkdown}
             onClose={() => setIsMarkdownPanelOpen(false)}
+            modelName={currentModelName}
         />
       )}
       

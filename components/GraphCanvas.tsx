@@ -116,13 +116,10 @@ const createDragHandler = (
     
     // Clean up temporary line from connect drag
     if (!isMoving) {
-        // Fix: Replace d3.selection.remove() with an .each() loop to call the native
-        // element's .remove() method. This works around a typing issue in some versions
-        // of @types/d3 where .remove() is incorrectly declared to require an argument.
-        d3.select(this.ownerSVGElement).select('.temp-drag-line').each(function() {
-            // FIX: Cast `this` to SVGElement to resolve a name collision with the app's `Element` type.
-            (this as SVGElement).remove();
-        });
+        // FIX: The type definitions for d3.selection.remove() are faulty in some versions
+        // of @types/d3, incorrectly expecting an argument. Casting the selection to `any`
+        // before calling remove() bypasses the faulty type check.
+        (d3.select(this.ownerSVGElement).select('.temp-drag-line') as any).remove();
     }
 
     const isClick = Math.abs(event.x - event.subject.x) < 5 && Math.abs(event.y - event.subject.y) < 5;

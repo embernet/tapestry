@@ -1,10 +1,12 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 
 interface MarkdownPanelProps {
   initialText: string;
   onApply: (text: string) => void;
   onClose: () => void;
+  modelName: string;
 }
 
 interface ImportMarkdownModalProps {
@@ -64,7 +66,7 @@ const ImportMarkdownModal: React.FC<ImportMarkdownModalProps> = ({ onClose, onSe
 };
 
 
-const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onClose }) => {
+const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onClose, modelName }) => {
   const [text, setText] = useState(initialText);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
@@ -83,7 +85,8 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'tapestry-export.md');
+    const filename = modelName && modelName !== 'Loading...' ? `${modelName.replace(/ /g, '_')}.md` : 'tapestry-export.md';
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -152,7 +155,7 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
             value={text}
             onChange={(e) => setText(e.target.value)}
             className="w-full h-full flex-grow bg-gray-900 border border-gray-600 rounded-md p-4 text-white font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder={`Element with spaces (Type):tag -[label]-> Another Element\nElement A -[rel]-> Element B; Element C`}
+            placeholder={`# This is a comment and will be ignored.\nElement with spaces (Type):tag -[label]-> Another Element\nElement A -[rel]-> Element B; Element C`}
           />
       </div>
       
