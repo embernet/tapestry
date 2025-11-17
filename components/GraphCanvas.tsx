@@ -1,25 +1,24 @@
-
-
-import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
 import * as d3 from 'd3';
-import { Fact, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection } from '../types';
+import { Element, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection } from '../types';
 import { LINK_DISTANCE, NODE_MAX_WIDTH, NODE_PADDING, DEFAULT_NODE_COLOR } from '../constants';
 
 interface GraphCanvasProps {
-  facts: Fact[];
+  elements: Element[];
   relationships: Relationship[];
-  onNodeClick: (factId: string) => void;
+  onNodeClick: (elementId: string) => void;
   onLinkClick: (relationshipId: string) => void;
   onCanvasClick: () => void;
   onCanvasDoubleClick: (coords: { x: number, y: number }) => void;
-  onNodeContextMenu: (event: React.MouseEvent, factId: string) => void;
+  onNodeContextMenu: (event: React.MouseEvent, elementId: string) => void;
+  onCanvasContextMenu: (event: React.MouseEvent) => void;
   onNodeConnect: (sourceId: string, targetId: string) => void;
   onNodeConnectToNew: (sourceId: string, coords: { x: number, y: number }) => void;
   activeColorScheme: ColorScheme | undefined;
-  selectedFactId: string | null;
+  selectedElementId: string | null;
   selectedRelationshipId: string | null;
-  focusMode: 'narrow' | 'wide';
-  setFacts: React.Dispatch<React.SetStateAction<Fact[]>>;
+  focusMode: 'narrow' | 'wide' | 'zoom';
+  setElements: React.Dispatch<React.SetStateAction<Element[]>>;
   isPhysicsModeActive: boolean;
 }
 
@@ -69,8 +68,8 @@ function getRectIntersection(sNode: D3Node, tNode: D3Node) {
 }
 
 const createDragHandler = (
-  setFactsState: React.Dispatch<React.SetStateAction<Fact[]>>,
-  onNodeClickCallback: (factId: string) => void,
+  setElementsState: React.Dispatch<React.SetStateAction<Element[]>>,
+  onNodeClickCallback: (elementId: string) => void,
   onNodeConnectCallback: (sourceId: string, targetId: string) => void,
   onNodeConnectToNew: (sourceId: string, coords: { x: number, y: number }) => void
 ) => {
@@ -113,12 +112,20 @@ const createDragHandler = (
     // FIX: Unconditionally persist the node's final position to React state.
     // This is the single source of truth and prevents the "spring back" bug by
     // ensuring React and D3 are synchronized after any drag operation.
-    setFactsState(prev => prev.map(f => f.id === d.id ? { ...f, fx: d.fx, fy: d.fy } : f));
+    setElementsState(prev => prev.map(e => e.id === d.id ? { ...e, fx: d.fx, fy: d.fy } : e));
     
     // Clean up temporary line from connect drag
     if (!isMoving) {
-        // FIX: The provided error message at line 205 is likely incorrect. The comment here points to a history of TypeScript errors with this line. Using `.node()?.remove()` is a more robust way to handle removing the element, addressing the likely underlying instability.
-        d3.select(this.ownerSVGElement).select('.temp-drag-line').remove();
+        // Fix: Replace d3.selection.remove() with an .each() loop to call the native
+        // element's .remove() method. This works around a typing issue in some versions
+        // of @types/d3 where .remove() is incorrectly declared to require an argument.
+        d3.select(this.ownerSVGElement).select('.temp-drag-line').each(function() {
+            // FIX: Add type guard to ensure `this` is an Element with a parentNode before removing.
+            // This resolves the "Property 'parentNode' does not exist on type 'BaseType'" error.
+            if (this instanceof Element && this.parentNode) {
+              this.parentNode.removeChild(this);
+            }
+        });
     }
 
     const isClick = Math.abs(event.x - event.subject.x) < 5 && Math.abs(event.y - event.subject.y) < 5;
@@ -131,14 +138,14 @@ const createDragHandler = (
     // It was a drag, not a click. Handle connect logic if necessary.
     if (!isMoving) {
         // Finalize the connect drag by checking the mouseup event's target.
-        const dropTargetElement = event.sourceEvent.target as Element;
+        const dropTargetElement = event.sourceEvent.target as HTMLElement;
         const dropNodeSelection = d3.select(dropTargetElement?.closest('.node'));
 
         // Check if the drop target is a valid, different node.
         if (!dropNodeSelection.empty() && (dropNodeSelection.datum() as D3Node).id !== d.id) {
             onNodeConnectCallback(d.id, (dropNodeSelection.datum() as D3Node).id);
         } else {
-            // Otherwise, treat it as a drop on the canvas to create a new fact.
+            // Otherwise, treat it as a drop on the canvas to create a new element.
             onNodeConnectToNew(d.id, { x: event.x, y: event.y });
         }
     }
@@ -152,11 +159,11 @@ const createDragHandler = (
 
 const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>) => {
   function dragstarted(event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
-    // FIX: Re-chained alphaTarget and restart calls. De-chaining did not resolve the
-    // TypeScript error and chaining is the idiomatic D3 pattern.
+    // FIX: Correctly "reheat" the simulation on drag start. Chaining alphaTarget and restart
+    // is the idiomatic D3 pattern and also resolves a TypeScript error from faulty type
+    // definitions where restart() is incorrectly expected to have an argument.
     if (!event.active) {
-      simulation.alphaTarget(0.3);
-      simulation.restart();
+      simulation.alphaTarget(0.3).restart();
     }
     d.fx = d.x;
     d.fy = d.y;
@@ -180,20 +187,21 @@ const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>) => 
 
 
 const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
-  facts,
+  elements,
   relationships,
   onNodeClick,
   onLinkClick,
   onCanvasClick,
   onCanvasDoubleClick,
   onNodeContextMenu,
+  onCanvasContextMenu,
   onNodeConnect,
   onNodeConnectToNew,
   activeColorScheme,
-  selectedFactId,
+  selectedElementId,
   selectedRelationshipId,
   focusMode,
-  setFacts,
+  setElements,
   isPhysicsModeActive
 }, ref) => {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -201,6 +209,52 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   const simulationRef = useRef<d3.Simulation<D3Node, D3Link> | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown>>();
   
+  const zoomToFit = (nodesToFit?: D3Node[], limitMaxZoom = false) => {
+    if (!svgRef.current || !gRef.current || !simulationRef.current || !zoomRef.current) return;
+
+    const svg = d3.select(svgRef.current);
+    const nodes = nodesToFit || simulationRef.current.nodes();
+
+    if (nodes.length === 0) return;
+
+    const { width, height } = svgRef.current.getBoundingClientRect();
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    nodes.forEach(node => {
+      const nodeWidth = node.width || NODE_MAX_WIDTH;
+      const nodeHeight = node.height || 80;
+      minX = Math.min(minX, (node.x || 0) - nodeWidth / 2);
+      minY = Math.min(minY, (node.y || 0) - nodeHeight / 2);
+      maxX = Math.max(maxX, (node.x || 0) + nodeWidth / 2);
+      maxY = Math.max(maxY, (node.y || 0) + nodeHeight / 2);
+    });
+
+    const boundsWidth = maxX - minX;
+    const boundsHeight = maxY - minY;
+
+    if (boundsWidth <= 0 || boundsHeight <= 0) return;
+
+    const padding = 0.9;
+    let scale = padding * Math.min(width / boundsWidth, height / boundsHeight);
+    
+    if (limitMaxZoom && scale > 1) {
+      scale = 1;
+    }
+    
+    const translateX = width / 2 - scale * (minX + boundsWidth / 2);
+    const translateY = height / 2 - scale * (minY + boundsHeight / 2);
+    
+    const transform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
+
+    svg.transition()
+       .duration(750)
+       .call(zoomRef.current.transform as any, transform);
+  };
+
   useImperativeHandle(ref, () => ({
     getFinalNodePositions: () => {
       if (simulationRef.current) {
@@ -212,48 +266,45 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       }
       return [];
     },
-    zoomToFit: () => {
-      if (!svgRef.current || !gRef.current || !simulationRef.current || !zoomRef.current) return;
-
-      const svg = d3.select(svgRef.current);
-      const nodes = simulationRef.current.nodes();
-
-      if (nodes.length === 0) return;
-
-      const { width, height } = svgRef.current.getBoundingClientRect();
-
-      let minX = Infinity;
-      let minY = Infinity;
-      let maxX = -Infinity;
-      let maxY = -Infinity;
-
-      nodes.forEach(node => {
-        const nodeWidth = node.width || NODE_MAX_WIDTH;
-        const nodeHeight = node.height || 80;
-        minX = Math.min(minX, (node.x || 0) - nodeWidth / 2);
-        minY = Math.min(minY, (node.y || 0) - nodeHeight / 2);
-        maxX = Math.max(maxX, (node.x || 0) + nodeWidth / 2);
-        maxY = Math.max(maxY, (node.y || 0) + nodeHeight / 2);
-      });
-
-      const boundsWidth = maxX - minX;
-      const boundsHeight = maxY - minY;
-
-      if (boundsWidth <= 0 || boundsHeight <= 0) return;
-
-      const padding = 0.9;
-      const scale = padding * Math.min(width / boundsWidth, height / boundsHeight);
-      
-      const translateX = width / 2 - scale * (minX + boundsWidth / 2);
-      const translateY = height / 2 - scale * (minY + boundsHeight / 2);
-      
-      const transform = d3.zoomIdentity.translate(translateX, translateY).scale(scale);
-
-      svg.transition()
-         .duration(750)
-         .call(zoomRef.current.transform as any, transform);
-    }
+    zoomToFit: () => zoomToFit(),
   }));
+
+  const highlightedNodeIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (selectedElementId) {
+        ids.add(selectedElementId);
+        relationships.forEach(rel => {
+            if (rel.source === selectedElementId) ids.add(rel.target as string);
+            if (rel.target === selectedElementId) ids.add(rel.source as string);
+        });
+    } else if (selectedRelationshipId) {
+        const rel = relationships.find(r => r.id === selectedRelationshipId);
+        if (rel) {
+            ids.add(rel.source as string);
+            ids.add(rel.target as string);
+        }
+    }
+    return ids;
+  }, [selectedElementId, selectedRelationshipId, relationships]);
+
+  useEffect(() => {
+    if (focusMode === 'zoom' && highlightedNodeIds.size > 0 && simulationRef.current) {
+        const nodesToFit = simulationRef.current.nodes().filter(n => highlightedNodeIds.has(n.id));
+        if (nodesToFit.length > 0) {
+            zoomToFit(nodesToFit, true);
+        }
+    }
+  }, [focusMode, highlightedNodeIds]);
+
+  const handleCanvasContextMenu = (event: React.MouseEvent) => {
+    // Prevent context menu if the target is a node or link
+    const target = event.target as HTMLElement;
+    if (target.closest('.node') || target.closest('.link-label-group')) {
+        // Let the node/link's own D3 context menu handler take over
+        return;
+    }
+    onCanvasContextMenu(event);
+  };
 
   useEffect(() => {
     if (!svgRef.current || !gRef.current) return;
@@ -282,37 +333,22 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     const simulation = simulationRef.current;
     
     const existingNodesMap = new Map(simulation.nodes().map(node => [node.id, node]));
-    const d3Nodes = facts.map(fact => {
-      const existingNode = existingNodesMap.get(fact.id);
+    const d3Nodes = elements.map(element => {
+      const existingNode = existingNodesMap.get(element.id);
       if (existingNode) {
         // Update existing D3 node with new data from React state, preserving simulation properties
-        return Object.assign(existingNode, fact);
+        return Object.assign(existingNode, element);
       } else {
-        // Create a new D3 node for a new fact
+        // Create a new D3 node for a new element
         return {
-            ...fact,
-            x: fact.x ?? width / 2,
-            y: fact.y ?? height / 2,
+            ...element,
+            x: element.x ?? width / 2,
+            y: element.y ?? height / 2,
         };
       }
     });
 
     const d3Links: D3Link[] = relationships.map(rel => ({ ...rel, source: rel.source, target: rel.target }));
-
-    const highlightedNodeIds = new Set<string>();
-    if (selectedFactId) {
-      highlightedNodeIds.add(selectedFactId);
-      relationships.forEach(rel => {
-        if (rel.source === selectedFactId) highlightedNodeIds.add(rel.target as string);
-        if (rel.target === selectedFactId) highlightedNodeIds.add(rel.source as string);
-      });
-    } else if (selectedRelationshipId) {
-      const rel = relationships.find(r => r.id === selectedRelationshipId);
-      if (rel) {
-        highlightedNodeIds.add(rel.source as string);
-        highlightedNodeIds.add(rel.target as string);
-      }
-    }
 
     simulation.nodes(d3Nodes);
     
@@ -328,11 +364,11 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .style('transition', 'opacity 0.3s ease, stroke 0.2s ease, stroke-width 0.2s ease')
       .attr('opacity', l => {
         if (focusMode === 'narrow') return 1.0;
-        if (!selectedFactId && !selectedRelationshipId) return 1.0;
+        if (!selectedElementId && !selectedRelationshipId) return 1.0;
         if (selectedRelationshipId) return l.id === selectedRelationshipId ? 1.0 : 0.2;
         const sourceId = typeof l.source === 'object' ? (l.source as D3Node).id : l.source;
         const targetId = typeof l.target === 'object' ? (l.target as D3Node).id : l.target;
-        return (sourceId === selectedFactId || targetId === selectedFactId) ? 1.0 : 0.2;
+        return (sourceId === selectedElementId || targetId === selectedElementId) ? 1.0 : 0.2;
       })
       .on('click', (event, d) => {
         event.stopPropagation();
@@ -372,11 +408,11 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .style('fill', d => (d.id === selectedRelationshipId ? '#60a5fa' : '#9ca3af'))
       .attr('opacity', l => {
         if (focusMode === 'narrow') return 1.0;
-        if (!selectedFactId && !selectedRelationshipId) return 1.0;
+        if (!selectedElementId && !selectedRelationshipId) return 1.0;
         if (selectedRelationshipId) return l.id === selectedRelationshipId ? 1.0 : 0.2;
         const sourceId = typeof l.source === 'object' ? (l.source as D3Node).id : l.source;
         const targetId = typeof l.target === 'object' ? (l.target as D3Node).id : l.target;
-        return (sourceId === selectedFactId || targetId === selectedFactId) ? 1.0 : 0.2;
+        return (sourceId === selectedElementId || targetId === selectedElementId) ? 1.0 : 0.2;
       });
 
 
@@ -388,10 +424,12 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .style('transition', 'opacity 0.3s ease')
       .attr('opacity', d => {
           if (focusMode === 'narrow') return 1.0;
-          return ((!selectedFactId && !selectedRelationshipId) || highlightedNodeIds.has(d.id)) ? 1.0 : 0.2;
+          return ((!selectedElementId && !selectedRelationshipId) || highlightedNodeIds.has(d.id)) ? 1.0 : 0.2;
       });
 
-    node.selectAll('*').remove(); // Re-render content to reflect data changes
+    // FIX: Using .each() with native element .remove() to work around a d3.selection.remove() typing issue
+    // that incorrectly expects an argument.
+    node.selectAll('*').each(function() { (this as Element).remove(); }); // Re-render content to reflect data changes
 
     node.append('rect')
         .attr('fill', d => {
@@ -404,16 +442,16 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
             }
             return DEFAULT_NODE_COLOR;
         })
-        .attr('stroke', d => (d.id === selectedFactId ? '#60a5fa' : '#cbd5e1'))
+        .attr('stroke', d => (d.id === selectedElementId ? '#60a5fa' : '#cbd5e1'))
         .style('transition', 'stroke 0.2s ease, stroke-width 0.2s ease')
-        .attr('stroke-width', d => (d.id === selectedFactId ? 3 : 1.5))
+        .attr('stroke-width', d => (d.id === selectedElementId ? 3 : 1.5))
         .attr('rx', 8).attr('ry', 8);
 
     node.append('foreignObject')
         .attr('width', NODE_MAX_WIDTH)
         .attr('pointer-events', 'none')
         .append('xhtml:div')
-        .style('width', `${NODE_MAX_WIDTH - NODE_PADDING * 2}px`)
+        .style('width', '100%')
         .style('height', '100%')
         .style('min-height', '80px')
         .style('display', 'flex').style('justify-content', 'center').style('align-items', 'center')
@@ -468,7 +506,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .force('center', d3.forceCenter(width / 2, height / 2));
 
       node.style('cursor', 'grab');
-      const physicsDragHandler = createPhysicsDragHandler(simulation);
+      // FIX: The restart() method has faulty type definitions, so we cast to 'any' to bypass the check.
+      // The previous code had a redundant drag handler definition. This is now cleaned up.
+      const physicsDragHandler = createPhysicsDragHandler(simulation as any);
       node.call(physicsDragHandler as any);
     } else {
       simulation
@@ -477,7 +517,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .force('center', null);
         
       node.style('cursor', 'crosshair');
-      const staticDragHandler = createDragHandler(setFacts, onNodeClick, onNodeConnect, onNodeConnectToNew);
+      const staticDragHandler = createDragHandler(setElements, onNodeClick, onNodeConnect, onNodeConnectToNew);
       node.call(staticDragHandler);
     }
 
@@ -517,10 +557,10 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         onCanvasDoubleClick({x, y});
       });
 
-  }, [facts, relationships, activeColorScheme, selectedFactId, selectedRelationshipId, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, setFacts, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive]);
+  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu]);
 
   return (
-    <div className="w-full h-full flex-grow bg-gray-900 cursor-grab active:cursor-grabbing">
+    <div className="w-full h-full flex-grow bg-gray-900 cursor-grab active:cursor-grabbing" onContextMenu={handleCanvasContextMenu}>
       <svg ref={svgRef} className="w-full h-full">
         <defs>
           <marker

@@ -1,29 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { Fact } from '../types';
+import { Element } from '../types';
 
-interface FactEditorProps {
-  factData: Partial<Fact>;
-  onDataChange: (updatedData: Partial<Fact>) => void;
+interface ElementEditorProps {
+  elementData: Partial<Element>;
+  onDataChange: (updatedData: Partial<Element>) => void;
   onBlur?: () => void;
   nameInputRef?: React.RefObject<HTMLInputElement>;
 }
 
-const FactEditor: React.FC<FactEditorProps> = ({ factData, onDataChange, onBlur, nameInputRef }) => {
+const ElementEditor: React.FC<ElementEditorProps> = ({ elementData, onDataChange, onBlur, nameInputRef }) => {
   const [tagsInput, setTagsInput] = useState('');
 
   useEffect(() => {
-    setTagsInput(factData.tags?.join(', ') || '');
-  }, [factData.tags]);
+    setTagsInput(elementData.tags?.join(', ') || '');
+  }, [elementData.tags]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    onDataChange({ ...factData, [name]: value });
+    onDataChange({ ...elementData, [name]: value });
   };
 
   const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTagsInput(e.target.value);
     const tags = e.target.value.split(',').map(tag => tag.trim()).filter(Boolean);
-    onDataChange({ ...factData, tags });
+    onDataChange({ ...elementData, tags });
   };
 
   return (
@@ -34,7 +34,7 @@ const FactEditor: React.FC<FactEditorProps> = ({ factData, onDataChange, onBlur,
           ref={nameInputRef}
           type="text"
           name="name"
-          value={factData.name || ''}
+          value={elementData.name || ''}
           onChange={handleInputChange}
           onBlur={onBlur}
           className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -45,7 +45,7 @@ const FactEditor: React.FC<FactEditorProps> = ({ factData, onDataChange, onBlur,
         <input
           type="text"
           name="type"
-          value={factData.type || ''}
+          value={elementData.type || ''}
           onChange={handleInputChange}
           onBlur={onBlur}
           className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -56,7 +56,7 @@ const FactEditor: React.FC<FactEditorProps> = ({ factData, onDataChange, onBlur,
         <textarea
           name="notes"
           rows={4}
-          value={factData.notes || ''}
+          value={elementData.notes || ''}
           onChange={handleInputChange}
           onBlur={onBlur}
           className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -77,4 +77,4 @@ const FactEditor: React.FC<FactEditorProps> = ({ factData, onDataChange, onBlur,
   );
 };
 
-export default FactEditor;
+export default ElementEditor;

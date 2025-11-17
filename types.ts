@@ -9,14 +9,14 @@ export enum RelationshipDirection {
 
 export interface Relationship {
   id: string;
-  source: string; // Fact ID
-  target: string; // Fact ID
+  source: string; // Element ID
+  target: string; // Element ID
   label: string;
   direction: RelationshipDirection;
   tags: string[];
 }
 
-export interface Fact {
+export interface Element {
   id:string;
   name: string;
   type: string;
@@ -36,7 +36,7 @@ export interface ColorScheme {
   tagColors: { [tag: string]: string };
 }
 
-export type D3Node = Fact & d3.SimulationNodeDatum & {
+export type D3Node = Element & d3.SimulationNodeDatum & {
   width?: number;
   height?: number;
 };
@@ -59,7 +59,7 @@ export interface ModelMetadata {
 
 export interface PanelState {
   view: 'details' | 'addRelationship';
-  sourceFactId: string | null;
-  targetFactId: string | null;
+  sourceElementId: string | null;
+  targetElementId: string | null;
   isNewTarget?: boolean;
 }

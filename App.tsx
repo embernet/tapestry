@@ -1,14 +1,16 @@
 
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Fact, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState } from './types';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState } from './types';
 import { DEFAULT_COLOR_SCHEMES } from './constants';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
-import FactDetailsPanel from './components/FactDetailsPanel';
+import ElementDetailsPanel from './components/FactDetailsPanel';
 import RelationshipDetailsPanel from './components/RelationshipDetailsPanel';
 import AddRelationshipPanel from './components/AddRelationshipPanel';
 import MarkdownPanel from './components/MarkdownPanel';
 import FilterPanel from './components/FilterPanel';
-import ReportPanel from './components/ReportPanel';
+// Fix: Changed to a named import to resolve module resolution error.
+import { ReportPanel } from './components/ReportPanel';
 
 /**
  * A simple UUID v4 generator.
@@ -50,15 +52,15 @@ const useClickOutside = <T extends HTMLElement,>(ref: React.RefObject<T>, handle
 
 // --- Helper Components defined in App.tsx to reduce file count ---
 
-// ContextMenu Component
+// Node ContextMenu Component
 interface ContextMenuProps {
   x: number;
   y: number;
   onAddRelationship: () => void;
-  onDeleteFact: () => void;
+  onDeleteElement: () => void;
   onClose: () => void;
 }
-const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onAddRelationship, onDeleteFact, onClose }) => {
+const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onAddRelationship, onDeleteElement, onClose }) => {
   const menuRef = React.useRef<HTMLDivElement>(null);
   useClickOutside(menuRef, onClose);
 
@@ -71,9 +73,55 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onAddRelationship, onDe
       <button onClick={onAddRelationship} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700">
         Add Relationship
       </button>
-      <button onClick={onDeleteFact} className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700">
-        Delete Fact
+      <button onClick={onDeleteElement} className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700">
+        Delete Element
       </button>
+    </div>
+  );
+};
+
+
+// Canvas ContextMenu Component
+interface CanvasContextMenuProps {
+  x: number;
+  y: number;
+  onClose: () => void;
+  onZoomToFit: () => void;
+  onAutoLayout: () => void;
+  onToggleReport: () => void;
+  onToggleMarkdown: () => void;
+  onToggleFilter: () => void;
+  onOpenModel: () => void;
+  onCreateModel: () => void;
+  isReportOpen: boolean;
+  isMarkdownOpen: boolean;
+  isFilterOpen: boolean;
+}
+const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ x, y, onClose, onZoomToFit, onAutoLayout, onToggleReport, onToggleMarkdown, onToggleFilter, onOpenModel, onCreateModel, isReportOpen, isMarkdownOpen, isFilterOpen }) => {
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  useClickOutside(menuRef, onClose);
+
+  // Combine handlers with onClose to close the menu after an action
+  const createHandler = (handler: () => void) => () => {
+    handler();
+    onClose();
+  };
+
+  return (
+    <div
+      ref={menuRef}
+      className="absolute bg-gray-800 border border-gray-600 rounded-md shadow-lg py-2 z-50 text-white text-sm"
+      style={{ top: y, left: x }}
+    >
+      <button onClick={createHandler(onZoomToFit)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Zoom to Fit</button>
+      <button onClick={createHandler(onAutoLayout)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Auto-Layout</button>
+      <div className="border-t border-gray-600 my-1"></div>
+      <button onClick={createHandler(onToggleReport)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isReportOpen ? 'Hide' : 'Show'} Report View</button>
+      <button onClick={createHandler(onToggleMarkdown)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isMarkdownOpen ? 'Hide' : 'Show'} Markdown View</button>
+      <button onClick={createHandler(onToggleFilter)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isFilterOpen ? 'Hide' : 'Show'} Filter</button>
+      <div className="border-t border-gray-600 my-1"></div>
+      <button onClick={createHandler(onOpenModel)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Open Model...</button>
+      <button onClick={createHandler(onCreateModel)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Create New Model...</button>
     </div>
   );
 };
@@ -353,21 +401,21 @@ const OpenModelModal: React.FC<OpenModelModalProps> = ({ models, onLoad, onClose
 };
 
 
-const generateMarkdownFromGraph = (facts: Fact[], relationships: Relationship[]): string => {
-  const factMap = new Map(facts.map(f => [f.id, f]));
-  const handledFactIds = new Set<string>();
+const generateMarkdownFromGraph = (elements: Element[], relationships: Relationship[]): string => {
+  const elementMap = new Map(elements.map(f => [f.id, f]));
+  const handledElementIds = new Set<string>();
   const lines: string[] = [];
 
-  const formatFact = (fact: Fact) => {
+  const formatElement = (element: Element) => {
     // Quote name if it contains characters that could be ambiguous for the parser.
-    const needsQuotes = /[():]/.test(fact.name);
-    let str = needsQuotes ? `"${fact.name}"` : fact.name;
+    const needsQuotes = /[():]/.test(element.name);
+    let str = needsQuotes ? `"${element.name}"` : element.name;
 
-    if (fact.type && fact.type !== 'Default') {
-      str += `(${fact.type})`;
+    if (element.type && element.type !== 'Default') {
+      str += `(${element.type})`;
     }
-    if (fact.tags && fact.tags.length > 0) {
-      str += `:${fact.tags.join(',')}`;
+    if (element.tags && element.tags.length > 0) {
+      str += `:${element.tags.join(',')}`;
     }
     return str;
   };
@@ -375,24 +423,24 @@ const generateMarkdownFromGraph = (facts: Fact[], relationships: Relationship[])
   // Group relationships by source, label, and direction to handle one-to-many syntax
   const relGroups = new Map<string, string[]>(); // key: `sourceId:label:direction`, value: formatted target strings
   relationships.forEach(rel => {
-      const source = factMap.get(rel.source as string);
-      const target = factMap.get(rel.target as string);
+      const source = elementMap.get(rel.source as string);
+      const target = elementMap.get(rel.target as string);
       if (!source || !target) return;
 
       const key = `${source.id}:${rel.label}:${rel.direction}`;
       if (!relGroups.has(key)) {
           relGroups.set(key, []);
       }
-      relGroups.get(key)!.push(formatFact(target));
+      relGroups.get(key)!.push(formatElement(target));
 
-      handledFactIds.add(source.id);
-      handledFactIds.add(target.id);
+      handledElementIds.add(source.id);
+      handledElementIds.add(target.id);
   });
 
   relGroups.forEach((targetStrs, key) => {
       const [sourceId, label, direction] = key.split(':');
-      const source = factMap.get(sourceId)!;
-      const sourceStr = formatFact(source);
+      const source = elementMap.get(sourceId)!;
+      const sourceStr = formatElement(source);
 
       let connector = '';
       switch (direction as RelationshipDirection) {
@@ -411,10 +459,10 @@ const generateMarkdownFromGraph = (facts: Fact[], relationships: Relationship[])
   });
 
 
-  // Add facts that have no relationships
-  facts.forEach(fact => {
-    if (!handledFactIds.has(fact.id)) {
-      lines.push(formatFact(fact));
+  // Add elements that have no relationships
+  elements.forEach(element => {
+    if (!handledElementIds.has(element.id)) {
+      lines.push(formatElement(element));
     }
   });
 
@@ -425,7 +473,7 @@ const generateMarkdownFromGraph = (facts: Fact[], relationships: Relationship[])
 // --- Main App Component ---
 
 export default function App() {
-  const [facts, setFacts] = useState<Fact[]>([]);
+  const [elements, setElements] = useState<Element[]>([]);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [colorSchemes, setColorSchemes] = useState<ColorScheme[]>(DEFAULT_COLOR_SCHEMES);
   const [activeSchemeId, setActiveSchemeId] = useState<string | null>(DEFAULT_COLOR_SCHEMES[0]?.id || null);
@@ -434,16 +482,18 @@ export default function App() {
   const [modelsIndex, setModelsIndex] = useState<ModelMetadata[]>([]);
   const [currentModelId, setCurrentModelId] = useState<string | null>(null);
 
-  const [selectedFactId, setSelectedFactId] = useState<string | null>(null);
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [selectedRelationshipId, setSelectedRelationshipId] = useState<string | null>(null);
   
   // UI State
-  const [focusMode, setFocusMode] = useState<'narrow' | 'wide'>('narrow');
-  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, factId: string } | null>(null);
+  const [focusMode, setFocusMode] = useState<'narrow' | 'wide' | 'zoom'>('narrow');
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, elementId: string } | null>(null);
+  const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number, y: number } | null>(null);
+
   const [panelState, setPanelState] = useState<PanelState>({
     view: 'details',
-    sourceFactId: null,
-    targetFactId: null,
+    sourceElementId: null,
+    targetElementId: null,
     isNewTarget: false,
   });
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -452,10 +502,15 @@ export default function App() {
   const [isMarkdownPanelOpen, setIsMarkdownPanelOpen] = useState(false);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isReportPanelOpen, setIsReportPanelOpen] = useState(false);
-  const [hiddenTags, setHiddenTags] = useState<Set<string>>(new Set());
+  
+  const [tagFilter, setTagFilter] = useState<{ included: Set<string>, excluded: Set<string> }>({
+    included: new Set(),
+    excluded: new Set(),
+  });
+
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [isPhysicsModeActive, setIsPhysicsModeActive] = useState(false);
-  const [originalFacts, setOriginalFacts] = useState<Fact[] | null>(null);
+  const [originalElements, setOriginalElements] = useState<Element[] | null>(null);
   const graphCanvasRef = useRef<GraphCanvasRef>(null);
 
   const importFileRef = useRef<HTMLInputElement>(null);
@@ -465,30 +520,87 @@ export default function App() {
   // --- Filtering Logic ---
   const allTags = useMemo(() => {
     const tags = new Set<string>();
-    facts.forEach(fact => {
-      fact.tags.forEach(tag => tags.add(tag));
+    elements.forEach(element => {
+      element.tags.forEach(tag => tags.add(tag));
     });
     return Array.from(tags).sort();
-  }, [facts]);
+  }, [elements]);
 
-  const filteredFacts = useMemo(() => {
-    if (hiddenTags.size === 0) {
-      return facts;
+  const tagCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    elements.forEach(element => {
+      element.tags.forEach(tag => {
+        counts.set(tag, (counts.get(tag) || 0) + 1);
+      });
+    });
+    return counts;
+  }, [elements]);
+
+  useEffect(() => {
+    // This effect synchronizes the filter state with the available tags in the model.
+    setTagFilter(prevFilter => {
+        const allTagsSet = new Set(allTags);
+        
+        // Build a new included set. A tag is included if:
+        // 1. It's a brand new tag (not in old included or old excluded sets).
+        // 2. It's an existing tag and was already included.
+        const newIncluded = new Set<string>();
+        for (const tag of allTags) {
+            const wasPreviouslyIncluded = prevFilter.included.has(tag);
+            const wasPreviouslyExcluded = prevFilter.excluded.has(tag);
+            if (wasPreviouslyIncluded) {
+                newIncluded.add(tag);
+            } else if (!wasPreviouslyExcluded) {
+                // This is a new tag, or a tag that was previously un-included.
+                // Default is to include it.
+                newIncluded.add(tag);
+            }
+        }
+
+        // Clean up excluded set for tags that no longer exist
+        const newExcluded = new Set<string>();
+        for (const tag of prevFilter.excluded) {
+            if (allTagsSet.has(tag)) {
+                newExcluded.add(tag);
+            }
+        }
+        
+        return { included: newIncluded, excluded: newExcluded };
+    });
+  }, [allTags]);
+
+
+  const filteredElements = useMemo(() => {
+    const { included, excluded } = tagFilter;
+    if (excluded.size === 0 && included.size === allTags.length) {
+      return elements;
     }
-    return facts.filter(fact =>
-      fact.tags.length === 0 || fact.tags.some(tag => !hiddenTags.has(tag))
-    );
-  }, [facts, hiddenTags]);
+    return elements.filter(element => {
+      // Rule 1: If an element has ANY excluded tag, it's hidden.
+      if (element.tags.some(tag => excluded.has(tag))) {
+        return false;
+      }
+      
+      // Rule 2: If an element has no tags, it's visible.
+      if (element.tags.length === 0) {
+        return true; 
+      }
+      
+      // Rule 3: If an element has tags, at least one must be in the included list.
+      return element.tags.some(tag => included.has(tag));
+    });
+  }, [elements, tagFilter, allTags]);
 
   const filteredRelationships = useMemo(() => {
-    if (hiddenTags.size === 0) {
+    const { included, excluded } = tagFilter;
+    if (excluded.size === 0 && included.size === allTags.length) {
       return relationships;
     }
-    const visibleFactIds = new Set(filteredFacts.map(f => f.id));
+    const visibleElementIds = new Set(filteredElements.map(f => f.id));
     return relationships.filter(rel =>
-      visibleFactIds.has(rel.source as string) && visibleFactIds.has(rel.target as string)
+      visibleElementIds.has(rel.source as string) && visibleElementIds.has(rel.target as string)
     );
-  }, [relationships, filteredFacts, hiddenTags]);
+  }, [relationships, filteredElements, tagFilter, allTags]);
 
 
   // --- Model Management ---
@@ -497,14 +609,14 @@ export default function App() {
     const modelDataString = localStorage.getItem(`${MODEL_DATA_PREFIX}${modelId}`);
     if (modelDataString) {
       const data = JSON.parse(modelDataString);
-      setFacts(data.facts || []);
+      setElements(data.elements || data.facts || []); // data.facts for backward compatibility
       setRelationships(data.relationships || []);
       setColorSchemes(data.colorSchemes || DEFAULT_COLOR_SCHEMES);
       setActiveSchemeId(data.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null);
       setCurrentModelId(modelId);
       localStorage.setItem(LAST_OPENED_MODEL_ID_KEY, modelId);
       setIsOpenModelModalOpen(false);
-      setHiddenTags(new Set()); // Reset filters on model load
+      setTagFilter({ included: new Set(), excluded: new Set() }); // Reset filters on model load
     }
   }, []);
 
@@ -550,7 +662,7 @@ export default function App() {
   // Auto-save model data and update timestamp on any data change
   useEffect(() => {
     if (currentModelId && !isInitialLoad) {
-      const modelData = { facts, relationships, colorSchemes, activeSchemeId };
+      const modelData = { elements, relationships, colorSchemes, activeSchemeId };
       localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
 
       // Update timestamp in the index state. The centralized effect will persist it.
@@ -561,7 +673,7 @@ export default function App() {
         );
       });
     }
-  }, [facts, relationships, colorSchemes, activeSchemeId, currentModelId, isInitialLoad]);
+  }, [elements, relationships, colorSchemes, activeSchemeId, currentModelId, isInitialLoad]);
 
   const handleCreateModel = useCallback((name: string, description: string) => {
     const now = new Date().toISOString();
@@ -577,7 +689,7 @@ export default function App() {
     setModelsIndex(prevIndex => [...prevIndex, newModel]);
 
     const newModelData = {
-      facts: [],
+      elements: [],
       relationships: [],
       colorSchemes: DEFAULT_COLOR_SCHEMES,
       activeSchemeId: DEFAULT_COLOR_SCHEMES[0]?.id || null,
@@ -589,11 +701,11 @@ export default function App() {
   }, [handleLoadModel]);
   
 
-  const handleAddFact = useCallback((coords: { x: number; y: number; }) => {
+  const handleAddElement = useCallback((coords: { x: number; y: number; }) => {
     const now = new Date().toISOString();
-    const newFact: Fact = {
+    const newElement: Element = {
       id: generateUUID(),
-      name: 'New Fact',
+      name: 'New Element',
       type: 'Default',
       notes: '',
       tags: [],
@@ -604,55 +716,55 @@ export default function App() {
       fx: coords.x,
       fy: coords.y,
     };
-    setFacts(prev => [...prev, newFact]);
-    setSelectedFactId(newFact.id);
+    setElements(prev => [...prev, newElement]);
+    setSelectedElementId(newElement.id);
     setSelectedRelationshipId(null);
-    setPanelState({ view: 'details', sourceFactId: null, targetFactId: null, isNewTarget: false });
+    setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
   }, []);
 
-  const handleUpdateFact = useCallback((updatedFact: Fact) => {
-    setFacts(prev => prev.map(f => f.id === updatedFact.id ? { ...updatedFact, updatedAt: new Date().toISOString() } : f));
+  const handleUpdateElement = useCallback((updatedElement: Element) => {
+    setElements(prev => prev.map(f => f.id === updatedElement.id ? { ...updatedElement, updatedAt: new Date().toISOString() } : f));
   }, []);
   
-  const handleDeleteFact = useCallback((factId: string) => {
-    setFacts(prev => prev.filter(f => f.id !== factId));
-    setRelationships(prev => prev.filter(r => r.source !== factId && r.target !== factId));
-    if (selectedFactId === factId) {
-      setSelectedFactId(null);
+  const handleDeleteElement = useCallback((elementId: string) => {
+    setElements(prev => prev.filter(f => f.id !== elementId));
+    setRelationships(prev => prev.filter(r => r.source !== elementId && r.target !== elementId));
+    if (selectedElementId === elementId) {
+      setSelectedElementId(null);
     }
-  }, [selectedFactId]);
+  }, [selectedElementId]);
 
-  const handleAddRelationship = useCallback((relationship: Omit<Relationship, 'id' | 'tags'>, newFactData?: Omit<Fact, 'id' | 'createdAt' | 'updatedAt'>) => {
+  const handleAddRelationship = useCallback((relationship: Omit<Relationship, 'id' | 'tags'>, newElementData?: Omit<Element, 'id' | 'createdAt' | 'updatedAt'>) => {
     let finalRelationship: Relationship = { ...relationship, id: generateUUID(), tags: [] };
 
-    if (newFactData) {
+    if (newElementData) {
       const now = new Date().toISOString();
-      const newFact: Fact = {
-        ...newFactData,
+      const newElement: Element = {
+        ...newElementData,
         id: generateUUID(),
         createdAt: now,
         updatedAt: now,
       };
-      setFacts(prev => [...prev, newFact]);
-      finalRelationship.target = newFact.id;
+      setElements(prev => [...prev, newElement]);
+      finalRelationship.target = newElement.id;
     }
     
     setRelationships(prev => [...prev, finalRelationship]);
-    setSelectedFactId(panelState.sourceFactId || null);
-    setPanelState({ view: 'details', sourceFactId: null, targetFactId: null, isNewTarget: false });
-  }, [panelState.sourceFactId]);
+    setSelectedElementId(panelState.sourceElementId || null);
+    setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
+  }, [panelState.sourceElementId]);
 
   const handleCancelAddRelationship = useCallback(() => {
-    // If we were cancelling the creation of a relationship to a NEW fact,
-    // delete that newly created (and now orphaned) fact.
-    if (panelState.isNewTarget && panelState.targetFactId) {
-      handleDeleteFact(panelState.targetFactId);
+    // If we were cancelling the creation of a relationship to a NEW element,
+    // delete that newly created (and now orphaned) element.
+    if (panelState.isNewTarget && panelState.targetElementId) {
+      handleDeleteElement(panelState.targetElementId);
     }
     
-    // Return to showing the details of the original source fact.
-    setSelectedFactId(panelState.sourceFactId || null);
-    setPanelState({ view: 'details', sourceFactId: null, targetFactId: null, isNewTarget: false });
-  }, [panelState, handleDeleteFact]);
+    // Return to showing the details of the original source element.
+    setSelectedElementId(panelState.sourceElementId || null);
+    setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
+  }, [panelState, handleDeleteElement]);
 
   const handleUpdateRelationship = useCallback((updatedRelationship: Relationship) => {
     setRelationships(prev => prev.map(r => r.id === updatedRelationship.id ? updatedRelationship : r));
@@ -679,7 +791,7 @@ export default function App() {
     const exportData = {
         metadata: modelMetadata,
         data: {
-            facts,
+            elements,
             relationships,
             colorSchemes,
             activeSchemeId,
@@ -696,7 +808,7 @@ export default function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [currentModelId, modelsIndex, facts, relationships, colorSchemes, activeSchemeId]);
+  }, [currentModelId, modelsIndex, elements, relationships, colorSchemes, activeSchemeId]);
 
   const handleImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -708,8 +820,8 @@ export default function App() {
             const text = e.target?.result as string;
             const imported = JSON.parse(text);
 
-            if (!imported.metadata || !imported.metadata.name || !imported.data || !Array.isArray(imported.data.facts) || !Array.isArray(imported.data.relationships)) {
-                throw new Error('Invalid file format. The file must be a valid Fact Weaver export.');
+            if (!imported.metadata || !imported.metadata.name || !imported.data || (!Array.isArray(imported.data.elements) && !Array.isArray(imported.data.facts)) || !Array.isArray(imported.data.relationships)) {
+                throw new Error('Invalid file format. The file must be a valid Tapestry export.');
             }
             
             let modelName = imported.metadata.name;
@@ -737,7 +849,7 @@ export default function App() {
                 };
 
                 const newModelData = {
-                    facts: imported.data.facts || [],
+                    elements: imported.data.elements || imported.data.facts || [],
                     relationships: imported.data.relationships || [],
                     colorSchemes: imported.data.colorSchemes || DEFAULT_COLOR_SCHEMES,
                     activeSchemeId: imported.data.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null,
@@ -762,45 +874,54 @@ export default function App() {
   }, [modelsIndex, handleLoadModel]);
   
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const closeCanvasContextMenu = useCallback(() => setCanvasContextMenu(null), []);
 
-  const handleNodeClick = useCallback((factId: string) => {
-    setSelectedFactId(factId);
+  const handleNodeClick = useCallback((elementId: string) => {
+    setSelectedElementId(elementId);
     setSelectedRelationshipId(null);
-    setPanelState({ view: 'details', sourceFactId: null, targetFactId: null, isNewTarget: false });
+    setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
     closeContextMenu();
   }, [closeContextMenu]);
   
   const handleLinkClick = useCallback((relationshipId: string) => {
     setSelectedRelationshipId(relationshipId);
-    setSelectedFactId(null);
-    setPanelState({ view: 'details', sourceFactId: null, targetFactId: null, isNewTarget: false });
+    setSelectedElementId(null);
+    setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
     closeContextMenu();
   }, [closeContextMenu]);
 
   const handleCanvasClick = useCallback(() => {
-    setSelectedFactId(null);
+    setSelectedElementId(null);
     setSelectedRelationshipId(null);
-    setPanelState({ view: 'details', sourceFactId: null, targetFactId: null, isNewTarget: false });
+    setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
+    closeContextMenu();
+    closeCanvasContextMenu();
+  }, [closeContextMenu, closeCanvasContextMenu]);
+  
+  const handleNodeContextMenu = useCallback((event: React.MouseEvent, elementId: string) => {
+    event.preventDefault();
+    setContextMenu({ x: event.clientX, y: event.clientY, elementId });
+    closeCanvasContextMenu();
+  }, [closeCanvasContextMenu]);
+  
+  const handleCanvasContextMenu = useCallback((event: React.MouseEvent) => {
+    event.preventDefault();
+    setCanvasContextMenu({ x: event.clientX, y: event.clientY });
     closeContextMenu();
   }, [closeContextMenu]);
-  
-  const handleNodeContextMenu = useCallback((event: React.MouseEvent, factId: string) => {
-    event.preventDefault();
-    setContextMenu({ x: event.clientX, y: event.clientY, factId });
-  }, []);
 
   const handleNodeConnect = useCallback((sourceId: string, targetId: string) => {
-    setPanelState({ view: 'addRelationship', sourceFactId: sourceId, targetFactId: targetId, isNewTarget: false });
-    setSelectedFactId(null);
+    setPanelState({ view: 'addRelationship', sourceElementId: sourceId, targetElementId: targetId, isNewTarget: false });
+    setSelectedElementId(null);
     setSelectedRelationshipId(null);
     closeContextMenu();
   }, [closeContextMenu]);
 
   const handleNodeConnectToNew = useCallback((sourceId: string, coords: { x: number, y: number }) => {
     const now = new Date().toISOString();
-    const newFact: Fact = {
+    const newElement: Element = {
       id: generateUUID(),
-      name: 'New Fact',
+      name: 'New Element',
       type: 'Default',
       notes: '',
       tags: [],
@@ -811,26 +932,30 @@ export default function App() {
       fx: coords.x,
       fy: coords.y,
     };
-    setFacts(prev => [...prev, newFact]);
+    setElements(prev => [...prev, newElement]);
     
-    // Open the relationship panel with the new fact as the target
-    setPanelState({ view: 'addRelationship', sourceFactId: sourceId, targetFactId: newFact.id, isNewTarget: true });
-    setSelectedFactId(null);
+    // Open the relationship panel with the new element as the target
+    setPanelState({ view: 'addRelationship', sourceElementId: sourceId, targetElementId: newElement.id, isNewTarget: true });
+    setSelectedElementId(null);
     setSelectedRelationshipId(null);
     closeContextMenu();
   }, [closeContextMenu]);
 
   const handleToggleFocusMode = () => {
-    setFocusMode(prev => prev === 'narrow' ? 'wide' : 'narrow');
+    setFocusMode(prev => {
+      if (prev === 'narrow') return 'wide';
+      if (prev === 'wide') return 'zoom';
+      return 'narrow';
+    });
   };
 
   const handleApplyMarkdown = (markdown: string) => {
     const lines = markdown.split('\n').filter(line => line.trim() !== '');
     
-    const parsedFacts = new Map<string, { type: string, tags: string[] }>();
+    const parsedElements = new Map<string, { type: string, tags: string[] }>();
     const parsedRels: { sourceName: string, targetName: string, label: string, direction: RelationshipDirection }[] = [];
 
-    const parseFactStr = (str: string) => {
+    const parseElementStr = (str: string) => {
         let workStr = str.trim();
         if (!workStr) return null;
 
@@ -868,14 +993,14 @@ export default function App() {
         return { name, type, tags };
     };
 
-    const updateParsedFact = (factData: { name: string, type: string, tags: string[] }) => {
-      const existing = parsedFacts.get(factData.name);
+    const updateParsedElement = (elementData: { name: string, type: string, tags: string[] }) => {
+      const existing = parsedElements.get(elementData.name);
       if (existing) {
-        const newType = factData.type !== 'Default' ? factData.type : existing.type;
-        const newTags = [...new Set([...existing.tags, ...factData.tags])];
-        parsedFacts.set(factData.name, { type: newType, tags: newTags });
+        const newType = elementData.type !== 'Default' ? elementData.type : existing.type;
+        const newTags = [...new Set([...existing.tags, ...elementData.tags])];
+        parsedElements.set(elementData.name, { type: newType, tags: newTags });
       } else {
-        parsedFacts.set(factData.name, { type: factData.type, tags: factData.tags });
+        parsedElements.set(elementData.name, { type: elementData.type, tags: elementData.tags });
       }
     };
 
@@ -887,27 +1012,27 @@ export default function App() {
 
       if (tokens.length === 0) continue;
 
-      if (tokens.length === 1) { // It's a single fact definition
-          const fact = parseFactStr(tokens[0]);
-          if (fact) {
-              updateParsedFact(fact);
+      if (tokens.length === 1) { // It's a single element definition
+          const element = parseElementStr(tokens[0]);
+          if (element) {
+              updateParsedElement(element);
           }
           continue;
       }
 
       // Process chains and one-to-many relationships
-      let currentSourceFactStr = tokens.shift();
+      let currentSourceElementStr = tokens.shift();
       while (tokens.length > 0) {
           const relStr = tokens.shift();
           const targetsStr = tokens.shift();
-          if (!currentSourceFactStr || !relStr || !targetsStr) break;
+          if (!currentSourceElementStr || !relStr || !targetsStr) break;
 
-          const sourceFactData = parseFactStr(currentSourceFactStr);
-          if (!sourceFactData) {
-              console.warn(`Could not parse source fact: ${currentSourceFactStr}`);
+          const sourceElementData = parseElementStr(currentSourceElementStr);
+          if (!sourceElementData) {
+              console.warn(`Could not parse source element: ${currentSourceElementStr}`);
               break;
           }
-          updateParsedFact(sourceFactData);
+          updateParsedElement(sourceElementData);
 
           const singleRelRegex = /<?-\[(.*?)]->?/;
           const relMatch = relStr.match(singleRelRegex);
@@ -921,48 +1046,48 @@ export default function App() {
           else if (relStr.endsWith('->')) direction = RelationshipDirection.To;
 
           // Handle one-to-many targets separated by semicolons
-          const targetFactStrs = targetsStr.split(';').map(t => t.trim()).filter(Boolean);
+          const targetElementStrs = targetsStr.split(';').map(t => t.trim()).filter(Boolean);
 
-          for (const targetFactStr of targetFactStrs) {
-              const targetFactData = parseFactStr(targetFactStr);
-              if (targetFactData) {
-                  updateParsedFact(targetFactData);
-                  parsedRels.push({ sourceName: sourceFactData.name, targetName: targetFactData.name, label, direction });
+          for (const targetElementStr of targetElementStrs) {
+              const targetElementData = parseElementStr(targetElementStr);
+              if (targetElementData) {
+                  updateParsedElement(targetElementData);
+                  parsedRels.push({ sourceName: sourceElementData.name, targetName: targetElementData.name, label, direction });
               } else {
-                   console.warn(`Could not parse target fact: ${targetFactStr}`);
+                   console.warn(`Could not parse target element: ${targetElementStr}`);
               }
           }
           
           // The last target becomes the next source for chaining, but only if it's not a one-to-many relationship.
-          if (targetFactStrs.length === 1) {
-              currentSourceFactStr = targetFactStrs[0];
+          if (targetElementStrs.length === 1) {
+              currentSourceElementStr = targetElementStrs[0];
           } else {
               break; // Stop chaining after a one-to-many relationship to avoid ambiguity
           }
       }
     }
 
-    const existingFactsByName = new Map(facts.map(f => [f.name, f]));
-    const nextFacts: Fact[] = [];
+    const existingElementsByName = new Map(elements.map(f => [f.name, f]));
+    const nextElements: Element[] = [];
     const nameToIdMap = new Map<string, string>();
-    const newFactNames = new Set<string>();
+    const newElementNames = new Set<string>();
 
-    parsedFacts.forEach(({ type, tags }, name) => {
-        const existingFact = existingFactsByName.get(name);
-        if (existingFact) {
-            const updatedFact: Fact = { ...existingFact, type, tags, updatedAt: new Date().toISOString() };
-            nextFacts.push(updatedFact);
-            nameToIdMap.set(name, existingFact.id);
+    parsedElements.forEach(({ type, tags }, name) => {
+        const existingElement = existingElementsByName.get(name);
+        if (existingElement) {
+            const updatedElement: Element = { ...existingElement, type, tags, updatedAt: new Date().toISOString() };
+            nextElements.push(updatedElement);
+            nameToIdMap.set(name, existingElement.id);
         } else {
             const now = new Date().toISOString();
-            const newFact: Fact = {
+            const newElement: Element = {
                 id: generateUUID(),
                 name, type, tags, notes: '',
                 createdAt: now, updatedAt: now,
             };
-            nextFacts.push(newFact);
-            nameToIdMap.set(name, newFact.id);
-            newFactNames.add(name);
+            nextElements.push(newElement);
+            nameToIdMap.set(name, newElement.id);
+            newElementNames.add(name);
         }
     });
 
@@ -973,20 +1098,20 @@ export default function App() {
         label, direction, tags: []
     }));
     
-    // Position new facts
-    let placedNewFactsCount = 0;
-    const positionNewFacts = () => {
-        nextFacts.forEach(fact => {
-            if (newFactNames.has(fact.name) && fact.x === undefined) {
-                let connectedAnchor: Fact | undefined;
+    // Position new elements
+    let placedNewElementsCount = 0;
+    const positionNewElements = () => {
+        nextElements.forEach(element => {
+            if (newElementNames.has(element.name) && element.x === undefined) {
+                let connectedAnchor: Element | undefined;
                 
                 for (const rel of nextRelationships) {
                     let anchorId: string | undefined;
-                    if (rel.source === fact.id) anchorId = rel.target;
-                    else if (rel.target === fact.id) anchorId = rel.source;
+                    if (rel.source === element.id) anchorId = rel.target;
+                    else if (rel.target === element.id) anchorId = rel.source;
 
                     if (anchorId) {
-                       const potentialAnchor = nextFacts.find(f => f.id === anchorId && f.x !== undefined);
+                       const potentialAnchor = nextElements.find(f => f.id === anchorId && f.x !== undefined);
                        if (potentialAnchor) {
                            connectedAnchor = potentialAnchor;
                            break;
@@ -995,32 +1120,32 @@ export default function App() {
                 }
 
                 if (connectedAnchor && connectedAnchor.x && connectedAnchor.y) {
-                    fact.x = connectedAnchor.x + (Math.random() - 0.5) * 300;
-                    fact.y = connectedAnchor.y + (Math.random() - 0.5) * 300;
+                    element.x = connectedAnchor.x + (Math.random() - 0.5) * 300;
+                    element.y = connectedAnchor.y + (Math.random() - 0.5) * 300;
                 } else {
-                    fact.x = 200 + (placedNewFactsCount * 50);
-                    fact.y = 200 + (placedNewFactsCount * 50);
-                    placedNewFactsCount++;
+                    element.x = 200 + (placedNewElementsCount * 50);
+                    element.y = 200 + (placedNewElementsCount * 50);
+                    placedNewElementsCount++;
                 }
-                fact.fx = fact.x;
-                fact.fy = fact.y;
+                element.fx = element.x;
+                element.fy = element.y;
             }
         });
     }
     
-    // Position multiple times to resolve chains of new facts
-    positionNewFacts();
-    positionNewFacts();
+    // Position multiple times to resolve chains of new elements
+    positionNewElements();
+    positionNewElements();
 
-    setFacts(nextFacts);
+    setElements(nextElements);
     setRelationships(nextRelationships);
     setIsMarkdownPanelOpen(false);
   };
   
   const handleStartPhysicsLayout = () => {
-    setOriginalFacts(facts);
+    setOriginalElements(elements);
     // Unpin all nodes to let the simulation run freely at the start
-    setFacts(prev => prev.map(f => ({ ...f, fx: null, fy: null })));
+    setElements(prev => prev.map(f => ({ ...f, fx: null, fy: null })));
     setIsPhysicsModeActive(true);
   };
 
@@ -1029,21 +1154,21 @@ export default function App() {
     if (finalPositions) {
       const positionsMap = new Map(finalPositions.map(p => [p.id, p]));
       // Apply the final positions from the simulation as fixed positions
-      setFacts(prev => prev.map(fact => {
-        const pos = positionsMap.get(fact.id);
-        return pos ? { ...fact, x: pos.x, y: pos.y, fx: pos.x, fy: pos.y } : fact;
+      setElements(prev => prev.map(element => {
+        const pos = positionsMap.get(element.id);
+        return pos ? { ...element, x: pos.x, y: pos.y, fx: pos.x, fy: pos.y } : element;
       }));
     }
     setIsPhysicsModeActive(false);
-    setOriginalFacts(null);
+    setOriginalElements(null);
   };
 
   const handleRejectLayout = () => {
-    if (originalFacts) {
-      setFacts(originalFacts); // Revert to the original fact positions
+    if (originalElements) {
+      setElements(originalElements); // Revert to the original element positions
     }
     setIsPhysicsModeActive(false);
-    setOriginalFacts(null);
+    setOriginalElements(null);
   };
 
   const handleZoomToFit = () => {
@@ -1051,9 +1176,9 @@ export default function App() {
   };
 
 
-  const selectedFact = useMemo(() => facts.find(f => f.id === selectedFactId), [facts, selectedFactId]);
+  const selectedElement = useMemo(() => elements.find(f => f.id === selectedElementId), [elements, selectedElementId]);
   const selectedRelationship = useMemo(() => relationships.find(r => r.id === selectedRelationshipId), [relationships, selectedRelationshipId]);
-  const addRelationshipSourceFact = useMemo(() => facts.find(f => f.id === panelState.sourceFactId), [facts, panelState.sourceFactId]);
+  const addRelationshipSourceElement = useMemo(() => elements.find(f => f.id === panelState.sourceElementId), [elements, panelState.sourceElementId]);
   const activeColorScheme = useMemo(() => colorSchemes.find(s => s.id === activeSchemeId), [colorSchemes, activeSchemeId]);
 
   if (isInitialLoad && !isCreateModelModalOpen) {
@@ -1063,6 +1188,13 @@ export default function App() {
       </div>
     );
   }
+
+  const focusButtonTitle = () => {
+    if (focusMode === 'narrow') return 'Switch to Wide Focus';
+    if (focusMode === 'wide') return 'Switch to Zoom Focus';
+    return 'Switch to Narrow Focus';
+  };
+
 
   return (
     <div className="w-screen h-screen overflow-hidden flex relative">
@@ -1075,8 +1207,10 @@ export default function App() {
       />
       <div className="absolute top-4 left-4 z-10 bg-gray-800 bg-opacity-80 p-2 rounded-lg flex items-center space-x-2">
         <div className="flex items-center space-x-2 text-gray-300">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 12c3-3 6-3 9 0s6 3 9 0m-18 6c3-3 6-3 9 0s6 3 9 0m-18-12c3-3 6-3 9 0s6 3 9 0" />
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 8c2-2 4-2 6 0s4 2 6 0" />
+                <path d="M4 12c2-2 4-2 6 0s4 2 6 0" />
+                <path d="M4 16c2-2 4-2 6 0s4 2 6 0" />
             </svg>
             <span className="text-xl font-bold">Tapestry</span>
         </div>
@@ -1098,17 +1232,23 @@ export default function App() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
           </svg>
         </button>
-        <button onClick={handleToggleFocusMode} title={focusMode === 'narrow' ? 'Switch to Wide Focus' : 'Switch to Narrow Focus'} className="p-2 rounded-md hover:bg-gray-700 transition">
-            {focusMode === 'narrow' ? (
-                // Icon for switching to Wide Focus
+        <button onClick={handleToggleFocusMode} title={focusButtonTitle()} className="p-2 rounded-md hover:bg-gray-700 transition">
+            {focusMode === 'narrow' && (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="3" />
+                </svg>
+            )}
+            {focusMode === 'wide' && (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="10" />
                   <circle cx="12" cy="12" r="3" />
                 </svg>
-            ) : (
-                // Icon for switching to Narrow Focus
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="3" />
+            )}
+            {focusMode === 'zoom' && (
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <circle cx="12" cy="12" r="3" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 6V2h4 M22 6V2h-4 M2 18v4h4 M22 18v4h-4" />
                 </svg>
             )}
         </button>
@@ -1122,7 +1262,7 @@ export default function App() {
         </button>
         <button onClick={handleZoomToFit} title="Zoom to Fit" className="p-2 rounded-md hover:bg-gray-700 transition">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4 M20 8V4h-4 M4 16v4h4 M20 16v4h-4" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
             </svg>
         </button>
          <div className="bg-gray-700 rounded-md flex">
@@ -1152,15 +1292,16 @@ export default function App() {
       {isFilterPanelOpen && (
         <FilterPanel
             allTags={allTags}
-            hiddenTags={hiddenTags}
-            onHiddenTagsChange={setHiddenTags}
+            tagCounts={tagCounts}
+            tagFilter={tagFilter}
+            onTagFilterChange={setTagFilter}
             onClose={() => setIsFilterPanelOpen(false)}
         />
       )}
       
       {isMarkdownPanelOpen && (
         <MarkdownPanel
-            initialText={generateMarkdownFromGraph(facts, relationships)}
+            initialText={generateMarkdownFromGraph(elements, relationships)}
             onApply={handleApplyMarkdown}
             onClose={() => setIsMarkdownPanelOpen(false)}
         />
@@ -1169,20 +1310,21 @@ export default function App() {
       {currentModelId ? (
         <GraphCanvas
           ref={graphCanvasRef}
-          facts={filteredFacts}
+          elements={filteredElements}
           relationships={filteredRelationships}
           onNodeClick={handleNodeClick}
           onLinkClick={handleLinkClick}
           onCanvasClick={handleCanvasClick}
-          onCanvasDoubleClick={handleAddFact}
+          onCanvasDoubleClick={handleAddElement}
           onNodeContextMenu={handleNodeContextMenu}
+          onCanvasContextMenu={handleCanvasContextMenu}
           onNodeConnect={handleNodeConnect}
           onNodeConnectToNew={handleNodeConnectToNew}
           activeColorScheme={activeColorScheme}
-          selectedFactId={selectedFactId}
+          selectedElementId={selectedElementId}
           selectedRelationshipId={selectedRelationshipId}
           focusMode={focusMode}
-          setFacts={setFacts}
+          setElements={setElements}
           isPhysicsModeActive={isPhysicsModeActive}
         />
       ) : (
@@ -1191,36 +1333,40 @@ export default function App() {
         </div>
       )}
       
-      {isReportPanelOpen ? (
-        <ReportPanel
-            facts={filteredFacts}
-            relationships={filteredRelationships}
-            onClose={() => setIsReportPanelOpen(false)}
-            onNodeClick={handleNodeClick}
-        />
-      ) : panelState.view === 'addRelationship' && addRelationshipSourceFact ? (
-        <AddRelationshipPanel
-          sourceFact={addRelationshipSourceFact}
-          targetFactId={panelState.targetFactId}
-          isNewTarget={panelState.isNewTarget}
-          allFacts={facts}
-          onCreate={handleAddRelationship}
-          onUpdateFact={handleUpdateFact}
-          onCancel={handleCancelAddRelationship}
-        />
-      ) : selectedRelationship ? (
-        <RelationshipDetailsPanel
-            relationship={selectedRelationship}
-            facts={facts}
-            onUpdate={handleUpdateRelationship}
-            onDelete={handleDeleteRelationship}
-        />
-      ) : (
-        <FactDetailsPanel
-            fact={selectedFact}
-            onUpdate={handleUpdateFact}
-            onDelete={handleDeleteFact}
-        />
+      <div className="flex-shrink-0 z-20">
+        {panelState.view === 'addRelationship' && addRelationshipSourceElement ? (
+            <AddRelationshipPanel
+            sourceElement={addRelationshipSourceElement}
+            targetElementId={panelState.targetElementId}
+            isNewTarget={panelState.isNewTarget}
+            allElements={elements}
+            onCreate={handleAddRelationship}
+            onUpdateElement={handleUpdateElement}
+            onCancel={handleCancelAddRelationship}
+            />
+        ) : selectedRelationship ? (
+            <RelationshipDetailsPanel
+                relationship={selectedRelationship}
+                elements={elements}
+                onUpdate={handleUpdateRelationship}
+                onDelete={handleDeleteRelationship}
+            />
+        ) : (
+            <ElementDetailsPanel
+                element={selectedElement}
+                onUpdate={handleUpdateElement}
+                onDelete={handleDeleteElement}
+            />
+        )}
+      </div>
+
+      {isReportPanelOpen && (
+          <ReportPanel
+              elements={filteredElements}
+              relationships={filteredRelationships}
+              onClose={() => setIsReportPanelOpen(false)}
+              onNodeClick={handleNodeClick}
+          />
       )}
 
       {contextMenu && (
@@ -1229,15 +1375,33 @@ export default function App() {
           y={contextMenu.y}
           onClose={closeContextMenu}
           onAddRelationship={() => {
-            setPanelState({ view: 'addRelationship', sourceFactId: contextMenu.factId, targetFactId: null, isNewTarget: false });
-            setSelectedFactId(null);
+            setPanelState({ view: 'addRelationship', sourceElementId: contextMenu.elementId, targetElementId: null, isNewTarget: false });
+            setSelectedElementId(null);
             setSelectedRelationshipId(null);
             closeContextMenu();
           }}
-          onDeleteFact={() => {
-             handleDeleteFact(contextMenu.factId);
+          onDeleteElement={() => {
+             handleDeleteElement(contextMenu.elementId);
              closeContextMenu();
           }}
+        />
+      )}
+
+      {canvasContextMenu && (
+        <CanvasContextMenu
+            x={canvasContextMenu.x}
+            y={canvasContextMenu.y}
+            onClose={closeCanvasContextMenu}
+            onZoomToFit={handleZoomToFit}
+            onAutoLayout={handleStartPhysicsLayout}
+            onToggleReport={() => setIsReportPanelOpen(p => !p)}
+            onToggleMarkdown={() => setIsMarkdownPanelOpen(p => !p)}
+            onToggleFilter={() => setIsFilterPanelOpen(p => !p)}
+            onOpenModel={() => setIsOpenModelModalOpen(true)}
+            onCreateModel={() => setIsCreateModelModalOpen(true)}
+            isReportOpen={isReportPanelOpen}
+            isMarkdownOpen={isMarkdownPanelOpen}
+            isFilterOpen={isFilterPanelOpen}
         />
       )}
 

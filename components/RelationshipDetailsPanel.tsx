@@ -1,15 +1,16 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { Relationship, Fact, RelationshipDirection } from '../types';
+import { Relationship, Element, RelationshipDirection } from '../types';
 
 interface RelationshipDetailsPanelProps {
   relationship: Relationship;
-  facts: Fact[];
+  elements: Element[];
   onUpdate: (relationship: Relationship) => void;
   onDelete: (relationshipId: string) => void;
 }
 
-const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ relationship, facts, onUpdate, onDelete }) => {
+const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ relationship, elements, onUpdate, onDelete }) => {
   const [formData, setFormData] = useState<Partial<Relationship>>(relationship);
   const [tagsInput, setTagsInput] = useState('');
 
@@ -18,11 +19,11 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
     setTagsInput(relationship.tags?.join(', ') || '');
   }, [relationship]);
   
-  const { sourceFact, targetFact } = useMemo(() => {
-      const sourceFact = facts.find(f => f.id === formData.source);
-      const targetFact = facts.find(f => f.id === formData.target);
-      return { sourceFact, targetFact };
-  }, [facts, formData.source, formData.target]);
+  const { sourceElement, targetElement } = useMemo(() => {
+      const sourceElement = elements.find(f => f.id === formData.source);
+      const targetElement = elements.find(f => f.id === formData.target);
+      return { sourceElement, targetElement };
+  }, [elements, formData.source, formData.target]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -73,9 +74,9 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
               onBlur={handleBlur}
               className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {facts.map(fact => (
-                <option key={fact.id} value={fact.id}>
-                  {fact.name}
+              {elements.map(element => (
+                <option key={element.id} value={element.id}>
+                  {element.name}
                 </option>
               ))}
             </select>
@@ -89,9 +90,9 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
               onBlur={handleBlur}
               className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {facts.map(fact => (
-                <option key={fact.id} value={fact.id}>
-                  {fact.name}
+              {elements.map(element => (
+                <option key={element.id} value={element.id}>
+                  {element.name}
                 </option>
               ))}
             </select>
@@ -116,9 +117,9 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
               onBlur={handleBlur}
               className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value={RelationshipDirection.To}>{sourceFact?.name || 'Source'} → {targetFact?.name || 'Target'}</option>
-              <option value={RelationshipDirection.From}>{targetFact?.name || 'Target'} → {sourceFact?.name || 'Source'}</option>
-              <option value={RelationshipDirection.None}>{sourceFact?.name || 'Source'} — {targetFact?.name || 'Target'}</option>
+              <option value={RelationshipDirection.To}>{sourceElement?.name || 'Source'} → {targetElement?.name || 'Target'}</option>
+              <option value={RelationshipDirection.From}>{targetElement?.name || 'Target'} → {sourceElement?.name || 'Source'}</option>
+              <option value={RelationshipDirection.None}>{sourceElement?.name || 'Source'} — {targetElement?.name || 'Target'}</option>
             </select>
           </div>
           <div>

@@ -1,31 +1,31 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Fact, Relationship, RelationshipDirection } from '../types';
-import FactEditor from './FactEditor';
+import { Element, Relationship, RelationshipDirection } from '../types';
+import ElementEditor from './FactEditor';
 
-// Define a type for the data needed to create a new fact.
-type NewFactData = Omit<Fact, 'id' | 'createdAt' | 'updatedAt'>;
+// Define a type for the data needed to create a new element.
+type NewElementData = Omit<Element, 'id' | 'createdAt' | 'updatedAt'>;
 
 interface AddRelationshipPanelProps {
-  sourceFact: Fact;
-  allFacts: Fact[];
-  onCreate: (relationship: Omit<Relationship, 'id' | 'tags'>, newFact?: NewFactData) => void;
-  onUpdateFact: (fact: Fact) => void;
+  sourceElement: Element;
+  allElements: Element[];
+  onCreate: (relationship: Omit<Relationship, 'id' | 'tags'>, newElement?: NewElementData) => void;
+  onUpdateElement: (element: Element) => void;
   onCancel: () => void;
-  targetFactId?: string | null;
+  targetElementId?: string | null;
   isNewTarget?: boolean;
 }
 
 const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
-  sourceFact,
-  allFacts,
+  sourceElement,
+  allElements,
   onCreate,
-  onUpdateFact,
+  onUpdateElement,
   onCancel,
-  targetFactId,
+  targetElementId,
   isNewTarget,
 }) => {
-  const [selectedTargetId, setSelectedTargetId] = useState<string>(targetFactId || 'NEW_FACT');
-  const [factEditorData, setFactEditorData] = useState<Partial<Fact>>({
+  const [selectedTargetId, setSelectedTargetId] = useState<string>(targetElementId || 'NEW_ELEMENT');
+  const [elementEditorData, setElementEditorData] = useState<Partial<Element>>({
     name: '',
     type: 'Default',
     notes: '',
@@ -35,22 +35,22 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   const [direction, setDirection] = useState<RelationshipDirection>(RelationshipDirection.To);
   const labelInputRef = useRef<HTMLInputElement>(null);
 
-  const targetFact = useMemo(() => allFacts.find(f => f.id === targetFactId), [allFacts, targetFactId]);
+  const targetElement = useMemo(() => allElements.find(f => f.id === targetElementId), [allElements, targetElementId]);
 
   useEffect(() => {
     // If a target is pre-selected from a drag-connect action, focus the label input.
-    if (targetFactId && labelInputRef.current) {
+    if (targetElementId && labelInputRef.current) {
         setTimeout(() => {
             labelInputRef.current?.focus();
         }, 100);
     }
 
-    if (isNewTarget && targetFact) {
-        setFactEditorData(targetFact);
+    if (isNewTarget && targetElement) {
+        setElementEditorData(targetElement);
     } else {
-        setFactEditorData({ name: '', type: 'Default', notes: '', tags: [] });
+        setElementEditorData({ name: '', type: 'Default', notes: '', tags: [] });
     }
-  }, [targetFactId, isNewTarget, targetFact]);
+  }, [targetElementId, isNewTarget, targetElement]);
 
   const handleSubmit = () => {
     if (!label.trim()) {
@@ -58,37 +58,37 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
         return;
     }
 
-    if (isNewTarget && targetFactId) {
-        if (!factEditorData.name?.trim()) {
-            alert("Please provide a name for the new fact.");
+    if (isNewTarget && targetElementId) {
+        if (!elementEditorData.name?.trim()) {
+            alert("Please provide a name for the new element.");
             return;
         }
-        // Update the newly created fact, then create the relationship to it
-        onUpdateFact(factEditorData as Fact);
-        onCreate({ source: sourceFact.id, target: targetFactId, label: label.trim(), direction });
-    } else if (selectedTargetId === 'NEW_FACT') {
-      if (!factEditorData.name?.trim()) {
-        alert("Please provide a name for the new fact.");
+        // Update the newly created element, then create the relationship to it
+        onUpdateElement(elementEditorData as Element);
+        onCreate({ source: sourceElement.id, target: targetElementId, label: label.trim(), direction });
+    } else if (selectedTargetId === 'NEW_ELEMENT') {
+      if (!elementEditorData.name?.trim()) {
+        alert("Please provide a name for the new element.");
         return;
       }
       onCreate(
-        { source: sourceFact.id, target: 'new-fact-placeholder', label: label.trim(), direction },
-        { ...factEditorData, name: factEditorData.name.trim(), type: factEditorData.type?.trim() || 'Default' } as NewFactData
+        { source: sourceElement.id, target: 'new-element-placeholder', label: label.trim(), direction },
+        { ...elementEditorData, name: elementEditorData.name.trim(), type: elementEditorData.type?.trim() || 'Default' } as NewElementData
       );
     } else {
       onCreate(
-        { source: sourceFact.id, target: selectedTargetId, label: label.trim(), direction }
+        { source: sourceElement.id, target: selectedTargetId, label: label.trim(), direction }
       );
     }
   };
 
-  const handleFactEditorChange = (updatedData: Partial<Fact>) => {
-    setFactEditorData(prev => ({...prev, ...updatedData}));
+  const handleElementEditorChange = (updatedData: Partial<Element>) => {
+    setElementEditorData(prev => ({...prev, ...updatedData}));
   };
 
-  const availableTargets = useMemo(() => allFacts.filter(f => f.id !== sourceFact.id), [allFacts, sourceFact.id]);
+  const availableTargets = useMemo(() => allElements.filter(f => f.id !== sourceElement.id), [allElements, sourceElement.id]);
 
-  const showFactEditor = isNewTarget || selectedTargetId === 'NEW_FACT';
+  const showElementEditor = isNewTarget || selectedTargetId === 'NEW_ELEMENT';
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     // Pressing Enter in any field (except textarea) should submit the form.
@@ -107,7 +107,7 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
       <div className="p-6 flex flex-col h-full">
         <div className="flex-shrink-0 mb-6">
           <h2 className="text-2xl font-bold text-white">Add Relationship</h2>
-          <p className="text-gray-400 mt-1">From: <span className="font-semibold text-blue-400">{sourceFact.name}</span></p>
+          <p className="text-gray-400 mt-1">From: <span className="font-semibold text-blue-400">{sourceElement.name}</span></p>
         </div>
 
         <div className="flex-grow space-y-4 text-gray-300 overflow-y-auto pr-2">
@@ -130,16 +130,16 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
               onChange={(e) => setDirection(e.target.value as RelationshipDirection)}
               className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value={RelationshipDirection.To}>{sourceFact.name} → Target</option>
-              <option value={RelationshipDirection.From}>Target → {sourceFact.name}</option>
-              <option value={RelationshipDirection.None}>{sourceFact.name} — Target</option>
+              <option value={RelationshipDirection.To}>{sourceElement.name} → Target</option>
+              <option value={RelationshipDirection.From}>Target → {sourceElement.name}</option>
+              <option value={RelationshipDirection.None}>{sourceElement.name} — Target</option>
             </select>
           </div>
           
           {isNewTarget ? (
              <div>
                 <label className="block text-sm font-medium">Target</label>
-                <p className="mt-1 p-2 bg-gray-700 rounded-md font-semibold">{targetFact?.name}</p>
+                <p className="mt-1 p-2 bg-gray-700 rounded-md font-semibold">{targetElement?.name}</p>
              </div>
           ) : (
              <div>
@@ -149,21 +149,21 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
                 onChange={(e) => setSelectedTargetId(e.target.value)}
                 className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="NEW_FACT">-- Create New Fact --</option>
+                <option value="NEW_ELEMENT">-- Create New Element --</option>
                 {availableTargets.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
             </div>
           )}
           
-          {/* New Fact Fields (using FactEditor) */}
-          {showFactEditor && (
+          {/* New Element Fields (using ElementEditor) */}
+          {showElementEditor && (
             <div className="pt-4 mt-4 border-t border-gray-700">
               <h3 className="text-lg font-semibold text-white mb-4">
-                {isNewTarget ? `Edit New Fact` : `New Fact Details`}
+                {isNewTarget ? `Edit New Element` : `New Element Details`}
               </h3>
-              <FactEditor
-                factData={factEditorData}
-                onDataChange={handleFactEditorChange}
+              <ElementEditor
+                elementData={elementEditorData}
+                onDataChange={handleElementEditorChange}
               />
             </div>
           )}
