@@ -1,3 +1,4 @@
+
 // Fix: Import d3 types to resolve "Cannot find namespace 'd3'" errors.
 import * as d3 from 'd3';
 
@@ -69,4 +70,12 @@ export interface DateFilterState {
   createdBefore: string;
   updatedAfter: string;
   updatedBefore: string;
+}
+
+export interface ModelActions {
+  addElement: (data: { name: string; type?: string; notes?: string; tags?: string[] }) => string;
+  updateElement: (name: string, data: { type?: string; notes?: string; tags?: string[] }) => boolean;
+  deleteElement: (name: string) => boolean;
+  addRelationship: (sourceName: string, targetName: string, label: string, direction?: string) => boolean;
+  deleteRelationship: (sourceName: string, targetName: string) => boolean;
 }

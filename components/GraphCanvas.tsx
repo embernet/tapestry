@@ -1,5 +1,6 @@
 
 
+
 import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
 import * as d3 from 'd3';
 import { Element, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection } from '../types';
@@ -142,8 +143,11 @@ const createDragHandler = (
         const dropNodeSelection = dropNodeElement ? d3.select(dropNodeElement) : d3.select(null as any);
 
         // Check if the drop target is a valid, different node.
-        if (!dropNodeSelection.empty() && (dropNodeSelection.datum() as D3Node).id !== d.id) {
-            onNodeConnectCallback(d.id, (dropNodeSelection.datum() as D3Node).id);
+        // Fix: Cast to any to avoid potential type error with datum() expecting arguments in some environments.
+        const dropNode = !dropNodeSelection.empty() ? (dropNodeSelection as any).datum() as D3Node : null;
+        
+        if (dropNode && dropNode.id !== d.id) {
+            onNodeConnectCallback(d.id, dropNode.id);
         } else {
             // Otherwise, treat it as a drop on the canvas to create a new element.
             onNodeConnectToNew(d.id, { x: event.x, y: event.y });
@@ -165,7 +169,8 @@ const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>) => 
       // FIX: The type definitions for d3-force's restart() method are faulty in some versions of @types/d3,
       // incorrectly expecting an argument. Casting the simulation to `any` before calling restart()
       // bypasses the faulty type check and resolves the error.
-      (simulation.alphaTarget(0.3) as any).restart();
+      simulation.alphaTarget(0.3);
+      (simulation as any).restart();
     }
     d.fx = d.x;
     d.fy = d.y;
@@ -215,8 +220,10 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     if (!svgRef.current || !gRef.current || !simulationRef.current || !zoomRef.current) return;
 
     const svg = d3.select(svgRef.current);
-    // FIX: d3 types might be incorrect, expecting arguments for nodes() getter. Cast to any.
-    const nodes: D3Node[] = nodesToFit || (simulationRef.current as any).nodes();
+    // Fix: Cast to unknown then interface with getter to avoid argument count errors.
+    // Some d3 type definitions incorrectly infer only the setter overload for nodes().
+    const sim = simulationRef.current as unknown as { nodes: () => D3Node[] };
+    const nodes: D3Node[] = nodesToFit || sim.nodes();
 
     if (nodes.length === 0) return;
 
@@ -262,8 +269,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     getFinalNodePositions: () => {
       const sim = simulationRef.current;
       if (sim) {
-        // FIX: d3 types might be incorrect. Cast to any to avoid argument count errors on nodes() getter.
-        const nodes = (sim as any).nodes() as D3Node[];
+        // FIX: d3 types might be incorrect. Cast to unknown then interface with getter to avoid argument count errors.
+        const nodes = (sim as unknown as { nodes: () => D3Node[] }).nodes();
         return nodes.map((node: D3Node) => ({
           id: node.id,
           x: node.x!,
@@ -272,7 +279,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       }
       return [];
     },
-    zoomToFit: () => zoomToFit(),
+    zoomToFit: () => zoomToFit(undefined),
   }));
 
   const highlightedNodeIds = useMemo(() => {
@@ -295,8 +302,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
 
   useEffect(() => {
     if (focusMode === 'zoom' && highlightedNodeIds.size > 0 && simulationRef.current) {
-        // FIX: d3 types might be incorrect. Cast to any.
-        const nodesToFit = (simulationRef.current as any).nodes().filter((n: D3Node) => highlightedNodeIds.has(n.id));
+        // Fix: Cast to unknown then interface with getter
+        const sim = simulationRef.current as unknown as { nodes: () => D3Node[] };
+        const nodesToFit = sim.nodes().filter((n: D3Node) => highlightedNodeIds.has(n.id));
         if (nodesToFit.length > 0) {
             zoomToFit(nodesToFit, true);
         }
@@ -339,8 +347,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     
     const simulation = simulationRef.current;
     
-    // FIX: Cast simulation to any to avoid "Expected 1 arguments, but got 0" error on nodes() getter.
-    const existingNodesMap = new Map((simulation as any).nodes().map((node: D3Node) => [node.id, node]));
+    // Fix: Cast to unknown then interface with getter to avoid argument count errors on nodes() call
+    const simGetter = simulation as unknown as { nodes: () => D3Node[] };
+    const existingNodesMap = new Map(simGetter.nodes().map((node: D3Node) => [node.id, node]));
     const d3Nodes = elements.map(element => {
       const existingNode = existingNodesMap.get(element.id);
       if (existingNode) {
@@ -485,8 +494,10 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         const height = foDiv.scrollHeight;
         const width = NODE_MAX_WIDTH;
 
-        d.width = width;
-        d.height = height;
+        // Fix: Cast d to D3Node to access width and height properties which might not exist on Element type
+        const dNode = d as D3Node;
+        dNode.width = width;
+        dNode.height = height;
 
         nodeElement.select('foreignObject')
             .attr('width', width).attr('height', height)
@@ -530,8 +541,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
 
 
     simulation.on('tick', () => {
-      // Fix: Explicitly type the Map to avoid 'unknown' inference
-      const nodesById = new Map<string, D3Node>((simulation as any).nodes().map((n: D3Node) => [n.id, n]));
+      // Fix: Explicitly type the Map to avoid 'unknown' inference. Use explicit cast for nodes getter.
+      const simGetter = simulation as unknown as { nodes: () => D3Node[] };
+      const nodesById = new Map<string, D3Node>(simGetter.nodes().map((n: D3Node) => [n.id, n]));
       
       link.attr('id', d => d.id)
         .attr('d', d => {
@@ -539,7 +551,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
           const source = (typeof d.source === 'string' ? nodesById.get(d.source) : d.source) as D3Node | undefined;
           const target = (typeof d.target === 'string' ? nodesById.get(d.target) : d.target) as D3Node | undefined;
           
-          if (!source || !target || !source.width || !target.width) return null;
+          // Use 'as any' to avoid "Property 'width' does not exist on type 'Element'" error if inferred incorrectly.
+          if (!source || !target || !(source as any).width || !(target as any).width) return null;
 
           const startPoint = getRectIntersection(source, target);
           const endPoint = getRectIntersection(target, source);

@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState } from './types';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions } from './types';
 import { DEFAULT_COLOR_SCHEMES } from './constants';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
 import ElementDetailsPanel from './components/ElementDetailsPanel';
@@ -1109,6 +1109,102 @@ export default function App() {
     setSelectedRelationshipId(null);
   }, []);
 
+
+  // --- AI Actions Adapter ---
+  // These functions are passed to the ChatPanel to allow the AI to modify the model.
+  // They abstract away the need for specific IDs or coordinates by handling defaults.
+  const aiActions: ModelActions = useMemo(() => {
+    const findElementByName = (name: string): Element | undefined => {
+      return elements.find(e => e.name.toLowerCase() === name.toLowerCase());
+    };
+
+    return {
+      addElement: (data) => {
+        const now = new Date().toISOString();
+        const id = generateUUID();
+        // Spiral placement logic for new AI nodes to prevent stacking
+        const count = elements.length;
+        const angle = count * 0.5;
+        const radius = 50 + (5 * count);
+        const centerX = window.innerWidth / 2; // Approx center
+        const centerY = window.innerHeight / 2;
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
+
+        const newElement: Element = {
+          id,
+          name: data.name,
+          type: data.type || 'Default',
+          notes: data.notes || '',
+          tags: data.tags || [],
+          createdAt: now,
+          updatedAt: now,
+          x, y, fx: x, fy: y
+        };
+        setElements(prev => [...prev, newElement]);
+        return id;
+      },
+      updateElement: (name, data) => {
+        const element = findElementByName(name);
+        if (!element) return false;
+        
+        const updatedElement = {
+          ...element,
+          ...data,
+          updatedAt: new Date().toISOString()
+        };
+        // Merge tags if provided, ensuring uniqueness
+        if (data.tags) {
+           updatedElement.tags = Array.from(new Set([...element.tags, ...data.tags]));
+        }
+        setElements(prev => prev.map(e => e.id === element.id ? updatedElement : e));
+        return true;
+      },
+      deleteElement: (name) => {
+        const element = findElementByName(name);
+        if (!element) return false;
+        handleDeleteElement(element.id);
+        return true;
+      },
+      addRelationship: (sourceName, targetName, label, directionStr) => {
+        const source = findElementByName(sourceName);
+        const target = findElementByName(targetName);
+        
+        if (!source || !target) return false;
+
+        let direction = RelationshipDirection.To;
+        if (directionStr) {
+            if (directionStr.toUpperCase() === 'FROM') direction = RelationshipDirection.From;
+            if (directionStr.toUpperCase() === 'NONE') direction = RelationshipDirection.None;
+        }
+
+        const newRel: Relationship = {
+          id: generateUUID(),
+          source: source.id,
+          target: target.id,
+          label: label,
+          direction: direction,
+          tags: []
+        };
+        setRelationships(prev => [...prev, newRel]);
+        return true;
+      },
+      deleteRelationship: (sourceName, targetName) => {
+        const source = findElementByName(sourceName);
+        const target = findElementByName(targetName);
+        if (!source || !target) return false;
+
+        setRelationships(prev => prev.filter(r => {
+            const isMatch = (r.source === source.id && r.target === target.id) || 
+                            (r.source === target.id && r.target === source.id); // Check both ways
+            return !isMatch;
+        }));
+        return true;
+      }
+    };
+  }, [elements, handleDeleteElement]);
+
+
   const handleExport = useCallback(() => {
     if (!currentModelId) {
         alert("No active model to export.");
@@ -1573,18 +1669,18 @@ export default function App() {
         </button>
         <button onClick={handleToggleFocusMode} title={focusButtonTitle()} className="p-2 rounded-md hover:bg-gray-700 transition">
             {focusMode === 'narrow' && (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <circle cx="12" cy="12" r="3" />
                 </svg>
             )}
             {focusMode === 'wide' && (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <circle cx="12" cy="12" r="10" />
                   <circle cx="12" cy="12" r="3" />
                 </svg>
             )}
             {focusMode === 'zoom' && (
-                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <circle cx="12" cy="12" r="10" />
                   <circle cx="12" cy="12" r="3" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M2 6V2h4 M22 6V2h-4 M2 18v4h4 M22 18v4h-4" />
@@ -1675,6 +1771,7 @@ export default function App() {
           relationships={relationships}
           onClose={() => setIsChatPanelOpen(false)}
           currentModelId={currentModelId}
+          modelActions={aiActions}
       />
 
       {currentModelId ? (
