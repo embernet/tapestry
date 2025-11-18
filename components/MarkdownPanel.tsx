@@ -176,12 +176,6 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
         </div>
         <div className="flex items-center space-x-4">
             <button
-                onClick={onClose}
-                className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150"
-            >
-                Cancel
-            </button>
-            <button
                 onClick={handleApply}
                 className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150"
             >

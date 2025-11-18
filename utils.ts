@@ -80,3 +80,36 @@ export const generateMarkdownFromGraph = (elements: Element[], relationships: Re
 
   return lines.join('\n');
 };
+
+export const generateElementMarkdown = (
+  element: Element,
+  relationships: Relationship[],
+  allElements: Element[]
+): string => {
+  const elementMap = new Map(allElements.map(e => [e.id, e]));
+  const lines: string[] = [`## ${element.name}`];
+  
+  if (element.type && element.type !== 'Default') lines.push(`**Type:** ${element.type}`);
+  if (element.tags.length > 0) lines.push(`**Tags:** ${element.tags.join(', ')}`);
+  if (element.notes) lines.push(`**Notes:**\n${element.notes}`);
+
+  const elementRels = relationships.filter(r => r.source === element.id || r.target === element.id);
+  if (elementRels.length > 0) {
+    lines.push("\n**Relationships:**");
+    elementRels.forEach(rel => {
+      const sourceElement = elementMap.get(rel.source as string);
+      const targetElement = elementMap.get(rel.target as string);
+      if (!sourceElement || !targetElement) return;
+      
+      let arrow = '';
+      switch (rel.direction) {
+        case RelationshipDirection.From: arrow = `<--[${rel.label}]--`; break;
+        case RelationshipDirection.None: arrow = `---[${rel.label}]---`; break;
+        default: arrow = `--[${rel.label}]-->`; break;
+      }
+      lines.push(`- \`${sourceElement.name}\` ${arrow} \`${targetElement.name}\``);
+    });
+  }
+  
+  return lines.join('\n\n---\n\n');
+};

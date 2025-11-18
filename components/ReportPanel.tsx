@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Element, Relationship, RelationshipDirection } from '../types';
+import { generateElementMarkdown } from '../utils';
 
 interface ReportPanelProps {
   elements: Element[];
@@ -169,28 +170,9 @@ const generateMarkdownReport = (
   // Details
   const detailLines: string[] = ["# Element Details"];
   elements.forEach(element => {
-    const elementLines = [`## ${element.name}`];
-    if (element.type && element.type !== 'Default') elementLines.push(`**Type:** ${element.type}`);
-    if (element.tags.length > 0) elementLines.push(`**Tags:** ${element.tags.join(', ')}`);
-    if (element.notes) elementLines.push(`**Notes:**\n${element.notes}`);
-    
-    const elementRels = relationships.filter(r => r.source === element.id || r.target === element.id);
-    if (elementRels.length > 0) {
-      elementLines.push("\n**Relationships:**");
-      elementRels.forEach(rel => {
-        const sourceElement = elementMap.get(rel.source as string);
-        const targetElement = elementMap.get(rel.target as string);
-        if (!sourceElement || !targetElement) return;
-        let arrow = '';
-        switch (rel.direction) {
-          case RelationshipDirection.From: arrow = `<--[${rel.label}]--`; break;
-          case RelationshipDirection.None: arrow = `---[${rel.label}]---`; break;
-          default: arrow = `--[${rel.label}]-->`; break;
-        }
-        elementLines.push(`- \`${sourceElement.name}\` ${arrow} \`${targetElement.name}\``);
-      });
-    }
-    detailLines.push(elementLines.join('\n\n---\n\n'));
+    // Use shared helper for consistency
+    const elementMarkdown = generateElementMarkdown(element, relationships, elements);
+    detailLines.push(elementMarkdown);
   });
   sections.push(detailLines.join('\n\n---\n\n'));
 
@@ -417,7 +399,6 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationship
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
                 ) : (
-                    // Fix: Replaced invalid text content with an SVG icon for "copy".
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>

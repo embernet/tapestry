@@ -63,3 +63,10 @@ export interface PanelState {
   targetElementId: string | null;
   isNewTarget?: boolean;
 }
+
+export interface DateFilterState {
+  createdAfter: string;
+  createdBefore: string;
+  updatedAfter: string;
+  updatedBefore: string;
+}

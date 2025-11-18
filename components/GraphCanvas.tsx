@@ -1,3 +1,5 @@
+
+
 import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
 import * as d3 from 'd3';
 import { Element, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection } from '../types';
@@ -117,12 +119,14 @@ const createDragHandler = (
     // Clean up temporary line from connect drag
     if (!isMoving) {
         // FIX: The type definitions for d3.selection.remove() are faulty in some versions
-        // of @types/d3, incorrectly expecting an argument. Casting the selection to `any`
-        // before calling remove() bypasses the faulty type check.
-        (d3.select(this.ownerSVGElement).select('.temp-drag-line') as any).remove();
+        // of @types/d3, incorrectly expecting an argument.
+        const tempLine: any = d3.select(this.ownerSVGElement).select('.temp-drag-line');
+        if (tempLine) tempLine.remove();
     }
 
-    const isClick = Math.abs(event.x - event.subject.x) < 5 && Math.abs(event.y - event.subject.y) < 5;
+    // Fix: Ensure event.subject properties are accessed safely and explicitly typed.
+    const subject = event.subject as D3Node;
+    const isClick = Math.abs(event.x - (subject.x || 0)) < 5 && Math.abs(event.y - (subject.y || 0)) < 5;
 
     if (isClick) {
         onNodeClickCallback(d.id);
@@ -133,7 +137,9 @@ const createDragHandler = (
     if (!isMoving) {
         // Finalize the connect drag by checking the mouseup event's target.
         const dropTargetElement = event.sourceEvent.target as HTMLElement;
-        const dropNodeSelection = d3.select(dropTargetElement?.closest('.node'));
+        // Find closest node if it exists, safe for null/undefined check
+        const dropNodeElement = dropTargetElement?.closest('.node');
+        const dropNodeSelection = dropNodeElement ? d3.select(dropNodeElement) : d3.select(null as any);
 
         // Check if the drop target is a valid, different node.
         if (!dropNodeSelection.empty() && (dropNodeSelection.datum() as D3Node).id !== d.id) {
@@ -159,8 +165,7 @@ const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>) => 
       // FIX: The type definitions for d3-force's restart() method are faulty in some versions of @types/d3,
       // incorrectly expecting an argument. Casting the simulation to `any` before calling restart()
       // bypasses the faulty type check and resolves the error.
-      simulation.alphaTarget(0.3);
-      (simulation as any).restart();
+      (simulation.alphaTarget(0.3) as any).restart();
     }
     d.fx = d.x;
     d.fy = d.y;
@@ -210,7 +215,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     if (!svgRef.current || !gRef.current || !simulationRef.current || !zoomRef.current) return;
 
     const svg = d3.select(svgRef.current);
-    const nodes = nodesToFit || simulationRef.current.nodes();
+    // FIX: d3 types might be incorrect, expecting arguments for nodes() getter. Cast to any.
+    const nodes: D3Node[] = nodesToFit || (simulationRef.current as any).nodes();
 
     if (nodes.length === 0) return;
 
@@ -254,8 +260,11 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
 
   useImperativeHandle(ref, () => ({
     getFinalNodePositions: () => {
-      if (simulationRef.current) {
-        return simulationRef.current.nodes().map(node => ({
+      const sim = simulationRef.current;
+      if (sim) {
+        // FIX: d3 types might be incorrect. Cast to any to avoid argument count errors on nodes() getter.
+        const nodes = (sim as any).nodes() as D3Node[];
+        return nodes.map((node: D3Node) => ({
           id: node.id,
           x: node.x!,
           y: node.y!
@@ -286,7 +295,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
 
   useEffect(() => {
     if (focusMode === 'zoom' && highlightedNodeIds.size > 0 && simulationRef.current) {
-        const nodesToFit = simulationRef.current.nodes().filter(n => highlightedNodeIds.has(n.id));
+        // FIX: d3 types might be incorrect. Cast to any.
+        const nodesToFit = (simulationRef.current as any).nodes().filter((n: D3Node) => highlightedNodeIds.has(n.id));
         if (nodesToFit.length > 0) {
             zoomToFit(nodesToFit, true);
         }
@@ -329,7 +339,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     
     const simulation = simulationRef.current;
     
-    const existingNodesMap = new Map(simulation.nodes().map(node => [node.id, node]));
+    // FIX: Cast simulation to any to avoid "Expected 1 arguments, but got 0" error on nodes() getter.
+    const existingNodesMap = new Map((simulation as any).nodes().map((node: D3Node) => [node.id, node]));
     const d3Nodes = elements.map(element => {
       const existingNode = existingNodesMap.get(element.id);
       if (existingNode) {
@@ -424,9 +435,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
           return ((!selectedElementId && !selectedRelationshipId) || highlightedNodeIds.has(d.id)) ? 1.0 : 0.2;
       });
 
-    // FIX: Using .each() with native element .remove() to work around a d3.selection.remove() typing issue
-    // that incorrectly expects an argument. The cast to `SVGElement` resolves name collision with the app's `Element` type.
-    node.selectAll('*').each(function() { (this as SVGElement).remove(); }); // Re-render content to reflect data changes
+    // FIX: Using (selection as any).remove() to bypass typing issues with d3.selection.remove() 
+    // or native Element.remove() expecting arguments in some environments.
+    (node.selectAll('*') as any).remove(); // Re-render content to reflect data changes
 
     node.append('rect')
         .attr('fill', d => {
@@ -514,17 +525,19 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         
       node.style('cursor', 'crosshair');
       const staticDragHandler = createDragHandler(setElements, onNodeClick, onNodeConnect, onNodeConnectToNew);
-      node.call(staticDragHandler);
+      node.call(staticDragHandler as any);
     }
 
 
     simulation.on('tick', () => {
-      const nodesById = new Map(simulation.nodes().map(n => [n.id, n]));
+      // Fix: Explicitly type the Map to avoid 'unknown' inference
+      const nodesById = new Map<string, D3Node>((simulation as any).nodes().map((n: D3Node) => [n.id, n]));
       
       link.attr('id', d => d.id)
         .attr('d', d => {
-          const source = typeof d.source === 'string' ? nodesById.get(d.source) : d.source as D3Node;
-          const target = typeof d.target === 'string' ? nodesById.get(d.target) : d.target as D3Node;
+          // Fix: Explicitly cast to D3Node | undefined to ensure correct typing
+          const source = (typeof d.source === 'string' ? nodesById.get(d.source) : d.source) as D3Node | undefined;
+          const target = (typeof d.target === 'string' ? nodesById.get(d.target) : d.target) as D3Node | undefined;
           
           if (!source || !target || !source.width || !target.width) return null;
 
@@ -551,8 +564,11 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     svg.on('click', onCanvasClick);
     svg.on('dblclick.zoom', null)
       .on('dblclick', (event) => {
-        const [x, y] = d3.pointer(event, g.node());
-        onCanvasDoubleClick({x, y});
+        const node = g.node();
+        if (node) {
+            const [x, y] = d3.pointer(event, node);
+            onCanvasDoubleClick({x, y});
+        }
       });
 
   }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu]);

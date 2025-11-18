@@ -1,15 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Element } from '../types';
+import { Element, Relationship } from '../types';
 import ElementEditor from './ElementEditor';
+import { generateElementMarkdown } from '../utils';
 
 interface ElementDetailsPanelProps {
   element: Element | undefined;
+  allElements: Element[];
+  relationships: Relationship[];
   onUpdate: (element: Element) => void;
   onDelete: (elementId: string) => void;
+  onClose: () => void;
 }
 
-const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, onUpdate, onDelete }) => {
+const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, allElements, relationships, onUpdate, onDelete, onClose }) => {
   const [formData, setFormData] = useState<Partial<Element>>({});
+  const [isCopied, setIsCopied] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -44,6 +49,15 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, onUp
       onDelete(element.id);
     }
   };
+  
+  const handleCopyMarkdown = () => {
+    if (!element) return;
+    const markdown = generateElementMarkdown(element, relationships, allElements);
+    navigator.clipboard.writeText(markdown).then(() => {
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    });
+  };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     // When Enter or Escape is pressed inside an input, blur it to trigger save.
@@ -57,24 +71,40 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, onUp
   }
 
   if (!element) {
-    return (
-      <div className="bg-gray-800 border-l border-gray-700 h-full w-96 flex-shrink-0 flex items-center justify-center p-6 text-gray-500">
-        <div className="text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-          </svg>
-          <p className="mt-4 text-lg">Select an element</p>
-          <p className="text-sm">Click on an element in the graph to view and edit its details here.</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
     <div className="bg-gray-800 border-l border-gray-700 h-full w-96 flex-shrink-0 z-20" onKeyDown={handleKeyDown}>
       <div className="p-6 flex flex-col h-full">
-        <div className="flex-shrink-0 mb-6">
+        <div className="flex-shrink-0 mb-6 flex justify-between items-start">
           <h2 className="text-2xl font-bold text-white">Element Details</h2>
+          <div className="flex space-x-2">
+            <button 
+              onClick={handleCopyMarkdown}
+              title={isCopied ? "Copied!" : "Copy as Markdown"}
+              className="text-gray-400 hover:text-white hover:bg-gray-700 p-1 rounded transition"
+            >
+              {isCopied ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              )}
+            </button>
+            <button 
+              onClick={onClose}
+              title="Close"
+              className="text-gray-400 hover:text-white hover:bg-gray-700 p-1 rounded transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="flex-grow overflow-y-auto pr-2">

@@ -1,8 +1,6 @@
 
-
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState } from './types';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState } from './types';
 import { DEFAULT_COLOR_SCHEMES } from './constants';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
 import ElementDetailsPanel from './components/ElementDetailsPanel';
@@ -16,9 +14,9 @@ import { generateUUID, generateMarkdownFromGraph } from './utils';
 
 
 // --- Storage Keys ---
-const MODELS_INDEX_KEY = 'factWeaver_models_index';
-const LAST_OPENED_MODEL_ID_KEY = 'factWeaver_last_opened_model_id';
-const MODEL_DATA_PREFIX = 'factWeaver_model_data_';
+const MODELS_INDEX_KEY = 'tapestry_models_index';
+const LAST_OPENED_MODEL_ID_KEY = 'tapestry_last_opened_model_id';
+const MODEL_DATA_PREFIX = 'tapestry_model_data_';
 
 
 // Helper Hook for detecting clicks outside an element
@@ -396,13 +394,19 @@ const OpenModelModal: React.FC<OpenModelModalProps> = ({ models, onLoad, onClose
 interface HelpMenuProps {
   onClose: () => void;
   onAbout: () => void;
+  onPatternGallery: () => void;
 }
-const HelpMenu: React.FC<HelpMenuProps> = ({ onClose, onAbout }) => {
+const HelpMenu: React.FC<HelpMenuProps> = ({ onClose, onAbout, onPatternGallery }) => {
   const menuRef = React.useRef<HTMLDivElement>(null);
   useClickOutside(menuRef, onClose);
   
   const handleAboutClick = () => {
     onAbout();
+    onClose();
+  };
+
+  const handlePatternGalleryClick = () => {
+    onPatternGallery();
     onClose();
   };
   
@@ -411,11 +415,290 @@ const HelpMenu: React.FC<HelpMenuProps> = ({ onClose, onAbout }) => {
       ref={menuRef}
       className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-600 rounded-md shadow-lg py-1 z-50 text-white"
     >
+      <button onClick={handlePatternGalleryClick} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700">
+        Pattern Gallery
+      </button>
       <button onClick={handleAboutClick} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700">
         About Tapestry
       </button>
     </div>
   );
+};
+
+// Pattern Gallery Modal Component
+interface PatternGalleryModalProps {
+  onClose: () => void;
+}
+const PatternGalleryModal: React.FC<PatternGalleryModalProps> = ({ onClose }) => {
+    const modalRef = React.useRef<HTMLDivElement>(null);
+    useClickOutside(modalRef, onClose);
+
+    // Colors: Red=Harmful, Green=Useful, Blue=Action, Teal=Trend, Orange=Emotion, Grey=Context, Black=Organisation, Yellow=Idea, Purple=Topic, Pink=Question
+    const tapestryPatterns = [
+        {
+            name: "The Weave",
+            desc: "When shifting trends intersect with human emotion, the fabric of culture is woven.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <path d="M8 4V28" stroke="#14b8a6" strokeWidth="3" strokeLinecap="round" />
+                    <path d="M16 4V28" stroke="#14b8a6" strokeWidth="3" strokeLinecap="round" />
+                    <path d="M24 4V28" stroke="#14b8a6" strokeWidth="3" strokeLinecap="round" />
+                    <path d="M4 8H28" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.8" />
+                    <path d="M4 16H28" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.8" />
+                    <path d="M4 24H28" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.8" />
+                </svg>
+            )
+        },
+        {
+            name: "The Mesh",
+            desc: "Action and inquiry must cross paths within a shared context to create meaningful progress.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <path d="M4 4L28 28" stroke="#3b82f6" strokeWidth="2" />
+                    <path d="M28 4L4 28" stroke="#ec4899" strokeWidth="2" />
+                    <path d="M16 2V30" stroke="#6b7280" strokeWidth="2" />
+                    <path d="M2 16H30" stroke="#6b7280" strokeWidth="2" />
+                    <rect x="10" y="10" width="12" height="12" stroke="#eab308" strokeWidth="2" fillOpacity="0" />
+                </svg>
+            )
+        },
+        {
+            name: "The Loop",
+            desc: "A bright idea can loop around a harmful problem to reveal a new trend.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <path d="M6 6C6 6 10 16 16 16C22 16 26 6 26 6" stroke="#ef4444" strokeWidth="3" strokeLinecap="round" />
+                    <path d="M6 26C6 26 10 16 16 16C22 16 26 26 26 26" stroke="#eab308" strokeWidth="3" strokeLinecap="round" />
+                    <circle cx="16" cy="16" r="4" fill="#14b8a6" />
+                </svg>
+            )
+        },
+        {
+            name: "The Stitch",
+            desc: "Useful innovations are often loose threads that need the structure of context to hold together.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <path d="M6 10H26" stroke="#22c55e" strokeWidth="4" strokeDasharray="4 4" />
+                    <path d="M6 22H26" stroke="#22c55e" strokeWidth="4" strokeDasharray="4 4" />
+                    <path d="M10 4V28" stroke="#6b7280" strokeWidth="2" />
+                    <path d="M22 4V28" stroke="#6b7280" strokeWidth="2" />
+                </svg>
+            )
+        },
+        {
+            name: "The Framework",
+            desc: "When harmful challenges intersect, a framework of solid action is required to contain them.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <rect x="6" y="6" width="20" height="20" stroke="#3b82f6" strokeWidth="2" />
+                    <path d="M16 2V30" stroke="#ef4444" strokeWidth="4" />
+                    <path d="M2 16H30" stroke="#ef4444" strokeWidth="4" />
+                    <rect x="14" y="14" width="4" height="4" fill="#ffffff" />
+                </svg>
+            )
+        },
+        {
+            name: "The Current",
+            desc: "Knowledge flows like a river, but it is the questioning current that gives it shape.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <path d="M8 8Q12 12 16 8T24 8" stroke="#a855f7" strokeWidth="3" strokeLinecap="round" />
+                    <path d="M8 16Q12 20 16 16T24 16" stroke="#ec4899" strokeWidth="3" strokeLinecap="round" />
+                    <path d="M8 24Q12 28 16 24T24 24" stroke="#a855f7" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+            )
+        },
+        {
+            name: "The Pivot",
+            desc: "An organisation that embraces a single bright idea can radiate usefulness in all directions.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <line x1="10" y1="4" x2="10" y2="28" stroke="black" strokeWidth="2" />
+                    <line x1="22" y1="4" x2="22" y2="28" stroke="black" strokeWidth="2" />
+                    <line x1="4" y1="10" x2="28" y2="10" stroke="black" strokeWidth="2" />
+                    <line x1="4" y1="22" x2="28" y2="22" stroke="black" strokeWidth="2" />
+                    <path d="M16 16L16 4 M16 16L28 16 M16 16L16 28 M16 16L4 16" stroke="#22c55e" strokeWidth="2" />
+                    <circle cx="16" cy="16" r="4" fill="#eab308" />
+                </svg>
+            )
+        },
+        {
+            name: "The Filter",
+            desc: "Context acts as a filter, refining chaotic trends into clear, direct action.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <path d="M0 10 Q16 0 32 10" stroke="#14b8a6" strokeWidth="3" fill="none" />
+                    <rect x="8" y="4" width="4" height="24" fill="#6b7280" />
+                    <rect x="20" y="4" width="4" height="24" fill="#6b7280" />
+                    <path d="M16 20 V30" stroke="#3b82f6" strokeWidth="4" markerEnd="url(#arrow)" />
+                </svg>
+            )
+        },
+        {
+            name: "The Resolution",
+            desc: "Even harmful conflict and raw emotion can be braided together to form a useful resolution.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <path d="M8 4 C8 4 12 12 4 12" stroke="#ef4444" strokeWidth="2" />
+                    <path d="M24 4 C24 4 20 12 28 12" stroke="#f97316" strokeWidth="2" />
+                    <path d="M10 16 C10 16 16 24 22 16 C22 16 16 8 10 16" stroke="#22c55e" strokeWidth="3" />
+                    <path d="M12 26 L20 26" stroke="#22c55e" strokeWidth="3" />
+                </svg>
+            )
+        },
+        {
+            name: "The Strategy",
+            desc: "The strongest organisations build a roof of action supported by the constant thread of questioning.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <rect x="4" y="8" width="4" height="20" fill="black" />
+                    <rect x="24" y="8" width="4" height="20" fill="black" />
+                    <rect x="2" y="4" width="28" height="4" fill="#3b82f6" />
+                    <line x1="12" y1="8" x2="12" y2="24" stroke="#ec4899" strokeWidth="2" strokeDasharray="2 2" />
+                    <line x1="20" y1="8" x2="20" y2="24" stroke="#ec4899" strokeWidth="2" strokeDasharray="2 2" />
+                </svg>
+            )
+        },
+        {
+            name: "The Insight",
+            desc: "True insight strikes when a powerful idea pierces through the center of established knowledge.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <rect x="4" y="4" width="24" height="24" rx="12" fill="#a855f7" fillOpacity="0.3" />
+                    <circle cx="16" cy="16" r="8" stroke="#6b7280" strokeWidth="2" />
+                    <path d="M22 4 L14 16 L18 16 L10 28" stroke="#eab308" strokeWidth="2" fill="none" />
+                </svg>
+            )
+        },
+        {
+            name: "The Compassion",
+            desc: "When a harmful trend emerges, it is human emotion that encircles it to provide healing.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#14b8a6" fillOpacity="0.2" rx="4" />
+                    <path d="M10 10 L22 22 M22 10 L10 22" stroke="#ef4444" strokeWidth="3" />
+                    <circle cx="16" cy="16" r="10" stroke="#f97316" strokeWidth="3" fill="none" />
+                </svg>
+            )
+        },
+        // New Tapestries for Advanced Innovation & Systems
+        {
+            name: "The Brocade",
+            desc: "Elevate a standard context by surface-weaving a pattern of bright ideas, adding value without disrupting the underlying structure.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#6b7280" rx="4" />
+                    <path d="M4 8H12 M16 8H24 M8 16H16 M20 16H28 M4 24H12 M16 24H24" stroke="#eab308" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+            )
+        },
+        {
+            name: "The Twill",
+            desc: "Establish a rhythm of overlapping actions that advances diagonally, creating a durable structure capable of withstanding stress.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <path d="M0 24 L8 32 M0 12 L20 32 M0 0 L32 32 M12 0 L32 20 M24 0 L32 8" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+            )
+        },
+        {
+            name: "The Darning",
+            desc: "Identify harmful holes in the narrative and systematically interlace useful solutions to restore integrity to the whole.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <circle cx="16" cy="16" r="12" stroke="#ef4444" strokeWidth="3" fill="none" />
+                    <path d="M8 12H24 M8 16H24 M8 20H24" stroke="#22c55e" strokeWidth="2" />
+                    <path d="M12 8V24 M16 8V24 M20 8V24" stroke="#a855f7" strokeWidth="2" opacity="0.7" />
+                </svg>
+            )
+        },
+        {
+            name: "The Jacquard",
+            desc: "Manage intricate relationships where every pixel of emotion, organisation, and idea is individually controlled to form a grand design.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <rect x="4" y="4" width="6" height="6" fill="#111827" />
+                    <rect x="12" y="4" width="6" height="6" fill="#f97316" />
+                    <rect x="20" y="4" width="6" height="6" fill="#eab308" />
+                    <rect x="4" y="12" width="6" height="6" fill="#f97316" />
+                    <rect x="12" y="12" width="6" height="6" fill="#eab308" />
+                    <rect x="20" y="12" width="6" height="6" fill="#111827" />
+                    <rect x="4" y="20" width="6" height="6" fill="#eab308" />
+                    <rect x="12" y="20" width="6" height="6" fill="#111827" />
+                    <rect x="20" y="20" width="6" height="6" fill="#f97316" />
+                </svg>
+            )
+        },
+        {
+            name: "The Selvage",
+            desc: "Reinforce the edges of a topic with specific questions to prevent the scope from unraveling into chaos.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#a855f7" fillOpacity="0.2" rx="4" />
+                    <path d="M6 4V28" stroke="#ec4899" strokeWidth="3" />
+                    <path d="M26 4V28" stroke="#ec4899" strokeWidth="3" />
+                    <path d="M10 16H22" stroke="#a855f7" strokeWidth="2" />
+                </svg>
+            )
+        },
+        {
+            name: "The Kilim",
+            desc: "Allow distinct organisations to butt against one another in a slit-weave, maintaining separate identities while forming a continuous surface.",
+            svg: (
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" fill="#1f2937" rx="4" />
+                    <path d="M16 4 L4 16 L16 28" fill="#111827" />
+                    <path d="M16 4 L28 16 L16 28" fill="#3b82f6" />
+                    <path d="M16 4 V28" stroke="#6b7280" strokeWidth="1" />
+                </svg>
+            )
+        }
+    ];
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+            <div ref={modalRef} className="bg-gray-800 rounded-lg w-full max-w-4xl shadow-xl border border-gray-600 text-gray-300 max-h-[90vh] flex flex-col">
+                <div className="flex-shrink-0 flex items-center justify-between p-6 border-b border-gray-700">
+                    <h2 className="text-2xl font-bold text-white">Tapestry Pattern Gallery</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="flex-grow overflow-y-auto p-8">
+                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {tapestryPatterns.map((pattern, idx) => (
+                            <div key={idx} className="bg-gray-700 bg-opacity-50 p-4 rounded-lg border border-gray-600 flex items-start space-x-4 hover:bg-opacity-70 transition">
+                                <div className="flex-shrink-0 pt-1">
+                                    {pattern.svg}
+                                </div>
+                                <div>
+                                    <h4 className="text-white font-bold text-sm mb-1">{pattern.name}</h4>
+                                    <p className="text-xs text-gray-300 italic leading-snug">{pattern.desc}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 // About Modal Component
@@ -428,61 +711,65 @@ const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
   
   const licenseText = `MIT License
 
-Copyright (c) 2025 Mark Burnett
+Copyright (c) 2025 Mark Burnett,
+https://www.linkedin.com/in/markburnett,
+https://github.com/embernet/tapestry
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.`;
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.`;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
-      <div ref={modalRef} className="bg-gray-800 rounded-lg p-8 w-full max-w-2xl shadow-xl border border-gray-600 text-gray-300 max-h-[90vh] flex flex-col">
-        <div className="flex-shrink-0 flex items-center gap-4 mb-6">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 8c2-2 4-2 6 0s4 2 6 0" />
-            <path d="M4 12c2-2 4-2 6 0s4 2 6 0" />
-            <path d="M4 16c2-2 4-2 6 0s4 2 6 0" />
-          </svg>
-          <div>
-            <h2 className="text-3xl font-bold text-white">Tapestry</h2>
-            <p className="text-gray-400">Version 0.0</p>
-          </div>
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+      <div ref={modalRef} className="bg-gray-800 rounded-lg w-full max-w-2xl shadow-xl border border-gray-600 text-gray-300 max-h-[90vh] flex flex-col">
+        <div className="flex-shrink-0 flex items-center justify-between p-6 border-b border-gray-700">
+           <div className="flex items-center gap-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 8c2-2 4-2 6 0s4 2 6 0" />
+                <path d="M4 12c2-2 4-2 6 0s4 2 6 0" />
+                <path d="M4 16c2-2 4-2 6 0s4 2 6 0" />
+              </svg>
+              <div>
+                <h2 className="text-3xl font-bold text-white">Tapestry</h2>
+                <p className="text-gray-400 text-sm">Visual Knowledge Weaver</p>
+              </div>
+           </div>
+           <button onClick={onClose} className="text-gray-400 hover:text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+           </button>
         </div>
         
-        <div className="flex-grow overflow-y-auto pr-4 space-y-4 text-base">
-          <p>
-            Tapestry is a AI tool for creating and exploring knowledge graphs, for learning and understanding the relationships between ideas, things, people, organisations, and actions, and for finding ways to improve or progress situations and help plan, prioritise, and decide what to do next. Tapestry is a tool for understanding, reflecting, communicating, planning change, and innovating; generating ideas and finding ways to convert them into actions that add value.
-          </p>
-
-          <div className="space-y-1 pt-2">
-            <p>Created by Mark Burnett - <a href="https://linkedin.com/in/markburnett" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">linkedin.com/in/markburnett</a></p>
-            <p>Project Repository: <a href="https://github.com/embernet/tapestry" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">github.com/embernet/tapestry</a></p>
+        <div className="flex-grow overflow-y-auto p-8 space-y-8">
+          <div className="prose prose-invert max-w-none">
+            <p className="text-lg leading-relaxed">
+              Tapestry is a tool for creating and exploring knowledge graphs. It helps you understand the relationships between ideas, people, organisations, and actions to find ways to improve situations and plan what to do next. It is a space for reflection, communication, and innovation.
+            </p>
           </div>
           
-          <div className="pt-2">
+          <div className="space-y-2 text-sm text-gray-400">
+            <p>Created by Mark Burnett</p>
+            <div className="flex gap-4">
+                 <a href="https://linkedin.com/in/markburnett" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path fillRule="evenodd" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" clipRule="evenodd" /></svg>
+                    LinkedIn
+                 </a>
+                 <a href="https://github.com/embernet/tapestry" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path fillRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" clipRule="evenodd" /></svg>
+                    GitHub
+                 </a>
+            </div>
+          </div>
+          
+          <div className="pt-6 border-t border-gray-700">
              <h3 className="text-lg font-semibold text-white mb-2">License</h3>
-             <pre className="bg-gray-900 border border-gray-700 rounded-md p-4 text-xs text-gray-400 overflow-x-auto max-h-48">
+             <pre className="text-xs text-gray-400 whitespace-pre-wrap font-mono bg-gray-900 bg-opacity-50 p-4 rounded-md border border-gray-700">
               {licenseText}
              </pre>
           </div>
-        </div>
-        
-        <div className="flex-shrink-0 mt-8 flex justify-end">
-          <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Close</button>
         </div>
       </div>
     </div>
@@ -525,10 +812,17 @@ export default function App() {
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
+  const [isPatternGalleryModalOpen, setIsPatternGalleryModalOpen] = useState(false);
   
   const [tagFilter, setTagFilter] = useState<{ included: Set<string>, excluded: Set<string> }>({
     included: new Set(),
     excluded: new Set(),
+  });
+  const [dateFilter, setDateFilter] = useState<DateFilterState>({
+    createdAfter: '',
+    createdBefore: '',
+    updatedAfter: '',
+    updatedBefore: '',
   });
 
   const [isInitialLoad, setIsInitialLoad] = useState(true);
@@ -595,16 +889,34 @@ export default function App() {
 
   const filteredElements = useMemo(() => {
     const { included, excluded } = tagFilter;
-    if (excluded.size === 0 && included.size === allTags.length) {
-      return elements;
-    }
+
+    const matchesDate = (element: Element) => {
+      const createdDate = element.createdAt.substring(0, 10);
+      const updatedDate = element.updatedAt.substring(0, 10);
+
+      if (dateFilter.createdAfter && createdDate < dateFilter.createdAfter) return false;
+      if (dateFilter.createdBefore && createdDate > dateFilter.createdBefore) return false;
+      if (dateFilter.updatedAfter && updatedDate < dateFilter.updatedAfter) return false;
+      if (dateFilter.updatedBefore && updatedDate > dateFilter.updatedBefore) return false;
+      return true;
+    };
+
     return elements.filter(element => {
+      // Rule 0: Check date filter
+      if (!matchesDate(element)) {
+        return false;
+      }
+
+      if (excluded.size === 0 && included.size === allTags.length) {
+        return true;
+      }
+
       // Rule 1: If an element has ANY excluded tag, it's hidden.
       if (element.tags.some(tag => excluded.has(tag))) {
         return false;
       }
       
-      // Rule 2: If an element has no tags, it's visible.
+      // Rule 2: If an element has no tags, it's visible (unless date filter hid it).
       if (element.tags.length === 0) {
         return true; 
       }
@@ -612,13 +924,11 @@ export default function App() {
       // Rule 3: If an element has tags, at least one must be in the included list.
       return element.tags.some(tag => included.has(tag));
     });
-  }, [elements, tagFilter, allTags]);
+  }, [elements, tagFilter, allTags, dateFilter]);
 
   const filteredRelationships = useMemo(() => {
     const { included, excluded } = tagFilter;
-    if (excluded.size === 0 && included.size === allTags.length) {
-      return relationships;
-    }
+    
     const visibleElementIds = new Set(filteredElements.map(f => f.id));
     return relationships.filter(rel =>
       visibleElementIds.has(rel.source as string) && visibleElementIds.has(rel.target as string)
@@ -632,14 +942,15 @@ export default function App() {
     const modelDataString = localStorage.getItem(`${MODEL_DATA_PREFIX}${modelId}`);
     if (modelDataString) {
       const data = JSON.parse(modelDataString);
-      setElements(data.elements || data.facts || []); // data.facts for backward compatibility
+      setElements(data.elements || []);
       setRelationships(data.relationships || []);
       setColorSchemes(data.colorSchemes || DEFAULT_COLOR_SCHEMES);
       setActiveSchemeId(data.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null);
       setCurrentModelId(modelId);
       localStorage.setItem(LAST_OPENED_MODEL_ID_KEY, modelId);
       setIsOpenModelModalOpen(false);
-      setTagFilter({ included: new Set(), excluded: new Set() }); // Reset filters on model load
+      setTagFilter({ included: new Set(), excluded: new Set() }); // Reset tag filters on model load
+      setDateFilter({ createdAfter: '', createdBefore: '', updatedAfter: '', updatedBefore: '' }); // Reset date filters
     }
   }, []);
 
@@ -843,7 +1154,7 @@ export default function App() {
             const text = e.target?.result as string;
             const imported = JSON.parse(text);
 
-            if (!imported.metadata || !imported.metadata.name || !imported.data || (!Array.isArray(imported.data.elements) && !Array.isArray(imported.data.facts)) || !Array.isArray(imported.data.relationships)) {
+            if (!imported.metadata || !imported.metadata.name || !imported.data || !Array.isArray(imported.data.elements) || !Array.isArray(imported.data.relationships)) {
                 throw new Error('Invalid file format. The file must be a valid Tapestry export.');
             }
             
@@ -872,7 +1183,7 @@ export default function App() {
                 };
 
                 const newModelData = {
-                    elements: imported.data.elements || imported.data.facts || [],
+                    elements: imported.data.elements || [],
                     relationships: imported.data.relationships || [],
                     colorSchemes: imported.data.colorSchemes || DEFAULT_COLOR_SCHEMES,
                     activeSchemeId: imported.data.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null,
@@ -1133,8 +1444,8 @@ export default function App() {
                 
                 for (const rel of nextRelationships) {
                     let anchorId: string | undefined;
-                    if (rel.source === element.id) anchorId = rel.target;
-                    else if (rel.target === element.id) anchorId = rel.source;
+                    if (rel.source === element.id) anchorId = rel.target as string;
+                    else if (rel.target === element.id) anchorId = rel.source as string;
 
                     if (anchorId) {
                        const potentialAnchor = nextElements.find(f => f.id === anchorId && f.x !== undefined);
@@ -1178,7 +1489,9 @@ export default function App() {
   const handleAcceptLayout = () => {
     const finalPositions = graphCanvasRef.current?.getFinalNodePositions();
     if (finalPositions) {
-      const positionsMap = new Map(finalPositions.map(p => [p.id, p]));
+      // Fix: Explicitly type `p` to resolve a chain of type inference errors where `p` and `pos`
+      // could be treated as `unknown`, causing errors on property access (id, x, y) and spreads.
+      const positionsMap = new Map(finalPositions.map((p: { id: string; x: number; y: number; }) => [p.id, p]));
       // Apply the final positions from the simulation as fixed positions
       setElements(prev => prev.map(element => {
         const pos = positionsMap.get(element.id);
@@ -1299,9 +1612,9 @@ export default function App() {
          <div className="bg-gray-700 rounded-md flex">
             {!isPhysicsModeActive ? (
                 <button onClick={handleStartPhysicsLayout} title="Auto-Layout" className="p-2 hover:bg-gray-600 rounded-md transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} fill="none">
-                        <circle cx="6" cy="18" r="3" fill="currentColor" />
-                        <circle cx="18" cy="6" r="3" fill="currentColor" />
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} fill="currentColor">
+                        <circle cx="6" cy="18" r="3" />
+                        <circle cx="18" cy="6" r="3" />
                         <path strokeLinecap="round" strokeLinejoin="round" d="M 8 16 Q 4 12, 12 12 T 16 8" />
                     </svg>
                 </button>
@@ -1326,6 +1639,7 @@ export default function App() {
               <HelpMenu 
                   onClose={() => setIsHelpMenuOpen(false)} 
                   onAbout={() => setIsAboutModalOpen(true)}
+                  onPatternGallery={() => setIsPatternGalleryModalOpen(true)}
               />
           )}
         </div>
@@ -1338,7 +1652,9 @@ export default function App() {
             allTags={allTags}
             tagCounts={tagCounts}
             tagFilter={tagFilter}
+            dateFilter={dateFilter}
             onTagFilterChange={setTagFilter}
+            onDateFilterChange={setDateFilter}
             onClose={() => setIsFilterPanelOpen(false)}
         />
       )}
@@ -1405,13 +1721,16 @@ export default function App() {
                 onUpdate={handleUpdateRelationship}
                 onDelete={handleDeleteRelationship}
             />
-        ) : (
+        ) : selectedElement ? (
             <ElementDetailsPanel
                 element={selectedElement}
+                allElements={elements}
+                relationships={relationships}
                 onUpdate={handleUpdateElement}
                 onDelete={handleDeleteElement}
+                onClose={() => setSelectedElementId(null)}
             />
-        )}
+        ) : null}
       </div>
 
       {isReportPanelOpen && (
@@ -1493,6 +1812,7 @@ export default function App() {
       )}
 
       {isAboutModalOpen && <AboutModal onClose={() => setIsAboutModalOpen(false)} />}
+      {isPatternGalleryModalOpen && <PatternGalleryModal onClose={() => setIsPatternGalleryModalOpen(false)} />}
     </div>
   );
 }
