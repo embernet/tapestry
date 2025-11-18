@@ -157,9 +157,10 @@ const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>) => 
     // is the idiomatic D3 pattern.
     if (!event.active) {
       // FIX: The type definitions for d3-force's restart() method are faulty in some versions of @types/d3,
-      // incorrectly expecting an argument. Casting the simulation to `any`
-      // calling restart() bypasses the faulty type check and resolves the error.
-      (simulation.alphaTarget(0.3) as any).restart();
+      // incorrectly expecting an argument. Casting the simulation to `any` before calling restart()
+      // bypasses the faulty type check and resolves the error.
+      simulation.alphaTarget(0.3);
+      (simulation as any).restart();
     }
     d.fx = d.x;
     d.fy = d.y;

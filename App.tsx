@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState } from './types';
 import { DEFAULT_COLOR_SCHEMES } from './constants';
@@ -389,6 +390,106 @@ const OpenModelModal: React.FC<OpenModelModalProps> = ({ models, onLoad, onClose
 };
 
 
+// --- New Helper Components for Help Menu ---
+
+// HelpMenu Dropdown Component
+interface HelpMenuProps {
+  onClose: () => void;
+  onAbout: () => void;
+}
+const HelpMenu: React.FC<HelpMenuProps> = ({ onClose, onAbout }) => {
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  useClickOutside(menuRef, onClose);
+  
+  const handleAboutClick = () => {
+    onAbout();
+    onClose();
+  };
+  
+  return (
+    <div
+      ref={menuRef}
+      className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-600 rounded-md shadow-lg py-1 z-50 text-white"
+    >
+      <button onClick={handleAboutClick} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700">
+        About Tapestry
+      </button>
+    </div>
+  );
+};
+
+// About Modal Component
+interface AboutModalProps {
+  onClose: () => void;
+}
+const AboutModal: React.FC<AboutModalProps> = ({ onClose }) => {
+  const modalRef = React.useRef<HTMLDivElement>(null);
+  useClickOutside(modalRef, onClose);
+  
+  const licenseText = `MIT License
+
+Copyright (c) 2025 Mark Burnett
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
+      <div ref={modalRef} className="bg-gray-800 rounded-lg p-8 w-full max-w-2xl shadow-xl border border-gray-600 text-gray-300 max-h-[90vh] flex flex-col">
+        <div className="flex-shrink-0 flex items-center gap-4 mb-6">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 8c2-2 4-2 6 0s4 2 6 0" />
+            <path d="M4 12c2-2 4-2 6 0s4 2 6 0" />
+            <path d="M4 16c2-2 4-2 6 0s4 2 6 0" />
+          </svg>
+          <div>
+            <h2 className="text-3xl font-bold text-white">Tapestry</h2>
+            <p className="text-gray-400">Version 0.0</p>
+          </div>
+        </div>
+        
+        <div className="flex-grow overflow-y-auto pr-4 space-y-4 text-base">
+          <p>
+            Tapestry is a AI tool for creating and exploring knowledge graphs, for learning and understanding the relationships between ideas, things, people, organisations, and actions, and for finding ways to improve or progress situations and help plan, prioritise, and decide what to do next. Tapestry is a tool for understanding, reflecting, communicating, planning change, and innovating; generating ideas and finding ways to convert them into actions that add value.
+          </p>
+
+          <div className="space-y-1 pt-2">
+            <p>Created by Mark Burnett - <a href="https://linkedin.com/in/markburnett" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">linkedin.com/in/markburnett</a></p>
+            <p>Project Repository: <a href="https://github.com/embernet/tapestry" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">github.com/embernet/tapestry</a></p>
+          </div>
+          
+          <div className="pt-2">
+             <h3 className="text-lg font-semibold text-white mb-2">License</h3>
+             <pre className="bg-gray-900 border border-gray-700 rounded-md p-4 text-xs text-gray-400 overflow-x-auto max-h-48">
+              {licenseText}
+             </pre>
+          </div>
+        </div>
+        
+        <div className="flex-shrink-0 mt-8 flex justify-end">
+          <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 // --- Main App Component ---
 
 export default function App() {
@@ -422,6 +523,8 @@ export default function App() {
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isReportPanelOpen, setIsReportPanelOpen] = useState(false);
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
+  const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   
   const [tagFilter, setTagFilter] = useState<{ included: Set<string>, excluded: Set<string> }>({
     included: new Set(),
@@ -1213,6 +1316,19 @@ export default function App() {
                 </div>
             )}
         </div>
+        <div className="relative">
+          <button onClick={() => setIsHelpMenuOpen(p => !p)} title="Help" className="p-2 rounded-md hover:bg-gray-700 transition">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+          {isHelpMenuOpen && (
+              <HelpMenu 
+                  onClose={() => setIsHelpMenuOpen(false)} 
+                  onAbout={() => setIsAboutModalOpen(true)}
+              />
+          )}
+        </div>
         <div className="border-l border-gray-600 h-6 mx-2"></div>
         <span className="text-gray-400 text-sm font-semibold pr-2">Current Model: {currentModelName}</span>
       </div>
@@ -1375,6 +1491,8 @@ export default function App() {
           }}
         />
       )}
+
+      {isAboutModalOpen && <AboutModal onClose={() => setIsAboutModalOpen(false)} />}
     </div>
   );
 }
