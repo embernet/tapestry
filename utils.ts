@@ -1,3 +1,4 @@
+
 import { Element, Relationship, RelationshipDirection } from './types';
 
 /**
@@ -23,9 +24,6 @@ export const generateMarkdownFromGraph = (elements: Element[], relationships: Re
     const needsQuotes = /[():]/.test(element.name);
     let str = needsQuotes ? `"${element.name}"` : element.name;
 
-    if (element.type && element.type !== 'Default') {
-      str += `(${element.type})`;
-    }
     if (element.tags && element.tags.length > 0) {
       str += `:${element.tags.join(',')}`;
     }
@@ -89,7 +87,6 @@ export const generateElementMarkdown = (
   const elementMap = new Map(allElements.map(e => [e.id, e]));
   const lines: string[] = [`## ${element.name}`];
   
-  if (element.type && element.type !== 'Default') lines.push(`**Type:** ${element.type}`);
   if (element.tags.length > 0) lines.push(`**Tags:** ${element.tags.join(', ')}`);
   if (element.notes) lines.push(`**Notes:**\n${element.notes}`);
 

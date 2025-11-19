@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Element, Relationship, RelationshipDirection } from '../types';
 import ElementEditor from './ElementEditor';
@@ -13,6 +14,7 @@ interface AddRelationshipPanelProps {
   onCancel: () => void;
   targetElementId?: string | null;
   isNewTarget?: boolean;
+  suggestedLabels?: string[];
 }
 
 const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
@@ -23,11 +25,11 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   onCancel,
   targetElementId,
   isNewTarget,
+  suggestedLabels = [],
 }) => {
   const [selectedTargetId, setSelectedTargetId] = useState<string>(targetElementId || 'NEW_ELEMENT');
   const [elementEditorData, setElementEditorData] = useState<Partial<Element>>({
     name: '',
-    type: 'Default',
     notes: '',
     tags: []
   });
@@ -48,7 +50,7 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
     if (isNewTarget && targetElement) {
         setElementEditorData(targetElement);
     } else {
-        setElementEditorData({ name: '', type: 'Default', notes: '', tags: [] });
+        setElementEditorData({ name: '', notes: '', tags: [] });
     }
   }, [targetElementId, isNewTarget, targetElement]);
 
@@ -73,7 +75,7 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
       }
       onCreate(
         { source: sourceElement.id, target: 'new-element-placeholder', label: label.trim(), direction },
-        { ...elementEditorData, name: elementEditorData.name.trim(), type: elementEditorData.type?.trim() || 'Default' } as NewElementData
+        { ...elementEditorData, name: elementEditorData.name.trim() } as NewElementData
       );
     } else {
       onCreate(
@@ -116,12 +118,16 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
             <label className="block text-sm font-medium">Label</label>
             <input
               ref={labelInputRef}
+              list="relationship-labels"
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="e.g., works at, is related to"
               className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <datalist id="relationship-labels">
+                {suggestedLabels.map(l => <option key={l} value={l} />)}
+            </datalist>
           </div>
           <div>
             <label className="block text-sm font-medium">Direction</label>

@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, Content, Part, Type, FunctionDeclaration, Tool, FunctionCall, FunctionResponse } from '@google/genai';
-import { Element, Relationship, ModelActions } from '../types';
+import { GoogleGenAI, Content, Part, Type, Tool, FunctionCall, FunctionResponse } from '@google/genai';
+import { Element, Relationship, ModelActions, ColorScheme } from '../types';
 import { generateMarkdownFromGraph } from '../utils';
 
 interface ChatPanelProps {
   elements: Element[];
   relationships: Relationship[];
+  colorSchemes: ColorScheme[];
+  activeSchemeId: string | null;
   onClose: () => void;
   currentModelId: string | null;
   modelActions: ModelActions;
@@ -22,7 +24,7 @@ interface Message {
   isPending?: boolean; // If true, the tool calls are waiting for user confirmation
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, onClose, currentModelId, modelActions, className, isOpen }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSchemes, activeSchemeId, onClose, currentModelId, modelActions, className, isOpen }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -78,8 +80,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, onClose,
                       type: Type.OBJECT,
                       properties: {
                           name: { type: Type.STRING, description: "The name of the element." },
-                          type: { type: Type.STRING, description: "The type/category of the element (e.g., Idea, Person, Goal). Default to 'Default' if unsure." },
-                          tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional tags for categorization." },
+                          tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional tags for categorization. Refer to the Active Schema for standard tags." },
                           notes: { type: Type.STRING, description: "Optional descriptive notes." }
                       },
                       required: ["name"]
@@ -87,12 +88,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, onClose,
               },
               {
                   name: "updateElement",
-                  description: "Updates an existing element. Use this to add tags, change types, or update notes.",
+                  description: "Updates an existing element. Use this to add tags or update notes.",
                   parameters: {
                       type: Type.OBJECT,
                       properties: {
                           name: { type: Type.STRING, description: "The name of the element to update (must match existing name)." },
-                          type: { type: Type.STRING, description: "New type." },
                           tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "New tags to add." },
                           notes: { type: Type.STRING, description: "New notes content." }
                       },
@@ -118,7 +118,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, onClose,
                       properties: {
                           sourceName: { type: Type.STRING, description: "The name of the starting element." },
                           targetName: { type: Type.STRING, description: "The name of the ending element." },
-                          label: { type: Type.STRING, description: "The label describing the relationship (e.g., 'causes', 'belongs to')." },
+                          label: { type: Type.STRING, description: "The label describing the relationship (e.g., 'causes', 'belongs to'). Check Schema for standard labels." },
                           direction: { type: Type.STRING, description: "Direction: 'TO', 'FROM', or 'NONE'. Default is 'TO'." }
                       },
                       required: ["sourceName", "targetName", "label"]
@@ -213,6 +213,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, onClose,
     return history;
   };
 
+  const formatFunctionCall = (fc: FunctionCall) => {
+      const args = fc.args as any;
+      switch(fc.name) {
+          case 'addElement':
+              return `Add Element: "${args.name}"` + (args.tags?.length ? ` [${args.tags.join(', ')}]` : '');
+          case 'addRelationship':
+              return `Connect: "${args.sourceName}" --[${args.label}]--> "${args.targetName}"`;
+          case 'deleteElement':
+              return `Delete Element: "${args.name}"`;
+          case 'updateElement':
+              return `Update Element: "${args.name}"`;
+          case 'deleteRelationship':
+               return `Disconnect: "${args.sourceName}" and "${args.targetName}"`;
+          default:
+              return `${fc.name}: ${JSON.stringify(args)}`;
+      }
+  };
+
   const handleSendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -244,11 +262,33 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, onClose,
         - Identify gaps in logic, missing perspectives, or emerging trends and ask the user questions to fill them.
         - You are encouraged to propose adding new elements using the 'addElement' tool if they add value, solve problems, or represent creative solutions.
         - Draw parallels with design patterns, historical events, or business strategies where appropriate.
+        - When adding new elements to counteract others, ALWAYS try to link them back to the problem element using 'addRelationship' with an appropriate label (e.g. 'mitigates', 'solves').
         `;
+
+        let schemaContext = "NO ACTIVE SCHEMA DEFINED. You can use any tags or relationship labels, but prefer standard ones like 'Action', 'Idea', 'Person' and 'causes', 'related to'.";
+        const activeScheme = colorSchemes.find(s => s.id === activeSchemeId);
+        if (activeScheme) {
+             const labels = activeScheme.relationshipLabels || [];
+             schemaContext = `
+        ACTIVE SCHEMA: "${activeScheme.name}"
+        The following tags are explicitly defined in the current schema. These tags govern the visual appearance of nodes.
+        You MUST use these specific tags when categorizing elements to ensure they integrate correctly with the user's model:
+        ${Object.keys(activeScheme.tagColors).map(tag => `- "${tag}"`).join('\n')}
+        
+        The following standard relationship labels are defined in the current schema:
+        ${labels.map(l => `- "${l}"`).join('\n')}
+        
+        RULES FOR SCHEMA USAGE:
+        1. When the user asks to add a specific type of agent (e.g. "add an Idea", "add an Action"), map their request to one of the tags above and include it in the 'tags' list for that element.
+        2. When connecting elements with 'addRelationship', prefer using one of the standard relationship labels listed above if it fits the context. If none fit, use a clear, concise label of your own.
+        `;
+        }
 
         const systemInstruction = `You are an AI assistant for a visual graphing tool called Tapestry. 
         
         ${isCreativeMode ? creativeInstruction : strictInstruction}
+
+        ${schemaContext}
         
         Context:
         The user is viewing a knowledge graph. You have been provided the graph data in a markdown-like format below. 
@@ -258,6 +298,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, onClose,
         2. **IF THE USER ASKS A QUESTION:** Answer it using text based on the context. **DO NOT** call any tools. Tools are ONLY for modifying the graph.
         3. **IF THE USER ASKS TO MODIFY THE GRAPH:** (e.g. "add a node", "connect A to B", "delete X"), then use the appropriate tools.
         4. When referring to elements, use their exact Names.
+        5. When adding or updating elements, ALWAYS consult the Active Schema above and apply the most relevant tag from the list if possible.
+        6. **BATCHING:** If a user request involves creating multiple elements and connecting them (e.g. "Add 3 actions to mitigate X"), you MUST generate ALL the necessary 'addElement' and 'addRelationship' tool calls in a SINGLE response. Do not ask for confirmation between individual steps of a single logical request.
         
         Current Model Data:
         ---\n${modelMarkdown}\n---`;
@@ -502,8 +544,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, onClose,
                               <li key={i} className="flex items-start gap-2">
                                   <span className="text-gray-500 mt-0.5">•</span>
                                   <div className="break-all">
-                                    <span className="text-blue-400 font-semibold">{fc.name}</span>
-                                    <span className="text-gray-400">({JSON.stringify(fc.args).replace(/^{|}$/g, '')})</span>
+                                    {formatFunctionCall(fc)}
                                   </div>
                               </li>
                           ))}

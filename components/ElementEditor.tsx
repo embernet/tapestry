@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Element } from '../types';
 
@@ -35,17 +36,6 @@ const ElementEditor: React.FC<ElementEditorProps> = ({ elementData, onDataChange
           type="text"
           name="name"
           value={elementData.name || ''}
-          onChange={handleInputChange}
-          onBlur={onBlur}
-          className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium">Type</label>
-        <input
-          type="text"
-          name="type"
-          value={elementData.type || ''}
           onChange={handleInputChange}
           onBlur={onBlur}
           className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"

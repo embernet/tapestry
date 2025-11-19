@@ -127,13 +127,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ initialSchemes, initialAc
   const [newTagName, setNewTagName] = useState('');
   const [editingTag, setEditingTag] = useState<string | null>(null);
   const [editingTagName, setEditingTagName] = useState('');
+  
+  const [newLabelName, setNewLabelName] = useState('');
+  const [activeTab, setActiveTab] = useState<'tags' | 'relationships'>('tags');
 
   const selectedScheme = useMemo(() => schemes.find(s => s.id === activeSchemeId), [schemes, activeSchemeId]);
 
   const handleCreateScheme = () => {
-    const name = prompt('Enter new scheme name:');
+    const name = prompt('Enter new schema name:');
     if (name) {
-      const newScheme: ColorScheme = { id: generateUUID(), name, tagColors: {} };
+      const newScheme: ColorScheme = { id: generateUUID(), name, tagColors: {}, relationshipLabels: [] };
       setSchemes(prev => [...prev, newScheme]);
       setActiveSchemeId(newScheme.id);
     }
@@ -212,6 +215,33 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ initialSchemes, initialAc
 
     handleCancelEditing();
   };
+  
+  const handleAddLabel = () => {
+      const trimmedLabel = newLabelName.trim();
+      if (trimmedLabel && activeSchemeId && selectedScheme) {
+          const existing = selectedScheme.relationshipLabels || [];
+          if (existing.some(l => l.toLowerCase() === trimmedLabel.toLowerCase())) {
+              alert(`Label "${trimmedLabel}" already exists.`);
+              return;
+          }
+          
+          setSchemes(prev => prev.map(s => 
+             s.id === activeSchemeId
+             ? { ...s, relationshipLabels: [...(s.relationshipLabels || []), trimmedLabel] }
+             : s
+          ));
+          setNewLabelName('');
+      }
+  };
+
+  const handleLabelDelete = (label: string) => {
+      if (!activeSchemeId) return;
+      setSchemes(prev => prev.map(s => 
+         s.id === activeSchemeId
+         ? { ...s, relationshipLabels: (s.relationshipLabels || []).filter(l => l !== label) }
+         : s
+      ));
+  };
 
 
   const modalRef = React.useRef<HTMLDivElement>(null);
@@ -219,10 +249,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ initialSchemes, initialAc
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
-      <div ref={modalRef} className="bg-gray-800 rounded-lg p-8 w-full max-w-2xl shadow-xl border border-gray-600">
-        <h2 className="text-2xl font-bold mb-6 text-white">Color Schemes</h2>
+      <div ref={modalRef} className="bg-gray-800 rounded-lg p-8 w-full max-w-2xl shadow-xl border border-gray-600 flex flex-col max-h-[85vh]">
+        <h2 className="text-2xl font-bold mb-6 text-white flex-shrink-0">Schemas</h2>
         
-        <div className="flex gap-4 items-center mb-6">
+        <div className="flex gap-4 items-center mb-6 flex-shrink-0">
             <select
               value={activeSchemeId || ''}
               onChange={(e) => setActiveSchemeId(e.target.value)}
@@ -230,65 +260,114 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ initialSchemes, initialAc
             >
               {schemes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
-            <button onClick={handleCreateScheme} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">New Scheme</button>
+            <button onClick={handleCreateScheme} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">New Schema</button>
         </div>
 
         {selectedScheme && (
-            <>
-              <h3 className="text-xl font-semibold mb-4 text-white">Edit: {selectedScheme.name}</h3>
-              <div className="space-y-4 max-h-72 overflow-y-auto pr-2 mb-6">
-                {Object.entries(selectedScheme.tagColors).map(([tag, color]) => (
-                  <div key={tag} className="flex items-center justify-between bg-gray-700 p-2 rounded-md">
-                    {editingTag === tag ? (
-                      <input 
-                        type="text"
-                        value={editingTagName}
-                        onChange={(e) => setEditingTagName(e.target.value)}
-                        onBlur={handleTagRename}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleTagRename();
-                          if (e.key === 'Escape') handleCancelEditing();
-                        }}
-                        autoFocus
-                        className="bg-gray-600 border border-gray-500 rounded-md px-2 py-1 text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    ) : (
-                      <span 
-                        onClick={() => handleStartEditingTag(tag)}
-                        className="text-gray-300 font-mono cursor-pointer hover:text-white"
-                      >
-                        {tag}
-                      </span>
-                    )}
-                    <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={color}
-                          onChange={(e) => handleTagColorChange(tag, e.target.value)}
-                          className="w-12 h-8 p-0 border-none rounded bg-transparent"
-                        />
-                        <button onClick={() => handleTagDelete(tag)} className="text-red-400 hover:text-red-300 p-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
-                        </button>
+            <div className="flex flex-col flex-grow min-h-0">
+                <div className="flex space-x-4 border-b border-gray-700 mb-4 flex-shrink-0">
+                    <button
+                        className={`py-2 px-4 font-semibold text-sm transition-colors duration-200 ${activeTab === 'tags' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'}`}
+                        onClick={() => setActiveTab('tags')}
+                    >
+                        Element Tags
+                    </button>
+                    <button
+                        className={`py-2 px-4 font-semibold text-sm transition-colors duration-200 ${activeTab === 'relationships' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'}`}
+                        onClick={() => setActiveTab('relationships')}
+                    >
+                        Relationship Labels
+                    </button>
+                </div>
+
+              {activeTab === 'tags' && (
+                  <>
+                    <div className="flex-1 overflow-y-auto pr-2 mb-4">
+                        <div className="space-y-2">
+                            {Object.entries(selectedScheme.tagColors).map(([tag, color]) => (
+                            <div key={tag} className="flex items-center justify-between bg-gray-700 p-2 rounded-md">
+                                {editingTag === tag ? (
+                                <input 
+                                    type="text"
+                                    value={editingTagName}
+                                    onChange={(e) => setEditingTagName(e.target.value)}
+                                    onBlur={handleTagRename}
+                                    onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleTagRename();
+                                    if (e.key === 'Escape') handleCancelEditing();
+                                    }}
+                                    autoFocus
+                                    className="bg-gray-600 border border-gray-500 rounded-md px-2 py-1 text-white font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                ) : (
+                                <span 
+                                    onClick={() => handleStartEditingTag(tag)}
+                                    className="text-gray-300 font-mono cursor-pointer hover:text-white"
+                                >
+                                    {tag}
+                                </span>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <input
+                                    type="color"
+                                    value={color}
+                                    onChange={(e) => handleTagColorChange(tag, e.target.value)}
+                                    className="w-12 h-8 p-0 border-none rounded bg-transparent cursor-pointer"
+                                    />
+                                    <button onClick={() => handleTagDelete(tag)} className="text-red-400 hover:text-red-300 p-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            ))}
+                        </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    value={newTagName}
-                    onChange={(e) => setNewTagName(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
-                    placeholder="New tag name..."
-                    className="flex-grow bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <button onClick={handleAddTag} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Add Tag</button>
-              </div>
-            </>
+                    <div className="flex gap-2 mt-auto">
+                        <input 
+                            type="text" 
+                            value={newTagName}
+                            onChange={(e) => setNewTagName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddTag()}
+                            placeholder="New tag name..."
+                            className="flex-grow bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button onClick={handleAddTag} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Add Tag</button>
+                    </div>
+                  </>
+              )}
+
+              {activeTab === 'relationships' && (
+                  <>
+                    <div className="flex-1 overflow-y-auto pr-2 mb-4">
+                        <div className="grid grid-cols-2 gap-2">
+                            {(selectedScheme.relationshipLabels || []).map(label => (
+                                <div key={label} className="flex justify-between items-center bg-gray-700 p-2 rounded-md">
+                                    <span className="text-gray-300 text-sm">{label}</span>
+                                    <button onClick={() => handleLabelDelete(label)} className="text-red-400 hover:text-red-300 p-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex gap-2 mt-auto">
+                        <input 
+                            type="text" 
+                            value={newLabelName}
+                            onChange={(e) => setNewLabelName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddLabel()}
+                            placeholder="New relationship label..."
+                            className="flex-grow bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button onClick={handleAddLabel} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Add Label</button>
+                    </div>
+                  </>
+              )}
+
+            </div>
         )}
 
-        <div className="mt-8 flex justify-end space-x-4">
+        <div className="mt-8 flex justify-end space-x-4 pt-4 border-t border-gray-700 flex-shrink-0">
           <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Cancel</button>
           <button onClick={() => onSave(schemes, activeSchemeId)} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Save</button>
         </div>
@@ -726,7 +805,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
       <div ref={modalRef} className="bg-gray-800 rounded-lg w-full max-w-2xl shadow-xl border border-gray-600 text-gray-300 max-h-[90vh] flex flex-col">
         <div className="flex-shrink-0 flex items-center justify-between p-6 border-b border-gray-700">
            <div className="flex items-center gap-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 8c2-2 4-2 6 0s4 2 6 0" />
                 <path d="M4 12c2-2 4-2 6 0s4 2 6 0" />
                 <path d="M4 16c2-2 4-2 6 0s4 2 6 0" />
@@ -784,6 +863,19 @@ export default function App() {
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [colorSchemes, setColorSchemes] = useState<ColorScheme[]>(DEFAULT_COLOR_SCHEMES);
   const [activeSchemeId, setActiveSchemeId] = useState<string | null>(DEFAULT_COLOR_SCHEMES[0]?.id || null);
+  
+  // --- State for Refs to allow synchronous access in batched AI actions ---
+  const elementsRef = useRef<Element[]>([]);
+  const relationshipsRef = useRef<Relationship[]>([]);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    elementsRef.current = elements;
+  }, [elements]);
+
+  useEffect(() => {
+    relationshipsRef.current = relationships;
+  }, [relationships]);
 
 
   const [modelsIndex, setModelsIndex] = useState<ModelMetadata[]>([]);
@@ -1040,7 +1132,6 @@ export default function App() {
     const newElement: Element = {
       id: generateUUID(),
       name: 'New Element',
-      type: 'Default',
       notes: '',
       tags: [],
       createdAt: now,
@@ -1115,7 +1206,8 @@ export default function App() {
   // They abstract away the need for specific IDs or coordinates by handling defaults.
   const aiActions: ModelActions = useMemo(() => {
     const findElementByName = (name: string): Element | undefined => {
-      return elements.find(e => e.name.toLowerCase() === name.toLowerCase());
+      // Use refs to search the most up-to-date state
+      return elementsRef.current.find(e => e.name.toLowerCase() === name.toLowerCase());
     };
 
     return {
@@ -1123,7 +1215,7 @@ export default function App() {
         const now = new Date().toISOString();
         const id = generateUUID();
         // Spiral placement logic for new AI nodes to prevent stacking
-        const count = elements.length;
+        const count = elementsRef.current.length;
         const angle = count * 0.5;
         const radius = 50 + (5 * count);
         const centerX = window.innerWidth / 2; // Approx center
@@ -1134,13 +1226,14 @@ export default function App() {
         const newElement: Element = {
           id,
           name: data.name,
-          type: data.type || 'Default',
           notes: data.notes || '',
           tags: data.tags || [],
           createdAt: now,
           updatedAt: now,
           x, y, fx: x, fy: y
         };
+        
+        // Optimistic update using ref and state
         setElements(prev => [...prev, newElement]);
         return id;
       },
@@ -1202,7 +1295,7 @@ export default function App() {
         return true;
       }
     };
-  }, [elements, handleDeleteElement]);
+  }, [handleDeleteElement]);
 
 
   const handleExport = useCallback(() => {
@@ -1352,7 +1445,6 @@ export default function App() {
     const newElement: Element = {
       id: generateUUID(),
       name: 'New Element',
-      type: 'Default',
       notes: '',
       tags: [],
       createdAt: now,
@@ -1385,7 +1477,7 @@ export default function App() {
       return trimmed !== '' && !trimmed.startsWith('#');
     });
     
-    const parsedElements = new Map<string, { type: string, tags: string[] }>();
+    const parsedElements = new Map<string, { tags: string[] }>();
     const parsedRels: { sourceName: string, targetName: string, label: string, direction: RelationshipDirection }[] = [];
 
     const parseElementStr = (str: string) => {
@@ -1393,29 +1485,19 @@ export default function App() {
         if (!workStr) return null;
 
         let name: string;
-        let type = 'Default';
         let tags: string[] = [];
 
         // 1. Tags (parse from right)
         const lastColonIndex = workStr.lastIndexOf(':');
         const lastParenOpenIndex = workStr.lastIndexOf('(');
-        if (lastColonIndex > lastParenOpenIndex) {
+        // Ensure colon is actual tag separator and not part of text inside parenthesis
+        if (lastColonIndex > -1 && lastColonIndex > lastParenOpenIndex) {
             const tagsStr = workStr.substring(lastColonIndex + 1);
             tags = tagsStr.split(',').map(t => t.trim()).filter(Boolean);
             workStr = workStr.substring(0, lastColonIndex).trim();
         }
 
-        // 2. Type (parse from right)
-        if (workStr.endsWith(')')) {
-            const openParenIndex = workStr.lastIndexOf('(');
-            // Heuristic: if there is content before the opening parenthesis, it's a type.
-            if (openParenIndex > -1 && workStr.substring(0, openParenIndex).trim().length > 0) {
-                type = workStr.substring(openParenIndex + 1, workStr.length - 1).trim() || 'Default';
-                workStr = workStr.substring(0, openParenIndex).trim();
-            }
-        }
-
-        // 3. The rest is the name
+        // 2. Name
         name = workStr;
         if (name.startsWith('"') && name.endsWith('"')) {
             name = name.substring(1, name.length - 1);
@@ -1423,17 +1505,16 @@ export default function App() {
 
         if (!name) return null;
 
-        return { name, type, tags };
+        return { name, tags };
     };
 
-    const updateParsedElement = (elementData: { name: string, type: string, tags: string[] }) => {
+    const updateParsedElement = (elementData: { name: string, tags: string[] }) => {
       const existing = parsedElements.get(elementData.name);
       if (existing) {
-        const newType = elementData.type !== 'Default' ? elementData.type : existing.type;
         const newTags = [...new Set([...existing.tags, ...elementData.tags])];
-        parsedElements.set(elementData.name, { type: newType, tags: newTags });
+        parsedElements.set(elementData.name, { tags: newTags });
       } else {
-        parsedElements.set(elementData.name, { type: elementData.type, tags: elementData.tags });
+        parsedElements.set(elementData.name, { tags: elementData.tags });
       }
     };
 
@@ -1505,17 +1586,17 @@ export default function App() {
     const nameToIdMap = new Map<string, string>();
     const newElementNames = new Set<string>();
 
-    parsedElements.forEach(({ type, tags }, name) => {
+    parsedElements.forEach(({ tags }, name) => {
         const existingElement = existingElementsByName.get(name);
         if (existingElement) {
-            const updatedElement: Element = { ...existingElement, type, tags, updatedAt: new Date().toISOString() };
+            const updatedElement: Element = { ...existingElement, tags, updatedAt: new Date().toISOString() };
             nextElements.push(updatedElement);
             nameToIdMap.set(name, existingElement.id);
         } else {
             const now = new Date().toISOString();
             const newElement: Element = {
                 id: generateUUID(),
-                name, type, tags, notes: '',
+                name, tags, notes: '',
                 createdAt: now, updatedAt: now,
             };
             nextElements.push(newElement);
@@ -1642,7 +1723,7 @@ export default function App() {
       />
       <div className="absolute top-4 left-4 z-10 bg-gray-800 bg-opacity-80 p-2 rounded-lg flex items-center space-x-2">
         <div className="flex items-center space-x-2 text-gray-300">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 8c2-2 4-2 6 0s4 2 6 0" />
                 <path d="M4 12c2-2 4-2 6 0s4 2 6 0" />
                 <path d="M4 16c2-2 4-2 6 0s4 2 6 0" />
@@ -1769,6 +1850,8 @@ export default function App() {
           isOpen={isChatPanelOpen}
           elements={elements}
           relationships={relationships}
+          colorSchemes={colorSchemes}
+          activeSchemeId={activeSchemeId}
           onClose={() => setIsChatPanelOpen(false)}
           currentModelId={currentModelId}
           modelActions={aiActions}
@@ -1810,6 +1893,7 @@ export default function App() {
             onCreate={handleAddRelationship}
             onUpdateElement={handleUpdateElement}
             onCancel={handleCancelAddRelationship}
+            suggestedLabels={activeColorScheme?.relationshipLabels || []}
             />
         ) : selectedRelationship ? (
             <RelationshipDetailsPanel

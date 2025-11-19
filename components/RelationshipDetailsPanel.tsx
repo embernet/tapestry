@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { Relationship, Element, RelationshipDirection } from '../types';
 
@@ -46,7 +45,7 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
     if (relationship) {
         onDelete(relationship.id);
     }
-  }
+  };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     // When Enter or Escape is pressed inside an input, blur it to trigger save.

@@ -20,7 +20,6 @@ export interface Relationship {
 export interface Element {
   id:string;
   name: string;
-  type: string;
   notes: string;
   tags: string[];
   createdAt: string;
@@ -35,6 +34,7 @@ export interface ColorScheme {
   id: string;
   name: string;
   tagColors: { [tag: string]: string };
+  relationshipLabels?: string[];
 }
 
 export type D3Node = Element & d3.SimulationNodeDatum & {
@@ -73,8 +73,8 @@ export interface DateFilterState {
 }
 
 export interface ModelActions {
-  addElement: (data: { name: string; type?: string; notes?: string; tags?: string[] }) => string;
-  updateElement: (name: string, data: { type?: string; notes?: string; tags?: string[] }) => boolean;
+  addElement: (data: { name: string; notes?: string; tags?: string[] }) => string;
+  updateElement: (name: string, data: { notes?: string; tags?: string[] }) => boolean;
   deleteElement: (name: string) => boolean;
   addRelationship: (sourceName: string, targetName: string, label: string, direction?: string) => boolean;
   deleteRelationship: (sourceName: string, targetName: string) => boolean;

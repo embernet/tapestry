@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Element, Relationship, RelationshipDirection } from '../types';
 import { generateElementMarkdown } from '../utils';
@@ -61,7 +62,6 @@ const ElementReportSection: React.FC<{
     <div id={`element-report-${element.id}`} className="py-4 scroll-mt-4">
       <h2 className="text-xl font-bold text-white mb-2 border-b border-gray-700 pb-1">{element.name}</h2>
       <div className="pl-2 space-y-2 text-gray-300">
-        {element.type && element.type !== 'Default' && <p><strong className="font-semibold text-gray-400 w-20 inline-block">Type:</strong> {element.type}</p>}
         {element.tags.length > 0 && <p><strong className="font-semibold text-gray-400 w-20 inline-block">Tags:</strong> {element.tags.join(', ')}</p>}
         {element.notes && (
           <div>

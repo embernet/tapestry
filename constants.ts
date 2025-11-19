@@ -1,3 +1,4 @@
+
 import { ColorScheme } from './types';
 
 export const NODE_MAX_WIDTH = 160;
@@ -16,7 +17,17 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
       'Emotion': '#f97316',
       'Context': '#6b7280',
       'Trend': '#14b8a6', // teal-500
-    }
+    },
+    relationshipLabels: [
+      'causes',
+      'prevents',
+      'mitigates',
+      'accelerates',
+      'requires',
+      'conflicts with',
+      'relates to',
+      'improves'
+    ]
   },
   {
     id: 'scheme-networking',
@@ -31,6 +42,16 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
       'Question': '#ec4899', // pink-500
       'Challenge': '#ef4444', // red-500
       'Trend': '#14b8a6', // teal-500
-    }
+    },
+    relationshipLabels: [
+      'knows',
+      'works for',
+      'author of',
+      'member of',
+      'interested in',
+      'collaborates with',
+      'manages',
+      'created'
+    ]
   }
 ];
