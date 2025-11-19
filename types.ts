@@ -30,11 +30,18 @@ export interface Element {
   fy?: number | null;
 }
 
+export interface RelationshipDefinition {
+  label: string;
+  description?: string;
+}
+
 export interface ColorScheme {
   id: string;
   name: string;
   tagColors: { [tag: string]: string };
-  relationshipLabels?: string[];
+  relationshipDefinitions?: RelationshipDefinition[];
+  relationshipLabels?: string[]; // Legacy support
+  defaultRelationshipLabel?: string;
 }
 
 export type D3Node = Element & d3.SimulationNodeDatum & {

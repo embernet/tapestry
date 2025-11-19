@@ -15,6 +15,8 @@ interface AddRelationshipPanelProps {
   targetElementId?: string | null;
   isNewTarget?: boolean;
   suggestedLabels?: string[];
+  defaultLabel?: string;
+  suggestedTags?: string[];
 }
 
 const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
@@ -26,6 +28,8 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   targetElementId,
   isNewTarget,
   suggestedLabels = [],
+  defaultLabel = '',
+  suggestedTags = [],
 }) => {
   const [selectedTargetId, setSelectedTargetId] = useState<string>(targetElementId || 'NEW_ELEMENT');
   const [elementEditorData, setElementEditorData] = useState<Partial<Element>>({
@@ -33,26 +37,41 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
     notes: '',
     tags: []
   });
-  const [label, setLabel] = useState('');
+  const [label, setLabel] = useState(defaultLabel);
   const [direction, setDirection] = useState<RelationshipDirection>(RelationshipDirection.To);
+  
   const labelInputRef = useRef<HTMLInputElement>(null);
+  const newElementNameInputRef = useRef<HTMLInputElement>(null);
 
   const targetElement = useMemo(() => allElements.find(f => f.id === targetElementId), [allElements, targetElementId]);
 
   useEffect(() => {
-    // If a target is pre-selected from a drag-connect action, focus the label input.
-    if (targetElementId && labelInputRef.current) {
-        setTimeout(() => {
-            labelInputRef.current?.focus();
-        }, 100);
-    }
+    // Focus logic:
+    // 1. If creating a NEW target (dragged to empty space), focus the new element name.
+    // 2. If dragging to an EXISTING target, focus the label input.
+    // 3. If manually changing dropdown to 'NEW_ELEMENT', focus the new element name.
+    
+    const focusTimeout = setTimeout(() => {
+        if (isNewTarget || selectedTargetId === 'NEW_ELEMENT') {
+             newElementNameInputRef.current?.focus();
+             newElementNameInputRef.current?.select();
+        } else if (targetElementId) {
+             labelInputRef.current?.focus();
+        }
+    }, 100);
 
+    return () => clearTimeout(focusTimeout);
+  }, [isNewTarget, targetElementId, selectedTargetId]);
+
+  useEffect(() => {
     if (isNewTarget && targetElement) {
         setElementEditorData(targetElement);
-    } else {
-        setElementEditorData({ name: '', notes: '', tags: [] });
+    } else if (selectedTargetId === 'NEW_ELEMENT' && !isNewTarget) {
+        // Reset editor data only if switching to new element mode manually, 
+        // not if we are already in "new target" mode from a drag.
+        setElementEditorData(prev => ({ ...prev, name: '', notes: '', tags: [] }));
     }
-  }, [targetElementId, isNewTarget, targetElement]);
+  }, [targetElementId, isNewTarget, targetElement, selectedTargetId]);
 
   const handleSubmit = () => {
     if (!label.trim()) {
@@ -84,7 +103,7 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
     }
   };
 
-  const handleElementEditorChange = (updatedData: Partial<Element>) => {
+  const handleElementEditorChange = (updatedData: Partial<Element>, immediate?: boolean) => {
     setElementEditorData(prev => ({...prev, ...updatedData}));
   };
 
@@ -145,7 +164,7 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
           {isNewTarget ? (
              <div>
                 <label className="block text-sm font-medium">Target</label>
-                <p className="mt-1 p-2 bg-gray-700 rounded-md font-semibold">{targetElement?.name}</p>
+                <p className="mt-1 p-2 bg-gray-700 rounded-md font-semibold italic text-gray-400">New Element</p>
              </div>
           ) : (
              <div>
@@ -170,6 +189,8 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
               <ElementEditor
                 elementData={elementEditorData}
                 onDataChange={handleElementEditorChange}
+                nameInputRef={newElementNameInputRef}
+                suggestedTags={suggestedTags}
               />
             </div>
           )}

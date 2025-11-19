@@ -32,7 +32,7 @@ export interface GraphCanvasRef {
  * Calculates the intersection point of a line (from source to target) with the
  * bounding box of the source node.
  */
-function getRectIntersection(sNode: D3Node, tNode: D3Node) {
+function getRectIntersection(sNode: D3Node, tNode: { x?: number; y?: number }) {
     const { x: sx, y: sy, width: sw = 0, height: sh = 0 } = sNode;
     const { x: tx, y: ty } = tNode;
 
@@ -74,21 +74,34 @@ const createDragHandler = (
   onNodeConnectToNew: (sourceId: string, coords: { x: number, y: number }) => void
 ) => {
   let isMoving = false; // Flag to track drag mode
+  let hasMoved = false; // Flag to distinguish click from drag
+  let startX = 0;
+  let startY = 0;
 
   function dragstarted(this: SVGGElement, event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
     const target = event.sourceEvent.target as SVGElement;
     isMoving = target.classList.contains('move-zone');
+    
+    hasMoved = false;
+    startX = event.x;
+    startY = event.y;
 
     // Pin the node during any drag operation to prevent interference from the simulation
     d.fx = d.x;
     d.fy = d.y;
     
     if (!isMoving) {
-      // It's a connect drag. Draw a temporary line.
+      // It's a connect drag. Draw a temporary line from edge to actual mouse pointer.
+      // We use d3.pointer to get coordinates relative to the parent group (model space)
+      const parent = this.parentNode as SVGGElement;
+      const [mx, my] = d3.pointer(event.sourceEvent, parent);
+      
+      const start = getRectIntersection(d, { x: mx, y: my });
+
       d3.select(this.ownerSVGElement).select('g')
         .append('path')
         .attr('class', 'temp-drag-line')
-        .attr('d', `M${d.x},${d.y} L${event.x},${event.y}`)
+        .attr('d', `M${start.x},${start.y} L${mx},${my}`)
         .attr('stroke', '#a5b4fc')
         .attr('stroke-width', 2)
         .attr('stroke-dasharray', '5,5')
@@ -97,14 +110,23 @@ const createDragHandler = (
   }
 
   function dragged(this: SVGGElement, event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
+    // Check for significant movement to determine if this is a drag or a click
+    if (!hasMoved && (Math.abs(event.x - startX) > 3 || Math.abs(event.y - startY) > 3)) {
+        hasMoved = true;
+    }
+
     if (isMoving) {
       // For a move drag, update the node's fixed position.
       d.fx = event.x;
       d.fy = event.y;
     } else {
-      // For a connect drag, only update the temporary line's endpoint.
+      // For a connect drag, use absolute mouse pointer position
+      const parent = this.parentNode as SVGGElement;
+      const [mx, my] = d3.pointer(event.sourceEvent, parent);
+      
+      const start = getRectIntersection(d, { x: mx, y: my });
       d3.select(this.ownerSVGElement).select('.temp-drag-line')
-        .attr('d', `M${d.x},${d.y} L${event.x},${event.y}`);
+        .attr('d', `M${start.x},${start.y} L${mx},${my}`);
     }
   }
 
@@ -116,14 +138,13 @@ const createDragHandler = (
         if (tempLine) tempLine.remove();
     }
 
-    const subject = event.subject as D3Node;
-    const isClick = Math.abs(event.x - (subject.x || 0)) < 5 && Math.abs(event.y - (subject.y || 0)) < 5;
-
-    if (isClick) {
+    // If we haven't moved significantly, treat it as a click
+    if (!hasMoved) {
         onNodeClickCallback(d.id);
         return; 
     }
 
+    // If we moved, and it wasn't a move-zone drag (meaning it was a connect drag)
     if (!isMoving) {
         const dropTargetElement = event.sourceEvent.target as HTMLElement;
         const dropNodeElement = dropTargetElement?.closest('.node');
@@ -134,7 +155,9 @@ const createDragHandler = (
         if (dropNode && dropNode.id !== d.id) {
             onNodeConnectCallback(d.id, dropNode.id);
         } else {
-            onNodeConnectToNew(d.id, { x: event.x, y: event.y });
+            const parent = this.parentNode as SVGGElement;
+            const [mx, my] = d3.pointer(event.sourceEvent, parent);
+            onNodeConnectToNew(d.id, { x: mx, y: my });
         }
     }
   }
@@ -145,7 +168,11 @@ const createDragHandler = (
     .on('end', dragended);
 };
 
-const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>) => {
+const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>, onNodeClickCallback: (elementId: string) => void) => {
+  let startX = 0;
+  let startY = 0;
+  let hasMoved = false;
+
   function dragstarted(event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
     if (!event.active) {
       simulation.alphaTarget(0.3);
@@ -153,15 +180,29 @@ const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>) => 
     }
     d.fx = d.x;
     d.fy = d.y;
+    startX = event.x;
+    startY = event.y;
+    hasMoved = false;
   }
 
   function dragged(event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
     d.fx = event.x;
     d.fy = event.y;
+    if (!hasMoved && (Math.abs(event.x - startX) > 3 || Math.abs(event.y - startY) > 3)) {
+        hasMoved = true;
+    }
   }
 
   function dragended(event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
     if (!event.active) simulation.alphaTarget(0);
+    
+    // In physics mode, typical D3 drag swallows click events. 
+    // We manually trigger click if no movement occurred.
+    if (!hasMoved) {
+        onNodeClickCallback(d.id);
+    }
+    d.fx = null;
+    d.fy = null;
   }
 
   return d3.drag<SVGGElement, D3Node>()
@@ -191,9 +232,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
   const simulationRef = useRef<d3.Simulation<D3Node, D3Link> | null>(null);
-  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown>>();
+  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   
-  const zoomToFit = (nodesToFit?: D3Node[], limitMaxZoom = false) => {
+  const internalZoomToFit = (nodesToFit?: D3Node[], limitMaxZoom = false) => {
     if (!svgRef.current || !gRef.current || !simulationRef.current || !zoomRef.current) return;
 
     const svg = d3.select(svgRef.current);
@@ -244,7 +285,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     getFinalNodePositions: () => {
       const sim = simulationRef.current;
       if (sim) {
-        const nodes = (sim as any).nodes() as D3Node[];
+        const nodes = (sim as any).nodes();
         return nodes.map((node: D3Node) => ({
           id: node.id,
           x: node.x!,
@@ -253,7 +294,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       }
       return [];
     },
-    zoomToFit: () => zoomToFit(undefined),
+    zoomToFit: (nodes?: any, limit?: boolean) => internalZoomToFit(nodes, limit),
   }));
 
   const highlightedNodeIds = useMemo(() => {
@@ -279,7 +320,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         const sim = simulationRef.current as any;
         const nodesToFit = sim.nodes().filter((n: D3Node) => highlightedNodeIds.has(n.id));
         if (nodesToFit.length > 0) {
-            zoomToFit(nodesToFit, true);
+            internalZoomToFit(nodesToFit, true);
         }
     }
   }, [focusMode, highlightedNodeIds]);
@@ -484,7 +525,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .force('center', d3.forceCenter(width / 2, height / 2));
 
       node.style('cursor', 'grab');
-      const physicsDragHandler = createPhysicsDragHandler(simulation);
+      const physicsDragHandler = createPhysicsDragHandler(simulation, onNodeClick);
       node.call(physicsDragHandler as any);
     } else {
       simulation

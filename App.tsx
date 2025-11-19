@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions } from './types';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition } from './types';
 import { DEFAULT_COLOR_SCHEMES } from './constants';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
 import ElementDetailsPanel from './components/ElementDetailsPanel';
@@ -129,6 +129,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ initialSchemes, initialAc
   const [editingTagName, setEditingTagName] = useState('');
   
   const [newLabelName, setNewLabelName] = useState('');
+  const [newLabelDesc, setNewLabelDesc] = useState('');
   const [activeTab, setActiveTab] = useState<'tags' | 'relationships'>('tags');
 
   const selectedScheme = useMemo(() => schemes.find(s => s.id === activeSchemeId), [schemes, activeSchemeId]);
@@ -136,7 +137,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ initialSchemes, initialAc
   const handleCreateScheme = () => {
     const name = prompt('Enter new schema name:');
     if (name) {
-      const newScheme: ColorScheme = { id: generateUUID(), name, tagColors: {}, relationshipLabels: [] };
+      const newScheme: ColorScheme = { id: generateUUID(), name, tagColors: {}, relationshipDefinitions: [] };
       setSchemes(prev => [...prev, newScheme]);
       setActiveSchemeId(newScheme.id);
     }
@@ -219,26 +220,43 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ initialSchemes, initialAc
   const handleAddLabel = () => {
       const trimmedLabel = newLabelName.trim();
       if (trimmedLabel && activeSchemeId && selectedScheme) {
-          const existing = selectedScheme.relationshipLabels || [];
-          if (existing.some(l => l.toLowerCase() === trimmedLabel.toLowerCase())) {
+          const existing = selectedScheme.relationshipDefinitions || [];
+          if (existing.some(l => l.label.toLowerCase() === trimmedLabel.toLowerCase())) {
               alert(`Label "${trimmedLabel}" already exists.`);
               return;
           }
           
+          const newDef: RelationshipDefinition = { label: trimmedLabel, description: newLabelDesc.trim() };
+          
           setSchemes(prev => prev.map(s => 
              s.id === activeSchemeId
-             ? { ...s, relationshipLabels: [...(s.relationshipLabels || []), trimmedLabel] }
+             ? { ...s, relationshipDefinitions: [...(s.relationshipDefinitions || []), newDef] }
              : s
           ));
           setNewLabelName('');
+          setNewLabelDesc('');
       }
   };
 
   const handleLabelDelete = (label: string) => {
       if (!activeSchemeId) return;
+      setSchemes(prev => prev.map(s => {
+         if (s.id !== activeSchemeId) return s;
+         const newDefs = (s.relationshipDefinitions || []).filter(l => l.label !== label);
+         return { 
+             ...s, 
+             relationshipDefinitions: newDefs,
+             // If the deleted label was the default, unset it
+             defaultRelationshipLabel: s.defaultRelationshipLabel === label ? undefined : s.defaultRelationshipLabel
+         };
+      }));
+  };
+
+  const handleDefaultLabelChange = (label: string) => {
+      if (!activeSchemeId) return;
       setSchemes(prev => prev.map(s => 
          s.id === activeSchemeId
-         ? { ...s, relationshipLabels: (s.relationshipLabels || []).filter(l => l !== label) }
+         ? { ...s, defaultRelationshipLabel: label }
          : s
       ));
   };
@@ -276,7 +294,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ initialSchemes, initialAc
                         className={`py-2 px-4 font-semibold text-sm transition-colors duration-200 ${activeTab === 'relationships' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-white'}`}
                         onClick={() => setActiveTab('relationships')}
                     >
-                        Relationship Labels
+                        Relationship Types
                     </button>
                 </div>
 
@@ -338,28 +356,53 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ initialSchemes, initialAc
 
               {activeTab === 'relationships' && (
                   <>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Default Label</label>
+                        <select
+                            value={selectedScheme.defaultRelationshipLabel || ''}
+                            onChange={(e) => handleDefaultLabelChange(e.target.value)}
+                            className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            <option value="">-- None --</option>
+                            {(selectedScheme.relationshipDefinitions || []).map(def => (
+                                <option key={def.label} value={def.label}>{def.label}</option>
+                            ))}
+                        </select>
+                    </div>
                     <div className="flex-1 overflow-y-auto pr-2 mb-4">
-                        <div className="grid grid-cols-2 gap-2">
-                            {(selectedScheme.relationshipLabels || []).map(label => (
-                                <div key={label} className="flex justify-between items-center bg-gray-700 p-2 rounded-md">
-                                    <span className="text-gray-300 text-sm">{label}</span>
-                                    <button onClick={() => handleLabelDelete(label)} className="text-red-400 hover:text-red-300 p-1">
+                        <div className="space-y-2">
+                            {(selectedScheme.relationshipDefinitions || []).map(def => (
+                                <div key={def.label} className="bg-gray-700 p-2 rounded-md flex items-start justify-between group">
+                                    <div className="flex flex-col">
+                                        <span className="text-gray-200 font-semibold text-sm">{def.label}</span>
+                                        <span className="text-gray-400 text-xs italic">{def.description || 'No description'}</span>
+                                    </div>
+                                    <button onClick={() => handleLabelDelete(def.label)} className="text-red-400 hover:text-red-300 p-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                                     </button>
                                 </div>
                             ))}
                         </div>
                     </div>
-                    <div className="flex gap-2 mt-auto">
-                        <input 
-                            type="text" 
-                            value={newLabelName}
-                            onChange={(e) => setNewLabelName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddLabel()}
-                            placeholder="New relationship label..."
-                            className="flex-grow bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <button onClick={handleAddLabel} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Add Label</button>
+                    <div className="mt-auto space-y-2">
+                        <div className="flex gap-2">
+                            <input 
+                                type="text" 
+                                value={newLabelName}
+                                onChange={(e) => setNewLabelName(e.target.value)}
+                                placeholder="Label (e.g. causes)"
+                                className="w-1/3 bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                            <input 
+                                type="text" 
+                                value={newLabelDesc}
+                                onChange={(e) => setNewLabelDesc(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAddLabel()}
+                                placeholder="Description (optional)"
+                                className="flex-grow bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                            />
+                        </div>
+                         <button onClick={handleAddLabel} className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150 text-sm">Add Relationship Type</button>
                     </div>
                   </>
               )}
@@ -946,13 +989,8 @@ export default function App() {
   }, [elements]);
 
   useEffect(() => {
-    // This effect synchronizes the filter state with the available tags in the model.
     setTagFilter(prevFilter => {
         const allTagsSet = new Set(allTags);
-        
-        // Build a new included set. A tag is included if:
-        // 1. It's a brand new tag (not in old included or old excluded sets).
-        // 2. It's an existing tag and was already included.
         const newIncluded = new Set<string>();
         for (const tag of allTags) {
             const wasPreviouslyIncluded = prevFilter.included.has(tag);
@@ -960,20 +998,15 @@ export default function App() {
             if (wasPreviouslyIncluded) {
                 newIncluded.add(tag);
             } else if (!wasPreviouslyExcluded) {
-                // This is a new tag, or a tag that was previously un-included.
-                // Default is to include it.
                 newIncluded.add(tag);
             }
         }
-
-        // Clean up excluded set for tags that no longer exist
         const newExcluded = new Set<string>();
         for (const tag of prevFilter.excluded) {
             if (allTagsSet.has(tag)) {
                 newExcluded.add(tag);
             }
         }
-        
         return { included: newIncluded, excluded: newExcluded };
     });
   }, [allTags]);
@@ -994,26 +1027,10 @@ export default function App() {
     };
 
     return elements.filter(element => {
-      // Rule 0: Check date filter
-      if (!matchesDate(element)) {
-        return false;
-      }
-
-      if (excluded.size === 0 && included.size === allTags.length) {
-        return true;
-      }
-
-      // Rule 1: If an element has ANY excluded tag, it's hidden.
-      if (element.tags.some(tag => excluded.has(tag))) {
-        return false;
-      }
-      
-      // Rule 2: If an element has no tags, it's visible (unless date filter hid it).
-      if (element.tags.length === 0) {
-        return true; 
-      }
-      
-      // Rule 3: If an element has tags, at least one must be in the included list.
+      if (!matchesDate(element)) return false;
+      if (excluded.size === 0 && included.size === allTags.length) return true;
+      if (element.tags.some(tag => excluded.has(tag))) return false;
+      if (element.tags.length === 0) return true; 
       return element.tags.some(tag => included.has(tag));
     });
   }, [elements, tagFilter, allTags, dateFilter]);
@@ -1030,23 +1047,63 @@ export default function App() {
 
   // --- Model Management ---
 
+  const migrateLegacySchemes = useCallback((loadedSchemes: ColorScheme[]): ColorScheme[] => {
+      return loadedSchemes.map(s => {
+          // If the scheme has the old string[] array but no definitions, convert it.
+          if (s.relationshipLabels && !s.relationshipDefinitions) {
+              // Check if this looks like a default scheme we know about
+              const defaultScheme = DEFAULT_COLOR_SCHEMES.find(d => d.id === s.id);
+              if (defaultScheme && defaultScheme.relationshipDefinitions) {
+                  // If it's a default scheme, prefer the robust definitions from constants
+                  // but we should probably try to preserve any custom labels the user might have added?
+                  // For simplicity, if it matches a default ID, we'll assume the user wants the rich default definitions
+                  // plus any extra labels they might have added as 'custom' definitions.
+                  const defaultLabels = new Set(defaultScheme.relationshipDefinitions.map(d => d.label));
+                  const extraLabels = s.relationshipLabels.filter(l => !defaultLabels.has(l));
+                  
+                  return {
+                      ...s,
+                      relationshipDefinitions: [
+                          ...defaultScheme.relationshipDefinitions,
+                          ...extraLabels.map(l => ({ label: l, description: '' }))
+                      ],
+                      relationshipLabels: undefined // Clear legacy
+                  };
+              } else {
+                  // It's a purely custom scheme, just map strings to objects
+                  return {
+                      ...s,
+                      relationshipDefinitions: s.relationshipLabels.map(l => ({ label: l, description: '' })),
+                      relationshipLabels: undefined
+                  };
+              }
+          }
+          return s;
+      });
+  }, []);
+
   const handleLoadModel = useCallback((modelId: string) => {
     const modelDataString = localStorage.getItem(`${MODEL_DATA_PREFIX}${modelId}`);
     if (modelDataString) {
       const data = JSON.parse(modelDataString);
       setElements(data.elements || []);
       setRelationships(data.relationships || []);
-      setColorSchemes(data.colorSchemes || DEFAULT_COLOR_SCHEMES);
+      
+      // Load schemas and migrate if necessary
+      let loadedSchemes = data.colorSchemes || DEFAULT_COLOR_SCHEMES;
+      loadedSchemes = migrateLegacySchemes(loadedSchemes);
+
+      setColorSchemes(loadedSchemes);
       setActiveSchemeId(data.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null);
+      
       setCurrentModelId(modelId);
       localStorage.setItem(LAST_OPENED_MODEL_ID_KEY, modelId);
       setIsOpenModelModalOpen(false);
       setTagFilter({ included: new Set(), excluded: new Set() }); // Reset tag filters on model load
       setDateFilter({ createdAfter: '', createdBefore: '', updatedAfter: '', updatedBefore: '' }); // Reset date filters
     }
-  }, []);
+  }, [migrateLegacySchemes]);
 
-  // Initial load from localStorage
   useEffect(() => {
     if (!isInitialLoad) return;
 
@@ -1075,9 +1132,6 @@ export default function App() {
     setIsInitialLoad(false);
   }, [isInitialLoad, handleLoadModel]);
 
-  // BUG FIX: Centralized persistence for the models index.
-  // This single effect is responsible for writing the index to localStorage,
-  // preventing race conditions from multiple save points.
   useEffect(() => {
     if (!isInitialLoad) {
       localStorage.setItem(MODELS_INDEX_KEY, JSON.stringify(modelsIndex));
@@ -1085,13 +1139,11 @@ export default function App() {
   }, [modelsIndex, isInitialLoad]);
 
 
-  // Auto-save model data and update timestamp on any data change
   useEffect(() => {
     if (currentModelId && !isInitialLoad) {
       const modelData = { elements, relationships, colorSchemes, activeSchemeId };
       localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
 
-      // Update timestamp in the index state. The centralized effect will persist it.
       setModelsIndex(prevIndex => {
         const now = new Date().toISOString();
         return prevIndex.map(m =>
@@ -1104,7 +1156,6 @@ export default function App() {
   const handleCreateModel = useCallback((name: string, description: string) => {
     const now = new Date().toISOString();
     const newModel: ModelMetadata = {
-      // FIX: Use a self-contained UUID generator to prevent environment-specific type errors.
       id: generateUUID(),
       name,
       description,
@@ -1175,18 +1226,23 @@ export default function App() {
     }
     
     setRelationships(prev => [...prev, finalRelationship]);
-    setSelectedElementId(panelState.sourceElementId || null);
-    setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
+    
+    if (newElementData) {
+        setSelectedElementId(panelState.sourceElementId || null);
+        setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
+    } else {
+        setSelectedRelationshipId(finalRelationship.id);
+        setSelectedElementId(null);
+        setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
+    }
+
   }, [panelState.sourceElementId]);
 
   const handleCancelAddRelationship = useCallback(() => {
-    // If we were cancelling the creation of a relationship to a NEW element,
-    // delete that newly created (and now orphaned) element.
     if (panelState.isNewTarget && panelState.targetElementId) {
       handleDeleteElement(panelState.targetElementId);
     }
     
-    // Return to showing the details of the original source element.
     setSelectedElementId(panelState.sourceElementId || null);
     setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
   }, [panelState, handleDeleteElement]);
@@ -1202,11 +1258,8 @@ export default function App() {
 
 
   // --- AI Actions Adapter ---
-  // These functions are passed to the ChatPanel to allow the AI to modify the model.
-  // They abstract away the need for specific IDs or coordinates by handling defaults.
   const aiActions: ModelActions = useMemo(() => {
     const findElementByName = (name: string): Element | undefined => {
-      // Use refs to search the most up-to-date state
       return elementsRef.current.find(e => e.name.toLowerCase() === name.toLowerCase());
     };
 
@@ -1214,11 +1267,10 @@ export default function App() {
       addElement: (data) => {
         const now = new Date().toISOString();
         const id = generateUUID();
-        // Spiral placement logic for new AI nodes to prevent stacking
         const count = elementsRef.current.length;
         const angle = count * 0.5;
         const radius = 50 + (5 * count);
-        const centerX = window.innerWidth / 2; // Approx center
+        const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
         const x = centerX + radius * Math.cos(angle);
         const y = centerY + radius * Math.sin(angle);
@@ -1233,7 +1285,6 @@ export default function App() {
           x, y, fx: x, fy: y
         };
         
-        // Optimistic update using ref and state
         setElements(prev => [...prev, newElement]);
         return id;
       },
@@ -1246,7 +1297,6 @@ export default function App() {
           ...data,
           updatedAt: new Date().toISOString()
         };
-        // Merge tags if provided, ensuring uniqueness
         if (data.tags) {
            updatedElement.tags = Array.from(new Set([...element.tags, ...data.tags]));
         }
@@ -1289,7 +1339,7 @@ export default function App() {
 
         setRelationships(prev => prev.filter(r => {
             const isMatch = (r.source === source.id && r.target === target.id) || 
-                            (r.source === target.id && r.target === source.id); // Check both ways
+                            (r.source === target.id && r.target === source.id);
             return !isMatch;
         }));
         return true;
@@ -1310,7 +1360,6 @@ export default function App() {
         return;
     }
 
-    // Use current state as the source of truth for the export
     const exportData = {
         metadata: modelMetadata,
         data: {
@@ -1348,7 +1397,6 @@ export default function App() {
             }
             
             let modelName = imported.metadata.name;
-            // Handle potential name collisions by suggesting a new name
             if (modelsIndex.some(m => m.name === modelName)) {
                 modelName = `${modelName} (Imported)`;
             }
@@ -1370,11 +1418,15 @@ export default function App() {
                     createdAt: now,
                     updatedAt: now,
                 };
+                
+                // Migrate schemes if necessary
+                let importedSchemes = imported.data.colorSchemes || DEFAULT_COLOR_SCHEMES;
+                importedSchemes = migrateLegacySchemes(importedSchemes);
 
                 const newModelData = {
                     elements: imported.data.elements || [],
                     relationships: imported.data.relationships || [],
-                    colorSchemes: imported.data.colorSchemes || DEFAULT_COLOR_SCHEMES,
+                    colorSchemes: importedSchemes,
                     activeSchemeId: imported.data.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null,
                 };
                 
@@ -1394,7 +1446,7 @@ export default function App() {
         }
     };
     reader.readAsText(file);
-  }, [modelsIndex, handleLoadModel]);
+  }, [modelsIndex, handleLoadModel, migrateLegacySchemes]);
   
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const closeCanvasContextMenu = useCallback(() => setCanvasContextMenu(null), []);
@@ -1434,11 +1486,38 @@ export default function App() {
   }, [closeContextMenu]);
 
   const handleNodeConnect = useCallback((sourceId: string, targetId: string) => {
-    setPanelState({ view: 'addRelationship', sourceElementId: sourceId, targetElementId: targetId, isNewTarget: false });
+    const currentScheme = colorSchemes.find(s => s.id === activeSchemeId);
+    let defaultLabel = 'related to';
+    
+    if (currentScheme) {
+        if (currentScheme.defaultRelationshipLabel) {
+            defaultLabel = currentScheme.defaultRelationshipLabel;
+        } else {
+            const defaultConstant = DEFAULT_COLOR_SCHEMES.find(d => d.id === currentScheme.id);
+            if (defaultConstant?.defaultRelationshipLabel) {
+                defaultLabel = defaultConstant.defaultRelationshipLabel;
+            }
+        }
+    }
+    
+    const newRelId = generateUUID();
+    const newRel: Relationship = {
+        id: newRelId,
+        source: sourceId,
+        target: targetId,
+        label: defaultLabel,
+        direction: RelationshipDirection.To,
+        tags: []
+    };
+
+    setRelationships(prev => [...prev, newRel]);
+    
+    setSelectedRelationshipId(newRelId);
     setSelectedElementId(null);
-    setSelectedRelationshipId(null);
+    setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
+    
     closeContextMenu();
-  }, [closeContextMenu]);
+  }, [activeSchemeId, colorSchemes, closeContextMenu]);
 
   const handleNodeConnectToNew = useCallback((sourceId: string, coords: { x: number, y: number }) => {
     const now = new Date().toISOString();
@@ -1456,7 +1535,6 @@ export default function App() {
     };
     setElements(prev => [...prev, newElement]);
     
-    // Open the relationship panel with the new element as the target
     setPanelState({ view: 'addRelationship', sourceElementId: sourceId, targetElementId: newElement.id, isNewTarget: true });
     setSelectedElementId(null);
     setSelectedRelationshipId(null);
@@ -1487,17 +1565,14 @@ export default function App() {
         let name: string;
         let tags: string[] = [];
 
-        // 1. Tags (parse from right)
         const lastColonIndex = workStr.lastIndexOf(':');
         const lastParenOpenIndex = workStr.lastIndexOf('(');
-        // Ensure colon is actual tag separator and not part of text inside parenthesis
         if (lastColonIndex > -1 && lastColonIndex > lastParenOpenIndex) {
             const tagsStr = workStr.substring(lastColonIndex + 1);
             tags = tagsStr.split(',').map(t => t.trim()).filter(Boolean);
             workStr = workStr.substring(0, lastColonIndex).trim();
         }
 
-        // 2. Name
         name = workStr;
         if (name.startsWith('"') && name.endsWith('"')) {
             name = name.substring(1, name.length - 1);
@@ -1519,14 +1594,13 @@ export default function App() {
     };
 
     for (const line of lines) {
-      // Use a global regex to split by relationships, keeping the delimiters
       const relSeparatorRegex = /(<?-\[.*?]->?)/g;
       const parts = line.split(relSeparatorRegex);
       const tokens = parts.map(p => p.trim()).filter(Boolean);
 
       if (tokens.length === 0) continue;
 
-      if (tokens.length === 1) { // It's a single element definition
+      if (tokens.length === 1) { 
           const element = parseElementStr(tokens[0]);
           if (element) {
               updateParsedElement(element);
@@ -1534,7 +1608,6 @@ export default function App() {
           continue;
       }
 
-      // Process chains and one-to-many relationships
       let currentSourceElementStr = tokens.shift();
       while (tokens.length > 0) {
           const relStr = tokens.shift();
@@ -1559,7 +1632,6 @@ export default function App() {
           if (relStr.startsWith('<-')) direction = RelationshipDirection.From;
           else if (relStr.endsWith('->')) direction = RelationshipDirection.To;
 
-          // Handle one-to-many targets separated by semicolons
           const targetElementStrs = targetsStr.split(';').map(t => t.trim()).filter(Boolean);
 
           for (const targetElementStr of targetElementStrs) {
@@ -1572,11 +1644,10 @@ export default function App() {
               }
           }
           
-          // The last target becomes the next source for chaining, but only if it's not a one-to-many relationship.
           if (targetElementStrs.length === 1) {
               currentSourceElementStr = targetElementStrs[0];
           } else {
-              break; // Stop chaining after a one-to-many relationship to avoid ambiguity
+              break; 
           }
       }
     }
@@ -1612,7 +1683,6 @@ export default function App() {
         label, direction, tags: []
     }));
     
-    // Position new elements
     let placedNewElementsCount = 0;
     const positionNewElements = () => {
         nextElements.forEach(element => {
@@ -1647,7 +1717,6 @@ export default function App() {
         });
     }
     
-    // Position multiple times to resolve chains of new elements
     positionNewElements();
     positionNewElements();
 
@@ -1658,7 +1727,6 @@ export default function App() {
   
   const handleStartPhysicsLayout = () => {
     setOriginalElements(elements);
-    // Unpin all nodes to let the simulation run freely at the start
     setElements(prev => prev.map(f => ({ ...f, fx: null, fy: null })));
     setIsPhysicsModeActive(true);
   };
@@ -1666,10 +1734,7 @@ export default function App() {
   const handleAcceptLayout = () => {
     const finalPositions = graphCanvasRef.current?.getFinalNodePositions();
     if (finalPositions) {
-      // Fix: Explicitly type `p` to resolve a chain of type inference errors where `p` and `pos`
-      // could be treated as `unknown`, causing errors on property access (id, x, y) and spreads.
       const positionsMap = new Map(finalPositions.map((p: { id: string; x: number; y: number; }) => [p.id, p]));
-      // Apply the final positions from the simulation as fixed positions
       setElements(prev => prev.map(element => {
         const pos = positionsMap.get(element.id);
         return pos ? { ...element, x: pos.x, y: pos.y, fx: pos.x, fy: pos.y } : element;
@@ -1681,7 +1746,7 @@ export default function App() {
 
   const handleRejectLayout = () => {
     if (originalElements) {
-      setElements(originalElements); // Revert to the original element positions
+      setElements(originalElements);
     }
     setIsPhysicsModeActive(false);
     setOriginalElements(null);
@@ -1695,7 +1760,45 @@ export default function App() {
   const selectedElement = useMemo(() => elements.find(f => f.id === selectedElementId), [elements, selectedElementId]);
   const selectedRelationship = useMemo(() => relationships.find(r => r.id === selectedRelationshipId), [relationships, selectedRelationshipId]);
   const addRelationshipSourceElement = useMemo(() => elements.find(f => f.id === panelState.sourceElementId), [elements, panelState.sourceElementId]);
-  const activeColorScheme = useMemo(() => colorSchemes.find(s => s.id === activeSchemeId), [colorSchemes, activeSchemeId]);
+  
+  // ACTIVE SCHEMA COMPUTATION
+  const activeColorScheme = useMemo(() => {
+    const current = colorSchemes.find(s => s.id === activeSchemeId);
+    if (!current) return undefined;
+
+    const defaultScheme = DEFAULT_COLOR_SCHEMES.find(d => d.id === current.id);
+    if (defaultScheme) {
+        const mergedTags = { ...defaultScheme.tagColors, ...current.tagColors };
+        
+        // Merge standard definitions with any definitions present in the current model
+        // Note: Migrated models will have relationshipDefinitions in 'current'
+        const currentDefs = current.relationshipDefinitions || [];
+        const defaultDefs = defaultScheme.relationshipDefinitions || [];
+        
+        // Combine unique definitions by label
+        const combinedDefsMap = new Map<string, RelationshipDefinition>();
+        defaultDefs.forEach(d => combinedDefsMap.set(d.label, d));
+        currentDefs.forEach(d => combinedDefsMap.set(d.label, d)); // User overrides win if labels match (though we usually just append)
+
+        const mergedDefinitions = Array.from(combinedDefsMap.values());
+        
+        const mergedDefaultLabel = current.defaultRelationshipLabel || defaultScheme.defaultRelationshipLabel;
+
+        return {
+            ...current,
+            tagColors: mergedTags,
+            relationshipDefinitions: mergedDefinitions,
+            defaultRelationshipLabel: mergedDefaultLabel
+        };
+    }
+    return current;
+  }, [colorSchemes, activeSchemeId]);
+  
+  // Flatten definitions for components that just need labels
+  const activeRelationshipLabels = useMemo(() => {
+      return activeColorScheme?.relationshipDefinitions?.map(d => d.label) || [];
+  }, [activeColorScheme]);
+
 
   if (isInitialLoad && !isCreateModelModalOpen) {
     return (
@@ -1893,7 +1996,9 @@ export default function App() {
             onCreate={handleAddRelationship}
             onUpdateElement={handleUpdateElement}
             onCancel={handleCancelAddRelationship}
-            suggestedLabels={activeColorScheme?.relationshipLabels || []}
+            suggestedLabels={activeRelationshipLabels}
+            defaultLabel={activeColorScheme?.defaultRelationshipLabel}
+            suggestedTags={Object.keys(activeColorScheme?.tagColors || {})}
             />
         ) : selectedRelationship ? (
             <RelationshipDetailsPanel
@@ -1901,6 +2006,7 @@ export default function App() {
                 elements={elements}
                 onUpdate={handleUpdateRelationship}
                 onDelete={handleDeleteRelationship}
+                suggestedLabels={activeRelationshipLabels}
             />
         ) : selectedElement ? (
             <ElementDetailsPanel
@@ -1910,6 +2016,7 @@ export default function App() {
                 onUpdate={handleUpdateElement}
                 onDelete={handleDeleteElement}
                 onClose={() => setSelectedElementId(null)}
+                suggestedTags={Object.keys(activeColorScheme?.tagColors || {})}
             />
         ) : null}
       </div>

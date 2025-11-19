@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Relationship, Element, RelationshipDirection } from '../types';
 
 interface RelationshipDetailsPanelProps {
@@ -7,15 +7,22 @@ interface RelationshipDetailsPanelProps {
   elements: Element[];
   onUpdate: (relationship: Relationship) => void;
   onDelete: (relationshipId: string) => void;
+  suggestedLabels?: string[];
 }
 
-const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ relationship, elements, onUpdate, onDelete }) => {
+const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ relationship, elements, onUpdate, onDelete, suggestedLabels = [] }) => {
   const [formData, setFormData] = useState<Partial<Relationship>>(relationship);
-  const [tagsInput, setTagsInput] = useState('');
+  const labelInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setFormData(relationship);
-    setTagsInput(relationship.tags?.join(', ') || '');
+    
+    // Auto-focus and select the label input when the relationship changes
+    setTimeout(() => {
+        labelInputRef.current?.focus();
+        labelInputRef.current?.select();
+    }, 50);
+    
   }, [relationship]);
   
   const { sourceElement, targetElement } = useMemo(() => {
@@ -29,10 +36,12 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTagsInput(e.target.value);
-    const tags = e.target.value.split(',').map(tag => tag.trim()).filter(Boolean);
-    setFormData(prev => ({ ...prev, tags }));
+  const handleLabelSelect = (label: string) => {
+    const newData = { ...formData, label };
+    setFormData(newData);
+    if (relationship && formData.id) {
+        onUpdate(newData as Relationship);
+    }
   };
 
   const handleBlur = () => {
@@ -48,64 +57,65 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    // When Enter or Escape is pressed inside an input, blur it to trigger save.
     if (event.key === 'Enter' || event.key === 'Escape') {
       (event.target as HTMLElement).blur();
     }
   };
 
-  if (!relationship) return null;
+  if (!relationship || !sourceElement || !targetElement) {
+    return null;
+  }
 
   return (
     <div className="bg-gray-800 border-l border-gray-700 h-full w-96 flex-shrink-0 z-20" onKeyDown={handleKeyDown}>
       <div className="p-6 flex flex-col h-full">
         <div className="flex-shrink-0 mb-6">
           <h2 className="text-2xl font-bold text-white">Relationship Details</h2>
+          <div className="flex items-center text-sm text-gray-400 mt-2 space-x-2">
+             <span className="bg-gray-700 px-2 py-0.5 rounded">{sourceElement.name}</span>
+             <span>→</span>
+             <span className="bg-gray-700 px-2 py-0.5 rounded">{targetElement.name}</span>
+          </div>
         </div>
 
         <div className="flex-grow space-y-4 text-gray-300 overflow-y-auto pr-2">
           <div>
-            <label className="block text-sm font-medium">Source</label>
-            <select
-              name="source"
-              value={formData.source || ''}
-              onChange={handleInputChange}
-              onBlur={handleBlur}
-              className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {elements.map(element => (
-                <option key={element.id} value={element.id}>
-                  {element.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Target</label>
-            <select
-              name="target"
-              value={formData.target || ''}
-              onChange={handleInputChange}
-              onBlur={handleBlur}
-              className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {elements.map(element => (
-                <option key={element.id} value={element.id}>
-                  {element.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
             <label className="block text-sm font-medium">Label</label>
             <input
+              ref={labelInputRef}
               type="text"
               name="label"
               value={formData.label || ''}
               onChange={handleInputChange}
               onBlur={handleBlur}
+              placeholder="e.g., works at, is related to"
               className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            
+            {suggestedLabels.length > 0 && (
+                <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">Schema Relationships:</p>
+                    <div className="flex flex-wrap gap-1">
+                        {suggestedLabels.map(label => {
+                            const isSelected = formData.label === label;
+                            return (
+                                <button
+                                    key={label}
+                                    type="button"
+                                    onClick={() => handleLabelSelect(label)}
+                                    className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                                        isSelected 
+                                        ? 'bg-blue-600 border-blue-500 text-white' 
+                                        : 'bg-gray-800 border-gray-600 text-gray-400 hover:bg-gray-700'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium">Direction</label>
@@ -116,31 +126,20 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
               onBlur={handleBlur}
               className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value={RelationshipDirection.To}>{sourceElement?.name || 'Source'} → {targetElement?.name || 'Target'}</option>
-              <option value={RelationshipDirection.From}>{targetElement?.name || 'Target'} → {sourceElement?.name || 'Source'}</option>
-              <option value={RelationshipDirection.None}>{sourceElement?.name || 'Source'} — {targetElement?.name || 'Target'}</option>
+              <option value={RelationshipDirection.To}>Forward (→)</option>
+              <option value={RelationshipDirection.From}>Reverse (←)</option>
+              <option value={RelationshipDirection.None}>None (—)</option>
             </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Tags (comma-separated)</label>
-            <input
-              type="text"
-              name="tags"
-              value={tagsInput}
-              onChange={handleTagsChange}
-              onBlur={handleBlur}
-              className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
           </div>
         </div>
         
         <div className="flex-shrink-0 mt-auto pt-6 flex justify-between items-center">
-          <p className="text-xs text-center text-gray-500">Changes are saved automatically.</p>
+           <p className="text-xs text-gray-500">Changes are saved automatically.</p>
            <button
             onClick={handleDelete}
             className="text-sm text-red-400 hover:text-red-300 hover:bg-red-900 bg-opacity-50 px-3 py-1 rounded-md transition"
           >
-            Delete Relationship
+            Delete Link
           </button>
         </div>
       </div>

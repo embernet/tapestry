@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Element, Relationship } from '../types';
 import ElementEditor from './ElementEditor';
@@ -10,9 +11,10 @@ interface ElementDetailsPanelProps {
   onUpdate: (element: Element) => void;
   onDelete: (elementId: string) => void;
   onClose: () => void;
+  suggestedTags?: string[];
 }
 
-const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, allElements, relationships, onUpdate, onDelete, onClose }) => {
+const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, allElements, relationships, onUpdate, onDelete, onClose, suggestedTags = [] }) => {
   const [formData, setFormData] = useState<Partial<Element>>({});
   const [isCopied, setIsCopied] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -22,20 +24,21 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, allE
       setFormData(element);
 
       // When a new element is created and selected, focus and select the name input.
-      // A new element is identified by its default name and identical creation/update timestamps.
       if (element.name === 'New Element' && element.createdAt === element.updatedAt && nameInputRef.current) {
-        // Use a short timeout to ensure the element is focusable after the render completes.
         setTimeout(() => {
           nameInputRef.current?.focus();
           nameInputRef.current?.select();
         }, 50);
       }
-
     }
   }, [element]);
 
-  const handleDataChange = (updatedData: Partial<Element>) => {
+  const handleDataChange = (updatedData: Partial<Element>, immediate: boolean = false) => {
     setFormData(updatedData);
+    if (immediate && element) {
+        // Immediate update requested (e.g. tag toggle)
+        onUpdate({ ...element, ...updatedData } as Element);
+    }
   };
 
   const handleBlur = () => {
@@ -60,7 +63,6 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, allE
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    // When Enter or Escape is pressed inside an input, blur it to trigger save.
     if (event.key === 'Enter' || event.key === 'Escape') {
       (event.target as HTMLElement).blur();
     }
@@ -113,6 +115,7 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, allE
             onDataChange={handleDataChange}
             onBlur={handleBlur}
             nameInputRef={nameInputRef}
+            suggestedTags={suggestedTags}
           />
           <div className="text-xs text-gray-500 pt-4 space-y-1 mt-4">
               <p>Created: {formatDate(element.createdAt)}</p>

@@ -268,19 +268,21 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSch
         let schemaContext = "NO ACTIVE SCHEMA DEFINED. You can use any tags or relationship labels, but prefer standard ones like 'Action', 'Idea', 'Person' and 'causes', 'related to'.";
         const activeScheme = colorSchemes.find(s => s.id === activeSchemeId);
         if (activeScheme) {
-             const labels = activeScheme.relationshipLabels || [];
+             const definitions = activeScheme.relationshipDefinitions || [];
+             const defaultRel = activeScheme.defaultRelationshipLabel;
              schemaContext = `
         ACTIVE SCHEMA: "${activeScheme.name}"
         The following tags are explicitly defined in the current schema. These tags govern the visual appearance of nodes.
         You MUST use these specific tags when categorizing elements to ensure they integrate correctly with the user's model:
         ${Object.keys(activeScheme.tagColors).map(tag => `- "${tag}"`).join('\n')}
         
-        The following standard relationship labels are defined in the current schema:
-        ${labels.map(l => `- "${l}"`).join('\n')}
+        The following standard relationship definitions (label: description) are defined in the current schema:
+        ${definitions.map(d => `- "${d.label}": ${d.description || 'No description'}`).join('\n')}
+        ${defaultRel ? `The DEFAULT relationship label for this schema is: "${defaultRel}". Use this if no specific relationship type is implied.` : ''}
         
         RULES FOR SCHEMA USAGE:
         1. When the user asks to add a specific type of agent (e.g. "add an Idea", "add an Action"), map their request to one of the tags above and include it in the 'tags' list for that element.
-        2. When connecting elements with 'addRelationship', prefer using one of the standard relationship labels listed above if it fits the context. If none fit, use a clear, concise label of your own.
+        2. When connecting elements with 'addRelationship', CAREFULLY REVIEW the relationship definitions above. Choose the label whose description best matches the semantic relationship you are trying to create. If none fit well, use a concise custom label.
         `;
         }
 
