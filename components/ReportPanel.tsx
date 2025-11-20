@@ -223,13 +223,10 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationship
     });
     
     const elementRelCounts = new Map<string, number>();
-    // Initialize all visible elements with a count of 0
     elements.forEach(f => elementRelCounts.set(f.id, 0));
-    // The relationships prop is already filtered, so this counts only visible relationships
     relationships.forEach(rel => {
         const sourceId = rel.source as string;
         const targetId = rel.target as string;
-        // Increment count for both source and target of the relationship
         elementRelCounts.set(sourceId, (elementRelCounts.get(sourceId) || 0) + 1);
         elementRelCounts.set(targetId, (elementRelCounts.get(targetId) || 0) + 1);
     });
@@ -348,9 +345,9 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationship
   }, [currentMatchIndex, matches]);
 
   return (
-    <div className="bg-gray-800 border-l border-gray-700 h-full w-[576px] flex-shrink-0 z-20 flex flex-col">
+    <div className="w-full h-full flex flex-col bg-gray-800">
       <div className="p-4 flex-shrink-0 flex justify-between items-center border-b border-gray-700">
-        <h2 className="text-2xl font-bold text-white">Report</h2>
+        <h2 className="text-xl font-bold text-white">Report</h2>
         <div className="flex items-center space-x-1">
             <div className="flex items-center space-x-1">
                 <input

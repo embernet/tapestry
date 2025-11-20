@@ -66,6 +66,7 @@ export interface ModelMetadata {
   updatedAt: string;
   filename?: string;
   contentHash?: string; // Used to detect if content has changed
+  lastDiskHash?: string; // Used to detect if content has changed since last disk save
 }
 
 export interface PanelState {
@@ -88,4 +89,12 @@ export interface ModelActions {
   deleteElement: (name: string) => boolean;
   addRelationship: (sourceName: string, targetName: string, label: string, direction?: string) => boolean;
   deleteRelationship: (sourceName: string, targetName: string) => boolean;
+}
+
+export interface ScamperSuggestion {
+  id: string; // Temporary ID for list management
+  name: string;
+  description: string;
+  relationshipLabel: string;
+  status: 'pending' | 'accepted' | 'rejected';
 }

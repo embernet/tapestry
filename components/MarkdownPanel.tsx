@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { isInIframe } from '../utils';
 
 interface MarkdownPanelProps {
   initialText: string;
@@ -97,7 +98,8 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
     setIsImportModalOpen(false);
 
     // Try File System Access API first for better UX (start in Documents)
-    if ('showOpenFilePicker' in window) {
+    // BUT ONLY IF NOT IN IFRAME (security restriction)
+    if (!isInIframe() && 'showOpenFilePicker' in window) {
         try {
             const pickerOptions = {
                 types: [{
@@ -158,7 +160,7 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
 
 
   return (
-    <div className="bg-gray-800 border-r border-gray-700 h-full w-1/3 max-w-lg flex-shrink-0 z-20 flex flex-col">
+    <div className="w-full h-full flex flex-col">
        <input
         type="file"
         ref={importFileRef}

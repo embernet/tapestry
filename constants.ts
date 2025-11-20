@@ -27,7 +27,7 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
       { label: 'Degrades', description: 'reduces efficiency or performance.' },
       { label: 'Inhibits', description: 'slows or blocks a function.' },
       { label: 'Destabilises', description: 'increases variability, noise, or unpredictability.' },
-      { label: 'Generates', description: 'creates a new effect, output, or state.' },
+      { label: 'Produces', description: 'creates a new effect, output, or state.' },
       { label: 'Consumes', description: 'uses up a resource or capacity.' },
       { label: 'Transforms', description: 'changes the form/structure of something.' },
       { label: 'Transfers', description: 'moves energy, information, or material.' },
@@ -38,8 +38,7 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
       { label: 'Propagates', description: 'spreads an effect through the system.' },
       { label: 'Buffers', description: 'absorbs or dampens shocks or variability.' },
       { label: 'Exposes', description: 'introduces a vulnerability or makes a risk visible.' }
-    ],
-    defaultRelationshipLabel: 'causes'
+    ]
   },
   {
     id: 'scheme-networking',
@@ -72,7 +71,6 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
       { label: 'depends-on', description: 'Indicates a requirement for the other element to function.' },
       { label: 'accountable for', description: 'Indicates ultimate answerability for an outcome.' },
       { label: 'responsible for', description: 'Indicates the duty to perform a task or function.' }
-    ],
-    defaultRelationshipLabel: 'related to'
+    ]
   }
 ];

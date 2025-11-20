@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { DateFilterState } from '../types';
 
@@ -65,7 +66,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ allTags, tagCounts, tagFilter
   };
 
   return (
-    <div className="bg-gray-800 border-r border-gray-700 h-full w-96 flex-shrink-0 z-20 flex flex-col">
+    <div className="absolute top-44 left-4 bottom-4 w-96 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl z-30 flex flex-col">
       <div className="p-6 flex-shrink-0 flex justify-between items-center">
         <h2 className="text-2xl font-bold text-white">Filter</h2>
         <button onClick={onClose} className="text-gray-400 hover:text-white">
@@ -242,3 +243,4 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ allTags, tagCounts, tagFilter
 };
 
 export default FilterPanel;
+    

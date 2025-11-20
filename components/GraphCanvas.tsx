@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
 import * as d3 from 'd3';
 import { Element, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection } from '../types';
@@ -21,6 +20,9 @@ interface GraphCanvasProps {
   focusMode: 'narrow' | 'wide' | 'zoom';
   setElements: React.Dispatch<React.SetStateAction<Element[]>>;
   isPhysicsModeActive: boolean;
+  layoutParams: { linkDistance: number; repulsion: number };
+  onJiggleTrigger?: number;
+  isBulkEditActive: boolean;
 }
 
 export interface GraphCanvasRef {
@@ -78,13 +80,14 @@ const createDragHandler = (
   let startX = 0;
   let startY = 0;
 
-  function dragstarted(this: SVGGElement, event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
+  function dragstarted(this: SVGGElement, event: any, d: D3Node) {
     const target = event.sourceEvent.target as SVGElement;
     isMoving = target.classList.contains('move-zone');
     
     hasMoved = false;
-    startX = event.x;
-    startY = event.y;
+    const e = event as any;
+    startX = e.x;
+    startY = e.y;
 
     // Pin the node during any drag operation to prevent interference from the simulation
     d.fx = d.x;
@@ -109,16 +112,17 @@ const createDragHandler = (
     }
   }
 
-  function dragged(this: SVGGElement, event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
+  function dragged(this: SVGGElement, event: any, d: D3Node) {
+    const e = event as any;
     // Check for significant movement to determine if this is a drag or a click
-    if (!hasMoved && (Math.abs(event.x - startX) > 3 || Math.abs(event.y - startY) > 3)) {
+    if (!hasMoved && (Math.abs(e.x - startX) > 3 || Math.abs(e.y - startY) > 3)) {
         hasMoved = true;
     }
 
     if (isMoving) {
       // For a move drag, update the node's fixed position.
-      d.fx = event.x;
-      d.fy = event.y;
+      d.fx = e.x;
+      d.fy = e.y;
     } else {
       // For a connect drag, use absolute mouse pointer position
       const parent = this.parentNode as SVGGElement;
@@ -130,7 +134,7 @@ const createDragHandler = (
     }
   }
 
-  function dragended(this: SVGGElement, event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
+  function dragended(this: SVGGElement, event: any, d: D3Node) {
     setElementsState(prev => prev.map(e => e.id === d.id ? { ...e, fx: d.fx, fy: d.fy } : e));
     
     if (!isMoving) {
@@ -173,27 +177,29 @@ const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>, onN
   let startY = 0;
   let hasMoved = false;
 
-  function dragstarted(event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
+  function dragstarted(event: any, d: D3Node) {
     if (!event.active) {
       simulation.alphaTarget(0.3);
       (simulation as any).restart();
     }
     d.fx = d.x;
     d.fy = d.y;
-    startX = event.x;
-    startY = event.y;
+    const e = event as any;
+    startX = e.x;
+    startY = e.y;
     hasMoved = false;
   }
 
-  function dragged(event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
-    d.fx = event.x;
-    d.fy = event.y;
-    if (!hasMoved && (Math.abs(event.x - startX) > 3 || Math.abs(event.y - startY) > 3)) {
+  function dragged(event: any, d: D3Node) {
+    const e = event as any;
+    d.fx = e.x;
+    d.fy = e.y;
+    if (!hasMoved && (Math.abs(e.x - startX) > 3 || Math.abs(e.y - startY) > 3)) {
         hasMoved = true;
     }
   }
 
-  function dragended(event: d3.D3DragEvent<SVGGElement, D3Node, D3Node>, d: D3Node) {
+  function dragended(event: any, d: D3Node) {
     if (!event.active) simulation.alphaTarget(0);
     
     // In physics mode, typical D3 drag swallows click events. 
@@ -227,7 +233,10 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   selectedRelationshipId,
   focusMode,
   setElements,
-  isPhysicsModeActive
+  isPhysicsModeActive,
+  layoutParams,
+  onJiggleTrigger,
+  isBulkEditActive
 }, ref) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
@@ -324,6 +333,30 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         }
     }
   }, [focusMode, highlightedNodeIds]);
+
+  // Respond to layout param changes
+  useEffect(() => {
+      if (simulationRef.current && isPhysicsModeActive) {
+          const sim = simulationRef.current;
+          sim.force('link', d3.forceLink<D3Node, D3Link>([]).id(d => d.id).distance(layoutParams.linkDistance));
+          sim.force('charge', d3.forceManyBody().strength(layoutParams.repulsion));
+          
+          // Re-initialize links to apply new distance
+          const simGetter = sim as any;
+          const links = simGetter.force('link').links();
+          sim.force('link', d3.forceLink<D3Node, D3Link>(links).id(d => d.id).distance(layoutParams.linkDistance));
+
+          sim.alpha(0.3).restart();
+      }
+  }, [layoutParams, isPhysicsModeActive]);
+
+  // Respond to jiggle trigger
+  useEffect(() => {
+      if (onJiggleTrigger && simulationRef.current && isPhysicsModeActive) {
+          const sim = simulationRef.current;
+          sim.alpha(0.5).restart();
+      }
+  }, [onJiggleTrigger, isPhysicsModeActive]);
 
   const handleCanvasContextMenu = (event: React.MouseEvent) => {
     const target = event.target as HTMLElement;
@@ -484,8 +517,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
 
     node.append('rect')
         .attr('class', 'move-zone')
-        .attr('fill', 'transparent')
-        .style('cursor', 'grab');
+        .attr('fill', 'transparent');
+        // Cursor style set dynamically below
 
     node.each(function (d) {
         const nodeElement = d3.select(this);
@@ -517,14 +550,34 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
             .attr('x', -moveZoneWidth / 2)
             .attr('y', -moveZoneHeight / 2);
     });
+    
+    // Apply Cursor Style based on Mode
+    let cursorStyle = 'default';
+    
+    // Custom SVG Cursor for Bulk Edit (pink lightning bolt to match toolbar)
+    const bulkCursorSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>`);
+    const bulkCursor = `url("data:image/svg+xml;charset=utf-8,${bulkCursorSvg}") 12 12, auto`;
+
+    let moveZoneCursor = isPhysicsModeActive ? 'grab' : 'move';
+
+    if (isBulkEditActive) {
+        cursorStyle = bulkCursor;
+        moveZoneCursor = bulkCursor;
+    } else if (isPhysicsModeActive) {
+        cursorStyle = 'grab';
+    } else {
+        cursorStyle = 'crosshair'; // Default Connect Mode
+    }
+
+    node.style('cursor', cursorStyle);
+    node.select('.move-zone').style('cursor', moveZoneCursor);
 
     if (isPhysicsModeActive) {
       simulation
-        .force('link', d3.forceLink<D3Node, D3Link>(d3Links).id(d => (d as D3Node).id).distance(LINK_DISTANCE))
-        .force('charge', d3.forceManyBody().strength(-400))
+        .force('link', d3.forceLink<D3Node, D3Link>(d3Links).id(d => (d as D3Node).id).distance(layoutParams.linkDistance))
+        .force('charge', d3.forceManyBody().strength(layoutParams.repulsion))
         .force('center', d3.forceCenter(width / 2, height / 2));
 
-      node.style('cursor', 'grab');
       const physicsDragHandler = createPhysicsDragHandler(simulation, onNodeClick);
       node.call(physicsDragHandler as any);
     } else {
@@ -533,7 +586,6 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .force('charge', null)
         .force('center', null);
         
-      node.style('cursor', 'crosshair');
       const staticDragHandler = createDragHandler(setElements, onNodeClick, onNodeConnect, onNodeConnectToNew);
       node.call(staticDragHandler as any);
     }
@@ -569,15 +621,18 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     svg.call(zoom as any);
     svg.on('click', onCanvasClick);
     svg.on('dblclick.zoom', null)
-      .on('dblclick', (event) => {
-        const node = g.node();
-        if (node) {
-            const [x, y] = d3.pointer(event, node);
-            onCanvasDoubleClick({x, y});
+      .on('dblclick', (event: any) => {
+        // Check if click target is svg background
+        if (event.target.tagName === 'svg' || event.target === svg.node()) {
+            const node = g.node();
+            if (node) {
+                const [x, y] = d3.pointer(event, node);
+                onCanvasDoubleClick({x, y});
+            }
         }
       });
 
-  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu]);
+  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive]);
 
   return (
     <div className="w-full h-full flex-grow bg-gray-900 cursor-grab active:cursor-grabbing" onContextMenu={handleCanvasContextMenu}>

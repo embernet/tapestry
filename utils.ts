@@ -35,6 +35,14 @@ export const computeContentHash = (data: any): string => {
   }
 };
 
+export const isInIframe = () => {
+  try {
+    return window.self !== window.top;
+  } catch (e) {
+    return true;
+  }
+};
+
 export const generateMarkdownFromGraph = (elements: Element[], relationships: Relationship[]): string => {
   const elementMap = new Map(elements.map(f => [f.id, f]));
   const handledElementIds = new Set<string>();

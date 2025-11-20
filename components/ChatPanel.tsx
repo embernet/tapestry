@@ -468,7 +468,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSch
   const isWaitingForConfirmation = messages.some(m => m.isPending);
 
   return (
-    <div className={`bg-gray-800 border-r border-gray-700 h-full w-1/3 max-w-lg flex-shrink-0 z-20 flex flex-col ${className || ''}`}>
+    <div className={`absolute top-44 left-4 bottom-4 w-96 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl z-30 flex flex-col ${className || ''}`}>
       <div className="p-4 flex-shrink-0 flex justify-between items-center border-b border-gray-700">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

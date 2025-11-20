@@ -1,7 +1,6 @@
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition } from './types';
-import { DEFAULT_COLOR_SCHEMES } from './constants';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion } from './types';
+import { DEFAULT_COLOR_SCHEMES, LINK_DISTANCE } from './constants';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
 import ElementDetailsPanel from './components/ElementDetailsPanel';
 import RelationshipDetailsPanel from './components/RelationshipDetailsPanel';
@@ -11,13 +10,274 @@ import JSONPanel from './components/JSONPanel';
 import FilterPanel from './components/FilterPanel';
 import { ReportPanel } from './components/ReportPanel';
 import ChatPanel from './components/ChatPanel';
-import { generateUUID, generateMarkdownFromGraph, computeContentHash } from './utils';
+import SchemaToolbar from './components/SchemaToolbar';
+import AnalysisToolbar from './components/AnalysisToolbar';
+import LayoutToolbar from './components/LayoutToolbar';
+import BulkEditToolbar from './components/BulkEditToolbar';
+import ScamperToolbar from './components/ScamperToolbar';
+import ScamperModal from './components/ScamperModal';
+import ToolsBar from './components/ToolsBar';
+import CommandBar from './components/CommandBar';
+import MatrixPanel from './components/MatrixPanel';
+import TablePanel from './components/TablePanel';
+import RightPanelContainer from './components/RightPanelContainer';
+import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe } from './utils';
+import { GoogleGenAI, Type } from '@google/genai';
 
+// Explicitly define coordinate type to fix type inference issues
+type Coords = { x: number; y: number };
 
 // --- Storage Keys ---
 const MODELS_INDEX_KEY = 'tapestry_models_index';
 const LAST_OPENED_MODEL_ID_KEY = 'tapestry_last_opened_model_id';
 const MODEL_DATA_PREFIX = 'tapestry_model_data_';
+
+// --- Shared Pattern Data ---
+// Colors: Red=Harmful, Green=Useful, Blue=Action, Teal=Trend, Orange=Emotion, Grey=Context, Black=Organisation, Yellow=Idea, Purple=Topic, Pink=Question
+export const TAPESTRY_PATTERNS = [
+    {
+        name: "The Weave",
+        desc: "When shifting trends intersect with human emotion, the fabric of culture is woven.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <path d="M8 4V28" stroke="#14b8a6" strokeWidth="3" strokeLinecap="round" />
+                <path d="M16 4V28" stroke="#14b8a6" strokeWidth="3" strokeLinecap="round" />
+                <path d="M24 4V28" stroke="#14b8a6" strokeWidth="3" strokeLinecap="round" />
+                <path d="M4 8H28" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.8" />
+                <path d="M4 16H28" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.8" />
+                <path d="M4 24H28" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.8" />
+            </svg>
+        )
+    },
+    {
+        name: "The Mesh",
+        desc: "Action and inquiry must cross paths within a shared context to create meaningful progress.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <path d="M4 4L28 28" stroke="#3b82f6" strokeWidth="2" />
+                <path d="M28 4L4 28" stroke="#ec4899" strokeWidth="2" />
+                <path d="M16 2V30" stroke="#6b7280" strokeWidth="2" />
+                <path d="M2 16H30" stroke="#6b7280" strokeWidth="2" />
+                <rect x="10" y="10" width="12" height="12" stroke="#eab308" strokeWidth="2" fillOpacity="0" />
+            </svg>
+        )
+    },
+    {
+        name: "The Loop",
+        desc: "A bright idea can loop around a harmful problem to reveal a new trend.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <path d="M6 6C6 6 10 16 16 16C22 16 26 6 26 6" stroke="#ef4444" strokeWidth="3" strokeLinecap="round" />
+                <path d="M6 26C6 26 10 16 16 16C22 16 26 26 26 26" stroke="#eab308" strokeWidth="3" strokeLinecap="round" />
+                <circle cx="16" cy="16" r="4" fill="#14b8a6" />
+            </svg>
+        )
+    },
+    {
+        name: "The Stitch",
+        desc: "Useful innovations are often loose threads that need the structure of context to hold together.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <path d="M6 10H26" stroke="#22c55e" strokeWidth="4" strokeDasharray="4 4" />
+                <path d="M6 22H26" stroke="#22c55e" strokeWidth="4" strokeDasharray="4 4" />
+                <path d="M10 4V28" stroke="#6b7280" strokeWidth="2" />
+                <path d="M22 4V28" stroke="#6b7280" strokeWidth="2" />
+            </svg>
+        )
+    },
+    {
+        name: "The Framework",
+        desc: "When harmful challenges intersect, a framework of solid action is required to contain them.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <rect x="6" y="6" width="20" height="20" stroke="#3b82f6" strokeWidth="2" />
+                <path d="M16 2V30" stroke="#ef4444" strokeWidth="4" />
+                <path d="M2 16H30" stroke="#ef4444" strokeWidth="4" />
+                <rect x="14" y="14" width="4" height="4" fill="#ffffff" />
+            </svg>
+        )
+    },
+    {
+        name: "The Current",
+        desc: "Knowledge flows like a river, but it is the questioning current that gives it shape.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <path d="M8 8Q12 12 16 8T24 8" stroke="#a855f7" strokeWidth="3" strokeLinecap="round" />
+                <path d="M8 16Q12 20 16 16T24 16" stroke="#ec4899" strokeWidth="3" strokeLinecap="round" />
+                <path d="M8 24Q12 28 16 24T24 24" stroke="#a855f7" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+        )
+    },
+    {
+        name: "The Pivot",
+        desc: "An organisation that embraces a single bright idea can radiate usefulness in all directions.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <line x1="10" y1="4" x2="10" y2="28" stroke="black" strokeWidth="2" />
+                <line x1="22" y1="4" x2="22" y2="28" stroke="black" strokeWidth="2" />
+                <line x1="4" y1="10" x2="28" y2="10" stroke="black" strokeWidth="2" />
+                <line x1="4" y1="22" x2="28" y2="22" stroke="black" strokeWidth="2" />
+                <path d="M16 16L16 4 M16 16L28 16 M16 16L16 28 M16 16L4 16" stroke="#22c55e" strokeWidth="2" />
+                <circle cx="16" cy="16" r="4" fill="#eab308" />
+            </svg>
+        )
+    },
+    {
+        name: "The Filter",
+        desc: "Context acts as a filter, refining chaotic trends into clear, direct action.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <path d="M0 10 Q16 0 32 10" stroke="#14b8a6" strokeWidth="3" fill="none" />
+                <rect x="8" y="4" width="4" height="24" fill="#6b7280" />
+                <rect x="20" y="4" width="4" height="24" fill="#6b7280" />
+                <path d="M16 20 V30" stroke="#3b82f6" strokeWidth="4" markerEnd="url(#arrow)" />
+            </svg>
+        )
+    },
+    {
+        name: "The Resolution",
+        desc: "Even harmful conflict and raw emotion can be braided together to form a useful resolution.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <path d="M8 4 C8 4 12 12 4 12" stroke="#ef4444" strokeWidth="2" />
+                <path d="M24 4 C24 4 20 12 28 12" stroke="#f97316" strokeWidth="2" />
+                <path d="M10 16 C10 16 16 24 22 16 C22 16 16 8 10 16" stroke="#22c55e" strokeWidth="3" />
+                <path d="M12 26 L20 26" stroke="#22c55e" strokeWidth="3" />
+            </svg>
+        )
+    },
+    {
+        name: "The Strategy",
+        desc: "The strongest organisations build a roof of action supported by the constant thread of questioning.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <rect x="4" y="8" width="4" height="20" fill="black" />
+                <rect x="24" y="8" width="4" height="20" fill="black" />
+                <rect x="2" y="4" width="28" height="4" fill="#3b82f6" />
+                <line x1="12" y1="8" x2="12" y2="24" stroke="#ec4899" strokeWidth="2" strokeDasharray="2 2" />
+                <line x1="20" y1="8" x2="20" y2="24" stroke="#ec4899" strokeWidth="2" strokeDasharray="2 2" />
+            </svg>
+        )
+    },
+    {
+        name: "The Insight",
+        desc: "True insight strikes when a powerful idea pierces through the center of established knowledge.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <rect x="4" y="4" width="24" height="24" rx="12" fill="#a855f7" fillOpacity="0.3" />
+                <circle cx="16" cy="16" r="8" stroke="#6b7280" strokeWidth="2" />
+                <path d="M22 4 L14 16 L18 16 L10 28" stroke="#eab308" strokeWidth="2" fill="none" />
+            </svg>
+        )
+    },
+    {
+        name: "The Compassion",
+        desc: "When a harmful trend emerges, it is human emotion that encircles it to provide healing.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#14b8a6" fillOpacity="0.2" rx="4" />
+                <path d="M10 10 L22 22 M22 10 L10 22" stroke="#ef4444" strokeWidth="3" />
+                <circle cx="16" cy="16" r="10" stroke="#f97316" strokeWidth="3" fill="none" />
+            </svg>
+        )
+    },
+    {
+        name: "The Brocade",
+        desc: "Elevate a standard context by surface-weaving a pattern of bright ideas, adding value without disrupting the underlying structure.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#6b7280" rx="4" />
+                <path d="M4 8H12 M16 8H24 M8 16H16 M20 16H28 M4 24H12 M16 24H24" stroke="#eab308" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+        )
+    },
+    {
+        name: "The Twill",
+        desc: "Establish a rhythm of overlapping actions that advances diagonally, creating a durable structure capable of withstanding stress.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <path d="M0 24 L8 32 M0 12 L20 32 M0 0 L32 32 M12 0 L32 20 M24 0 L32 8" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+        )
+    },
+    {
+        name: "The Darnining",
+        desc: "Identify harmful holes in the narrative and systematically interlace useful solutions to restore integrity to the whole.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <circle cx="16" cy="16" r="12" stroke="#ef4444" strokeWidth="3" fill="none" />
+                <path d="M8 12H24 M8 16H24 M8 20H24" stroke="#22c55e" strokeWidth="2" />
+                <path d="M12 8V24 M16 8V24 M20 8V24" stroke="#a855f7" strokeWidth="2" opacity="0.7" />
+            </svg>
+        )
+    },
+    {
+        name: "The Jacquard",
+        desc: "Manage intricate relationships where every pixel of emotion, organisation, and idea is individually controlled to form a grand design.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <rect x="4" y="4" width="6" height="6" fill="#111827" />
+                <rect x="12" y="4" width="6" height="6" fill="#f97316" />
+                <rect x="20" y="4" width="6" height="6" fill="#eab308" />
+                <rect x="4" y="12" width="6" height="6" fill="#f97316" />
+                <rect x="12" y="12" width="6" height="6" fill="#eab308" />
+                <rect x="20" y="12" width="6" height="6" fill="#111827" />
+                <rect x="4" y="20" width="6" height="6" fill="#eab308" />
+                <rect x="12" y="20" width="6" height="6" fill="#111827" />
+                <rect x="20" y="20" width="6" height="6" fill="#f97316" />
+            </svg>
+        )
+    },
+    {
+        name: "The Selvage",
+        desc: "Reinforce the edges of a topic with specific questions to prevent the scope from unraveling into chaos.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#a855f7" fillOpacity="0.2" rx="4" />
+                <path d="M6 4V28" stroke="#ec4899" strokeWidth="3" />
+                <path d="M26 4V28" stroke="#ec4899" strokeWidth="3" />
+                <path d="M10 16H22" stroke="#a855f7" strokeWidth="2" />
+            </svg>
+        )
+    },
+    {
+        name: "The Kilim",
+        desc: "Allow distinct organisations to butt against one another in a slit-weave, maintaining separate identities while forming a continuous surface.",
+        svg: (
+            <svg width="100%" height="100%" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" fill="#1f2937" rx="4" />
+                <path d="M16 4 L4 16 L16 28" fill="#111827" />
+                <path d="M16 4 L28 16 L16 28" fill="#3b82f6" />
+                <path d="M16 4 V28" stroke="#6b7280" strokeWidth="1" />
+            </svg>
+        )
+    }
+];
+
+const TAGLINES = [
+    "Visual Knowledge Weaver",
+    "Complex Problem Solver",
+    "Emerging Trend Explorer",
+    "Creative Solution Mapper",
+    "Strategic Insight Generator",
+    "Dynamic Connection Builder",
+    "Structured Chaos Organizer",
+    "Future Scenario Planner"
+];
 
 
 // Helper Hook for detecting clicks outside an element
@@ -39,6 +299,57 @@ const useClickOutside = <T extends HTMLElement,>(ref: React.RefObject<T>, handle
 };
 
 // --- Helper Components defined in App.tsx to reduce file count ---
+
+// Tapestry Icon Animator for Landing Screen
+const TapestryAnimator: React.FC = () => {
+    const [index, setIndex] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setIndex((prevIndex) => (prevIndex + 1) % TAPESTRY_PATTERNS.length);
+        }, 4000); // Change every 4 seconds
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="relative w-16 h-16 flex-shrink-0">
+            {TAPESTRY_PATTERNS.map((pattern, i) => (
+                <div 
+                    key={i} 
+                    className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${i === index ? 'opacity-100' : 'opacity-0'}`}
+                >
+                    {pattern.svg}
+                </div>
+            ))}
+        </div>
+    );
+};
+
+// Text Animator for Landing Screen
+const TextAnimator: React.FC = () => {
+    const [index, setIndex] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setIndex((prevIndex) => (prevIndex + 1) % TAGLINES.length);
+        }, 4000); // Sync with tapestry animator
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="relative h-8 w-full flex justify-center overflow-hidden">
+            {TAGLINES.map((text, i) => (
+                <span 
+                    key={i} 
+                    className={`absolute transition-opacity duration-1000 ease-in-out ${i === index ? 'opacity-100' : 'opacity-0'}`}
+                >
+                    {text}
+                </span>
+            ))}
+        </div>
+    );
+};
+
 
 // Conflict Resolution Modal
 interface ConflictResolutionModalProps {
@@ -165,6 +476,8 @@ interface CanvasContextMenuProps {
   onToggleMarkdown: () => void;
   onToggleJSON: () => void;
   onToggleFilter: () => void;
+  onToggleMatrix: () => void;
+  onToggleTable: () => void;
   onOpenModel: () => void;
   onSaveModel: () => void;
   onCreateModel: () => void;
@@ -172,8 +485,10 @@ interface CanvasContextMenuProps {
   isMarkdownOpen: boolean;
   isJSONOpen: boolean;
   isFilterOpen: boolean;
+  isMatrixOpen: boolean;
+  isTableOpen: boolean;
 }
-const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ x, y, onClose, onZoomToFit, onAutoLayout, onToggleReport, onToggleMarkdown, onToggleJSON, onToggleFilter, onOpenModel, onSaveModel, onCreateModel, isReportOpen, isMarkdownOpen, isJSONOpen, isFilterOpen }) => {
+const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ x, y, onClose, onZoomToFit, onAutoLayout, onToggleReport, onToggleMarkdown, onToggleJSON, onToggleFilter, onToggleMatrix, onToggleTable, onOpenModel, onSaveModel, onCreateModel, isReportOpen, isMarkdownOpen, isJSONOpen, isFilterOpen, isMatrixOpen, isTableOpen }) => {
   const menuRef = React.useRef<HTMLDivElement>(null);
   useClickOutside(menuRef, onClose);
 
@@ -193,6 +508,8 @@ const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ x, y, onClose, on
       <button onClick={createHandler(onAutoLayout)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Auto-Layout</button>
       <div className="border-t border-gray-600 my-1"></div>
       <button onClick={createHandler(onToggleReport)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isReportOpen ? 'Hide' : 'Show'} Report View</button>
+      <button onClick={createHandler(onToggleTable)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isTableOpen ? 'Hide' : 'Show'} Table View</button>
+      <button onClick={createHandler(onToggleMatrix)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isMatrixOpen ? 'Hide' : 'Show'} Matrix View</button>
       <button onClick={createHandler(onToggleMarkdown)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isMarkdownOpen ? 'Hide' : 'Show'} Markdown View</button>
       <button onClick={createHandler(onToggleJSON)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isJSONOpen ? 'Hide' : 'Show'} JSON View</button>
       <button onClick={createHandler(onToggleFilter)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isFilterOpen ? 'Hide' : 'Show'} Filter</button>
@@ -343,16 +660,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ initialSchemes, initialAc
       }));
   };
 
-  const handleDefaultLabelChange = (label: string) => {
-      if (!activeSchemeId) return;
-      setSchemes(prev => prev.map(s => 
-         s.id === activeSchemeId
-         ? { ...s, defaultRelationshipLabel: label }
-         : s
-      ));
-  };
-
-
   const modalRef = React.useRef<HTMLDivElement>(null);
   useClickOutside(modalRef, onClose);
 
@@ -447,19 +754,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ initialSchemes, initialAc
 
               {activeTab === 'relationships' && (
                   <>
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Default Label</label>
-                        <select
-                            value={selectedScheme.defaultRelationshipLabel || ''}
-                            onChange={(e) => handleDefaultLabelChange(e.target.value)}
-                            className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            <option value="">-- None --</option>
-                            {(selectedScheme.relationshipDefinitions || []).map(def => (
-                                <option key={def.label} value={def.label}>{def.label}</option>
-                            ))}
-                        </select>
-                    </div>
                     <div className="flex-1 overflow-y-auto pr-2 mb-4">
                         <div className="space-y-2">
                             {(selectedScheme.relationshipDefinitions || []).map(def => (
@@ -610,8 +904,7 @@ interface HelpMenuProps {
   onPatternGallery: () => void;
 }
 const HelpMenu: React.FC<HelpMenuProps> = ({ onClose, onAbout, onPatternGallery }) => {
-  const menuRef = React.useRef<HTMLDivElement>(null);
-  useClickOutside(menuRef, onClose);
+  // Removed useClickOutside from here. Handled by parent wrapper ref.
   
   const handleAboutClick = () => {
     onAbout();
@@ -625,7 +918,6 @@ const HelpMenu: React.FC<HelpMenuProps> = ({ onClose, onAbout, onPatternGallery 
   
   return (
     <div
-      ref={menuRef}
       className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-600 rounded-md shadow-lg py-1 z-50 text-white"
     >
       <button onClick={handlePatternGalleryClick} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-700">
@@ -646,242 +938,6 @@ const PatternGalleryModal: React.FC<PatternGalleryModalProps> = ({ onClose }) =>
     const modalRef = React.useRef<HTMLDivElement>(null);
     useClickOutside(modalRef, onClose);
 
-    // Colors: Red=Harmful, Green=Useful, Blue=Action, Teal=Trend, Orange=Emotion, Grey=Context, Black=Organisation, Yellow=Idea, Purple=Topic, Pink=Question
-    const tapestryPatterns = [
-        {
-            name: "The Weave",
-            desc: "When shifting trends intersect with human emotion, the fabric of culture is woven.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <path d="M8 4V28" stroke="#14b8a6" strokeWidth="3" strokeLinecap="round" />
-                    <path d="M16 4V28" stroke="#14b8a6" strokeWidth="3" strokeLinecap="round" />
-                    <path d="M24 4V28" stroke="#14b8a6" strokeWidth="3" strokeLinecap="round" />
-                    <path d="M4 8H28" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.8" />
-                    <path d="M4 16H28" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.8" />
-                    <path d="M4 24H28" stroke="#f97316" strokeWidth="3" strokeLinecap="round" strokeOpacity="0.8" />
-                </svg>
-            )
-        },
-        {
-            name: "The Mesh",
-            desc: "Action and inquiry must cross paths within a shared context to create meaningful progress.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <path d="M4 4L28 28" stroke="#3b82f6" strokeWidth="2" />
-                    <path d="M28 4L4 28" stroke="#ec4899" strokeWidth="2" />
-                    <path d="M16 2V30" stroke="#6b7280" strokeWidth="2" />
-                    <path d="M2 16H30" stroke="#6b7280" strokeWidth="2" />
-                    <rect x="10" y="10" width="12" height="12" stroke="#eab308" strokeWidth="2" fillOpacity="0" />
-                </svg>
-            )
-        },
-        {
-            name: "The Loop",
-            desc: "A bright idea can loop around a harmful problem to reveal a new trend.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <path d="M6 6C6 6 10 16 16 16C22 16 26 6 26 6" stroke="#ef4444" strokeWidth="3" strokeLinecap="round" />
-                    <path d="M6 26C6 26 10 16 16 16C22 16 26 26 26 26" stroke="#eab308" strokeWidth="3" strokeLinecap="round" />
-                    <circle cx="16" cy="16" r="4" fill="#14b8a6" />
-                </svg>
-            )
-        },
-        {
-            name: "The Stitch",
-            desc: "Useful innovations are often loose threads that need the structure of context to hold together.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <path d="M6 10H26" stroke="#22c55e" strokeWidth="4" strokeDasharray="4 4" />
-                    <path d="M6 22H26" stroke="#22c55e" strokeWidth="4" strokeDasharray="4 4" />
-                    <path d="M10 4V28" stroke="#6b7280" strokeWidth="2" />
-                    <path d="M22 4V28" stroke="#6b7280" strokeWidth="2" />
-                </svg>
-            )
-        },
-        {
-            name: "The Framework",
-            desc: "When harmful challenges intersect, a framework of solid action is required to contain them.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <rect x="6" y="6" width="20" height="20" stroke="#3b82f6" strokeWidth="2" />
-                    <path d="M16 2V30" stroke="#ef4444" strokeWidth="4" />
-                    <path d="M2 16H30" stroke="#ef4444" strokeWidth="4" />
-                    <rect x="14" y="14" width="4" height="4" fill="#ffffff" />
-                </svg>
-            )
-        },
-        {
-            name: "The Current",
-            desc: "Knowledge flows like a river, but it is the questioning current that gives it shape.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <path d="M8 8Q12 12 16 8T24 8" stroke="#a855f7" strokeWidth="3" strokeLinecap="round" />
-                    <path d="M8 16Q12 20 16 16T24 16" stroke="#ec4899" strokeWidth="3" strokeLinecap="round" />
-                    <path d="M8 24Q12 28 16 24T24 24" stroke="#a855f7" strokeWidth="3" strokeLinecap="round" />
-                </svg>
-            )
-        },
-        {
-            name: "The Pivot",
-            desc: "An organisation that embraces a single bright idea can radiate usefulness in all directions.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <line x1="10" y1="4" x2="10" y2="28" stroke="black" strokeWidth="2" />
-                    <line x1="22" y1="4" x2="22" y2="28" stroke="black" strokeWidth="2" />
-                    <line x1="4" y1="10" x2="28" y2="10" stroke="black" strokeWidth="2" />
-                    <line x1="4" y1="22" x2="28" y2="22" stroke="black" strokeWidth="2" />
-                    <path d="M16 16L16 4 M16 16L28 16 M16 16L16 28 M16 16L4 16" stroke="#22c55e" strokeWidth="2" />
-                    <circle cx="16" cy="16" r="4" fill="#eab308" />
-                </svg>
-            )
-        },
-        {
-            name: "The Filter",
-            desc: "Context acts as a filter, refining chaotic trends into clear, direct action.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <path d="M0 10 Q16 0 32 10" stroke="#14b8a6" strokeWidth="3" fill="none" />
-                    <rect x="8" y="4" width="4" height="24" fill="#6b7280" />
-                    <rect x="20" y="4" width="4" height="24" fill="#6b7280" />
-                    <path d="M16 20 V30" stroke="#3b82f6" strokeWidth="4" markerEnd="url(#arrow)" />
-                </svg>
-            )
-        },
-        {
-            name: "The Resolution",
-            desc: "Even harmful conflict and raw emotion can be braided together to form a useful resolution.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <path d="M8 4 C8 4 12 12 4 12" stroke="#ef4444" strokeWidth="2" />
-                    <path d="M24 4 C24 4 20 12 28 12" stroke="#f97316" strokeWidth="2" />
-                    <path d="M10 16 C10 16 16 24 22 16 C22 16 16 8 10 16" stroke="#22c55e" strokeWidth="3" />
-                    <path d="M12 26 L20 26" stroke="#22c55e" strokeWidth="3" />
-                </svg>
-            )
-        },
-        {
-            name: "The Strategy",
-            desc: "The strongest organisations build a roof of action supported by the constant thread of questioning.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <rect x="4" y="8" width="4" height="20" fill="black" />
-                    <rect x="24" y="8" width="4" height="20" fill="black" />
-                    <rect x="2" y="4" width="28" height="4" fill="#3b82f6" />
-                    <line x1="12" y1="8" x2="12" y2="24" stroke="#ec4899" strokeWidth="2" strokeDasharray="2 2" />
-                    <line x1="20" y1="8" x2="20" y2="24" stroke="#ec4899" strokeWidth="2" strokeDasharray="2 2" />
-                </svg>
-            )
-        },
-        {
-            name: "The Insight",
-            desc: "True insight strikes when a powerful idea pierces through the center of established knowledge.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <rect x="4" y="4" width="24" height="24" rx="12" fill="#a855f7" fillOpacity="0.3" />
-                    <circle cx="16" cy="16" r="8" stroke="#6b7280" strokeWidth="2" />
-                    <path d="M22 4 L14 16 L18 16 L10 28" stroke="#eab308" strokeWidth="2" fill="none" />
-                </svg>
-            )
-        },
-        {
-            name: "The Compassion",
-            desc: "When a harmful trend emerges, it is human emotion that encircles it to provide healing.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#14b8a6" fillOpacity="0.2" rx="4" />
-                    <path d="M10 10 L22 22 M22 10 L10 22" stroke="#ef4444" strokeWidth="3" />
-                    <circle cx="16" cy="16" r="10" stroke="#f97316" strokeWidth="3" fill="none" />
-                </svg>
-            )
-        },
-        // New Tapestries for Advanced Innovation & Systems
-        {
-            name: "The Brocade",
-            desc: "Elevate a standard context by surface-weaving a pattern of bright ideas, adding value without disrupting the underlying structure.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#6b7280" rx="4" />
-                    <path d="M4 8H12 M16 8H24 M8 16H16 M20 16H28 M4 24H12 M16 24H24" stroke="#eab308" strokeWidth="3" strokeLinecap="round" />
-                </svg>
-            )
-        },
-        {
-            name: "The Twill",
-            desc: "Establish a rhythm of overlapping actions that advances diagonally, creating a durable structure capable of withstanding stress.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <path d="M0 24 L8 32 M0 12 L20 32 M0 0 L32 32 M12 0 L32 20 M24 0 L32 8" stroke="#3b82f6" strokeWidth="3" strokeLinecap="round" />
-                </svg>
-            )
-        },
-        {
-            name: "The Darning",
-            desc: "Identify harmful holes in the narrative and systematically interlace useful solutions to restore integrity to the whole.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <circle cx="16" cy="16" r="12" stroke="#ef4444" strokeWidth="3" fill="none" />
-                    <path d="M8 12H24 M8 16H24 M8 20H24" stroke="#22c55e" strokeWidth="2" />
-                    <path d="M12 8V24 M16 8V24 M20 8V24" stroke="#a855f7" strokeWidth="2" opacity="0.7" />
-                </svg>
-            )
-        },
-        {
-            name: "The Jacquard",
-            desc: "Manage intricate relationships where every pixel of emotion, organisation, and idea is individually controlled to form a grand design.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <rect x="4" y="4" width="6" height="6" fill="#111827" />
-                    <rect x="12" y="4" width="6" height="6" fill="#f97316" />
-                    <rect x="20" y="4" width="6" height="6" fill="#eab308" />
-                    <rect x="4" y="12" width="6" height="6" fill="#f97316" />
-                    <rect x="12" y="12" width="6" height="6" fill="#eab308" />
-                    <rect x="20" y="12" width="6" height="6" fill="#111827" />
-                    <rect x="4" y="20" width="6" height="6" fill="#eab308" />
-                    <rect x="12" y="20" width="6" height="6" fill="#111827" />
-                    <rect x="20" y="20" width="6" height="6" fill="#f97316" />
-                </svg>
-            )
-        },
-        {
-            name: "The Selvage",
-            desc: "Reinforce the edges of a topic with specific questions to prevent the scope from unraveling into chaos.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#a855f7" fillOpacity="0.2" rx="4" />
-                    <path d="M6 4V28" stroke="#ec4899" strokeWidth="3" />
-                    <path d="M26 4V28" stroke="#ec4899" strokeWidth="3" />
-                    <path d="M10 16H22" stroke="#a855f7" strokeWidth="2" />
-                </svg>
-            )
-        },
-        {
-            name: "The Kilim",
-            desc: "Allow distinct organisations to butt against one another in a slit-weave, maintaining separate identities while forming a continuous surface.",
-            svg: (
-                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="32" height="32" fill="#1f2937" rx="4" />
-                    <path d="M16 4 L4 16 L16 28" fill="#111827" />
-                    <path d="M16 4 L28 16 L16 28" fill="#3b82f6" />
-                    <path d="M16 4 V28" stroke="#6b7280" strokeWidth="1" />
-                </svg>
-            )
-        }
-    ];
-
     return (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
             <div ref={modalRef} className="bg-gray-800 rounded-lg w-full max-w-4xl shadow-xl border border-gray-600 text-gray-300 max-h-[90vh] flex flex-col">
@@ -896,9 +952,9 @@ const PatternGalleryModal: React.FC<PatternGalleryModalProps> = ({ onClose }) =>
 
                 <div className="flex-grow overflow-y-auto p-8">
                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {tapestryPatterns.map((pattern, idx) => (
+                        {TAPESTRY_PATTERNS.map((pattern, idx) => (
                             <div key={idx} className="bg-gray-700 bg-opacity-50 p-4 rounded-lg border border-gray-600 flex items-start space-x-4 hover:bg-opacity-70 transition">
-                                <div className="flex-shrink-0 pt-1">
+                                <div className="flex-shrink-0 pt-1 w-8 h-8">
                                     {pattern.svg}
                                 </div>
                                 <div>
@@ -997,7 +1053,38 @@ export default function App() {
   const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [colorSchemes, setColorSchemes] = useState<ColorScheme[]>(DEFAULT_COLOR_SCHEMES);
   const [activeSchemeId, setActiveSchemeId] = useState<string | null>(DEFAULT_COLOR_SCHEMES[0]?.id || null);
+  const [defaultTags, setDefaultTags] = useState<string[]>([]);
   
+  // --- Layout Parameters State ---
+  const [layoutParams, setLayoutParams] = useState({ linkDistance: 250, repulsion: -400 });
+  const [jiggleTrigger, setJiggleTrigger] = useState(0);
+
+  // --- Active Tool State ---
+  const [activeTool, setActiveTool] = useState<string | null>(null);
+
+  // --- Bulk Edit State ---
+  const [isBulkEditActive, setIsBulkEditActive] = useState(false);
+  const [bulkTagsToAdd, setBulkTagsToAdd] = useState<string[]>([]);
+  const [bulkTagsToRemove, setBulkTagsToRemove] = useState<string[]>([]);
+
+  const toggleTool = (toolName: string) => {
+      setActiveTool(prev => {
+          // If closing the bulk tool, ensure mode is reset
+          if (prev === 'bulk' && toolName !== 'bulk') {
+              setIsBulkEditActive(false);
+          }
+          return prev === toolName ? null : toolName;
+      });
+  };
+
+  // Reset bulk mode if tool is closed
+  useEffect(() => {
+      if (activeTool !== 'bulk') {
+          setIsBulkEditActive(false);
+      }
+  }, [activeTool]);
+
+
   // --- State for Refs to allow synchronous access in batched AI actions ---
   const elementsRef = useRef<Element[]>([]);
   const relationshipsRef = useRef<Relationship[]>([]);
@@ -1010,6 +1097,11 @@ export default function App() {
   useEffect(() => {
     relationshipsRef.current = relationships;
   }, [relationships]);
+
+  // Reset default tags when scheme changes
+  useEffect(() => {
+      setDefaultTags([]);
+  }, [activeSchemeId]);
 
 
   const [modelsIndex, setModelsIndex] = useState<ModelMetadata[]>([]);
@@ -1036,12 +1128,23 @@ export default function App() {
   const [isJSONPanelOpen, setIsJSONPanelOpen] = useState(false);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isReportPanelOpen, setIsReportPanelOpen] = useState(false);
+  const [isMatrixPanelOpen, setIsMatrixPanelOpen] = useState(false);
+  const [isTablePanelOpen, setIsTablePanelOpen] = useState(false);
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isPatternGalleryModalOpen, setIsPatternGalleryModalOpen] = useState(false);
   const [pendingImport, setPendingImport] = useState<{ localMetadata: ModelMetadata, diskMetadata: ModelMetadata, localData: any, diskData: any } | null>(null);
   
+  // SCAMPER State
+  const [isScamperModalOpen, setIsScamperModalOpen] = useState(false);
+  const [isScamperLoading, setIsScamperLoading] = useState(false);
+  const [currentScamperOperator, setCurrentScamperOperator] = useState<{ name: string, letter: string } | null>(null);
+  const [scamperSuggestions, setScamperSuggestions] = useState<ScamperSuggestion[]>([]);
+  
+  const helpMenuRef = useRef<HTMLDivElement>(null);
+  useClickOutside(helpMenuRef, () => setIsHelpMenuOpen(false));
+
   const [tagFilter, setTagFilter] = useState<{ included: Set<string>, excluded: Set<string> }>({
     included: new Set(),
     excluded: new Set(),
@@ -1059,6 +1162,7 @@ export default function App() {
   const graphCanvasRef = useRef<GraphCanvasRef>(null);
 
   const importFileRef = useRef<HTMLInputElement>(null);
+  const currentFileHandleRef = useRef<any>(null); // Ref to store FileSystemFileHandle
 
   const currentModelName = useMemo(() => modelsIndex.find(m => m.id === currentModelId)?.name || 'Loading...', [modelsIndex, currentModelId]);
 
@@ -1188,6 +1292,12 @@ export default function App() {
       setIsOpenModelModalOpen(false);
       setTagFilter({ included: new Set(), excluded: new Set() });
       setDateFilter({ createdAfter: '', createdBefore: '', updatedAfter: '', updatedBefore: '' });
+      
+      // Clear file handle when loading from local storage to avoid accidental overwrites of wrong file
+      // The handle is only set during explicit file open or save operations
+      if (modelMetadata && !modelMetadata.filename) {
+           currentFileHandleRef.current = null;
+      }
 
       if (modelMetadata) {
         // Update index with new metadata (e.g. update filename/timestamp/hash)
@@ -1206,6 +1316,8 @@ export default function App() {
     const modelDataString = localStorage.getItem(`${MODEL_DATA_PREFIX}${modelId}`);
     if (modelDataString) {
       const data = JSON.parse(modelDataString);
+      // Clear handle since we are loading from local storage
+      currentFileHandleRef.current = null;
       loadModelData(data, modelId);
     }
   }, [loadModelData]);
@@ -1273,25 +1385,29 @@ export default function App() {
       createdAt: now,
       updatedAt: now,
       filename: `${name.replace(/ /g, '_')}.json`,
-      contentHash: initialHash
+      contentHash: initialHash,
+      // lastDiskHash left undefined as it's not saved to disk yet
     };
 
     setModelsIndex(prevIndex => [...prevIndex, newModel]);
 
     localStorage.setItem(`${MODEL_DATA_PREFIX}${newModel.id}`, JSON.stringify(newModelData));
+    
+    // Clear any existing file handle
+    currentFileHandleRef.current = null;
 
     handleLoadModel(newModel.id);
     setIsCreateModelModalOpen(false);
   }, [handleLoadModel]);
   
 
-  const handleAddElement = useCallback((coords: { x: number; y: number; }) => {
+  const handleAddElement = useCallback((coords: { x: number; y: number }) => {
     const now = new Date().toISOString();
     const newElement: Element = {
       id: generateUUID(),
       name: 'New Element',
       notes: '',
-      tags: [],
+      tags: [...defaultTags],
       createdAt: now,
       updatedAt: now,
       x: coords.x,
@@ -1303,7 +1419,30 @@ export default function App() {
     setSelectedElementId(newElement.id);
     setSelectedRelationshipId(null);
     setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
-  }, []);
+  }, [defaultTags]);
+  
+  const handleAddElementFromName = useCallback((name: string) => {
+      // Add element without explicit coordinates (e.g. from table view)
+      // Default to center or random position
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight / 2;
+      const randomOffset = () => (Math.random() - 0.5) * 100;
+      
+      const now = new Date().toISOString();
+      const newElement: Element = {
+        id: generateUUID(),
+        name: name,
+        notes: '',
+        tags: [...defaultTags],
+        createdAt: now,
+        updatedAt: now,
+        x: centerX + randomOffset(),
+        y: centerY + randomOffset(),
+        fx: null,
+        fy: null,
+      };
+      setElements(prev => [...prev, newElement]);
+  }, [defaultTags]);
 
   const handleUpdateElement = useCallback((updatedElement: Element) => {
     setElements(prev => prev.map(f => f.id === updatedElement.id ? { ...updatedElement, updatedAt: new Date().toISOString() } : f));
@@ -1316,6 +1455,30 @@ export default function App() {
       setSelectedElementId(null);
     }
   }, [selectedElementId]);
+  
+  const handleBulkTagAction = useCallback((elementIds: string[], tag: string, mode: 'add' | 'remove') => {
+      setElements(prev => prev.map(e => {
+          if (elementIds.includes(e.id)) {
+              let newTags = [...e.tags];
+              if (mode === 'add') {
+                  if (!newTags.includes(tag)) {
+                      newTags.push(tag);
+                  } else {
+                      return e; // No change
+                  }
+              } else {
+                   // mode === 'remove'
+                   if (newTags.includes(tag)) {
+                       newTags = newTags.filter(t => t !== tag);
+                   } else {
+                       return e; // No change
+                   }
+              }
+              return { ...e, tags: newTags, updatedAt: new Date().toISOString() };
+          }
+          return e;
+      }));
+  }, []);
 
   const handleAddRelationship = useCallback((relationship: Omit<Relationship, 'id' | 'tags'>, newElementData?: Omit<Element, 'id' | 'createdAt' | 'updatedAt'>) => {
     let finalRelationship: Relationship = { ...relationship, id: generateUUID(), tags: [] };
@@ -1344,6 +1507,12 @@ export default function App() {
     }
 
   }, [panelState.sourceElementId]);
+  
+  // Wrapper for table view adding relationships directly
+  const handleAddRelationshipDirect = useCallback((relationship: Omit<Relationship, 'id' | 'tags'>) => {
+      const newRel: Relationship = { ...relationship, id: generateUUID(), tags: [] };
+      setRelationships(prev => [...prev, newRel]);
+  }, []);
 
   const handleCancelAddRelationship = useCallback(() => {
     if (panelState.isNewTarget && panelState.targetElementId) {
@@ -1392,6 +1561,9 @@ export default function App() {
           x, y, fx: x, fy: y
         };
         
+        // Update Ref immediately for subsequent batched calls
+        elementsRef.current = [...elementsRef.current, newElement];
+        
         setElements(prev => [...prev, newElement]);
         return id;
       },
@@ -1407,12 +1579,21 @@ export default function App() {
         if (data.tags) {
            updatedElement.tags = Array.from(new Set([...element.tags, ...data.tags]));
         }
+        
+        // Update Ref immediately
+        elementsRef.current = elementsRef.current.map(e => e.id === element.id ? updatedElement : e);
+        
         setElements(prev => prev.map(e => e.id === element.id ? updatedElement : e));
         return true;
       },
       deleteElement: (name) => {
         const element = findElementByName(name);
         if (!element) return false;
+        
+        // Update Refs immediately
+        elementsRef.current = elementsRef.current.filter(f => f.id !== element.id);
+        relationshipsRef.current = relationshipsRef.current.filter(r => r.source !== element.id && r.target !== element.id);
+        
         handleDeleteElement(element.id);
         return true;
       },
@@ -1436,6 +1617,10 @@ export default function App() {
           direction: direction,
           tags: []
         };
+        
+        // Update Ref immediately
+        relationshipsRef.current = [...relationshipsRef.current, newRel];
+        
         setRelationships(prev => [...prev, newRel]);
         return true;
       },
@@ -1443,6 +1628,13 @@ export default function App() {
         const source = findElementByName(sourceName);
         const target = findElementByName(targetName);
         if (!source || !target) return false;
+
+        // Update Ref immediately
+        relationshipsRef.current = relationshipsRef.current.filter(r => {
+             const isMatch = (r.source === source.id && r.target === target.id) || 
+                            (r.source === target.id && r.target === source.id);
+            return !isMatch;
+        });
 
         setRelationships(prev => prev.filter(r => {
             const isMatch = (r.source === source.id && r.target === target.id) || 
@@ -1455,7 +1647,123 @@ export default function App() {
   }, [handleDeleteElement]);
 
 
-  const handleDiskSave = useCallback(() => {
+  // SCAMPER Actions
+  const handleScamperGenerate = async (operator: string, letter: string) => {
+      if (!selectedElementId) return;
+      const sourceElement = elements.find(e => e.id === selectedElementId);
+      if (!sourceElement) return;
+
+      setIsScamperModalOpen(true);
+      setIsScamperLoading(true);
+      setCurrentScamperOperator({ name: operator, letter });
+      setScamperSuggestions([]);
+
+      try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        
+        const prompt = `
+        Apply the SCAMPER technique '${letter} - ${operator}' to the concept: "${sourceElement.name}" (Notes: ${sourceElement.notes}).
+        Generate 4-8 distinct, creative ideas that emerge from applying this operator.
+        For each idea, provide a name, a short description/rationale, and a short relationship label that connects the original concept to the new idea (e.g. "can be replaced by", "combined with", "adapted to").
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            name: { type: Type.STRING, description: "The name of the new idea node." },
+                            description: { type: Type.STRING, description: "Rationale or explanation." },
+                            relationshipLabel: { type: Type.STRING, description: "Label for the link from original node to this new node." }
+                        }
+                    }
+                }
+            }
+        });
+
+        const results = JSON.parse(response.text || "[]");
+        const suggestions: ScamperSuggestion[] = results.map((r: any) => ({
+            id: generateUUID(),
+            name: r.name,
+            description: r.description,
+            relationshipLabel: r.relationshipLabel,
+            status: 'pending'
+        }));
+        setScamperSuggestions(suggestions);
+
+      } catch (e) {
+          console.error("SCAMPER generation failed", e);
+          alert("Failed to generate ideas. Please try again.");
+          setIsScamperModalOpen(false);
+      } finally {
+          setIsScamperLoading(false);
+      }
+  };
+
+  const handleScamperAccept = (id: string) => {
+      const suggestion = scamperSuggestions.find(s => s.id === id);
+      const sourceElement = elements.find(e => e.id === selectedElementId);
+      
+      if (suggestion && sourceElement) {
+          // 1. Add Node
+          const newId = generateUUID();
+          const now = new Date().toISOString();
+          
+          // Randomize position near source
+          const angle = Math.random() * Math.PI * 2;
+          const distance = 150 + Math.random() * 50;
+          const x = (sourceElement.x || 0) + Math.cos(angle) * distance;
+          const y = (sourceElement.y || 0) + Math.sin(angle) * distance;
+
+          const newElement: Element = {
+              id: newId,
+              name: suggestion.name,
+              notes: suggestion.description,
+              tags: ['Idea', ...defaultTags], // Auto-tag as Idea
+              createdAt: now,
+              updatedAt: now,
+              x, y, fx: x, fy: y
+          };
+          
+          // 2. Add Relationship
+          const newRel: Relationship = {
+              id: generateUUID(),
+              source: sourceElement.id,
+              target: newId,
+              label: suggestion.relationshipLabel,
+              direction: RelationshipDirection.To,
+              tags: []
+          };
+
+          setElements(prev => [...prev, newElement]);
+          setRelationships(prev => [...prev, newRel]);
+
+          // 3. Update Suggestion Status
+          setScamperSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: 'accepted' } : s));
+      }
+  };
+
+  const handleScamperReject = (id: string) => {
+      setScamperSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: 'rejected' } : s));
+  };
+
+  const handleScamperAcceptAll = () => {
+      scamperSuggestions.forEach(s => {
+          if (s.status === 'pending') handleScamperAccept(s.id);
+      });
+  };
+
+  const handleScamperRejectAll = () => {
+       setScamperSuggestions(prev => prev.map(s => s.status === 'pending' ? { ...s, status: 'rejected' } : s));
+  };
+
+
+  const handleDiskSave = useCallback(async () => {
     if (!currentModelId) {
         alert("No active model to save.");
         return;
@@ -1482,7 +1790,8 @@ export default function App() {
         ...modelMetadata, 
         updatedAt: now, 
         filename: modelMetadata.filename || `${modelMetadata.name.replace(/ /g, '_')}.json`,
-        contentHash: currentHash
+        contentHash: currentHash,
+        lastDiskHash: currentHash // Track that the disk state matches this hash
     };
 
     const exportData = {
@@ -1491,23 +1800,58 @@ export default function App() {
     };
 
     const jsonString = JSON.stringify(exportData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = updatedMetadata.filename!;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    // Update local index and storage to reflect that we just saved to disk
-    // and the hash is now synced
-    setModelsIndex(prev => prev.map(m => m.id === currentModelId ? updatedMetadata : m));
-    localStorage.setItem(MODELS_INDEX_KEY, JSON.stringify(
-        modelsIndex.map(m => m.id === currentModelId ? updatedMetadata : m)
-    ));
-    localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
+
+    try {
+        // Try to use File System Access API to overwrite if we have a handle
+        // BUT ONLY IF NOT IN IFRAME (security restriction)
+        if (!isInIframe() && currentFileHandleRef.current && 'createWritable' in currentFileHandleRef.current) {
+            const writable = await currentFileHandleRef.current.createWritable();
+            await writable.write(jsonString);
+            await writable.close();
+        } 
+        // If no handle, or overwrite not supported, try "Save As" picker
+        // BUT ONLY IF NOT IN IFRAME
+        else if (!isInIframe() && 'showSaveFilePicker' in window) {
+            const options = {
+                suggestedName: updatedMetadata.filename,
+                types: [{
+                    description: 'JSON Files',
+                    accept: {'application/json': ['.json']},
+                }],
+            };
+            // @ts-ignore
+            const fileHandle = await window.showSaveFilePicker(options);
+            currentFileHandleRef.current = fileHandle; // Store handle for next time
+            const writable = await fileHandle.createWritable();
+            await writable.write(jsonString);
+            await writable.close();
+        } 
+        // Fallback for environments where File System Access is blocked/unavailable (like iframes)
+        else {
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = updatedMetadata.filename!;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        // Update local index and storage to reflect that we just saved to disk
+        setModelsIndex(prev => prev.map(m => m.id === currentModelId ? updatedMetadata : m));
+        localStorage.setItem(MODELS_INDEX_KEY, JSON.stringify(
+            modelsIndex.map(m => m.id === currentModelId ? updatedMetadata : m)
+        ));
+        localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
+        
+    } catch (err: any) {
+        if (err.name !== 'AbortError') {
+            console.error("Save failed:", err);
+            alert("Failed to save file. You can try using the 'Export' feature in JSON view as a backup.");
+        }
+    }
     
   }, [currentModelId, modelsIndex, elements, relationships, colorSchemes, activeSchemeId]);
 
@@ -1560,7 +1904,8 @@ export default function App() {
                                 diskMetadata: { 
                                     ...imported.metadata, 
                                     filename: filename || imported.metadata.filename,
-                                    contentHash: importedHash 
+                                    contentHash: importedHash,
+                                    lastDiskHash: importedHash // Ensure disk version tracks this hash
                                 },
                                 localData: JSON.parse(localDataStr),
                                 diskData: dataToImport
@@ -1593,7 +1938,8 @@ export default function App() {
                 createdAt: imported.metadata?.createdAt || now,
                 updatedAt: imported.metadata?.updatedAt || now,
                 filename: filename,
-                contentHash: importedHash
+                contentHash: importedHash,
+                lastDiskHash: importedHash // Track that loaded content is from disk
             };
             
             const newModelData = {
@@ -1612,16 +1958,50 @@ export default function App() {
         }
   }, [modelsIndex, loadModelData]);
 
-  const handleImportClick = useCallback(() => {
+  const handleImportClick = useCallback(async () => {
+      // Try File System Access API first to allow overwrite capability later
+      // Check if NOT in iframe to avoid cross-origin security errors
+      if (!isInIframe() && 'showOpenFilePicker' in window) {
+          try {
+              const pickerOptions = {
+                  types: [{
+                      description: 'JSON Files',
+                      accept: { 'application/json': ['.json'] }
+                  }],
+              };
+              // @ts-ignore
+              const [fileHandle] = await window.showOpenFilePicker(pickerOptions);
+              currentFileHandleRef.current = fileHandle;
+              
+              const file = await fileHandle.getFile();
+              const text = await file.text();
+              processImportedData(text, file.name);
+              return;
+          } catch (err: any) {
+              // Security errors (cross-origin) or cancellation
+              if (err.name !== 'AbortError') {
+                   console.warn("File System Access API failed, falling back to input.", err);
+                   // Fallback to input below
+              } else {
+                  // User cancelled, do nothing
+                  return;
+              }
+          }
+      }
+
+      // Fallback for standard input
       if (importFileRef.current) {
           importFileRef.current.value = '';
           importFileRef.current.click();
       }
-  }, []);
+  }, [processImportedData]);
 
   const handleImportInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    
+    // Standard input does not provide a handle, so we can't overwrite this file later
+    currentFileHandleRef.current = null;
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -1652,15 +2032,75 @@ export default function App() {
       }
   }, [migrateLegacySchemes]);
   
+  const handleNewModelClick = useCallback(async () => {
+      if (currentModelId) {
+          const currentMeta = modelsIndex.find(m => m.id === currentModelId);
+          const modelData = { elements, relationships, colorSchemes, activeSchemeId };
+          const currentHash = computeContentHash(modelData);
+          
+          // Check if dirty: current state differs from last successful disk save state.
+          // If lastDiskHash is missing (new unsaved model), we assume dirty unless empty.
+          const isDirty = currentMeta?.lastDiskHash !== currentHash;
+          const isEmpty = elements.length === 0;
+          
+          if (isDirty && !isEmpty) {
+             if (confirm("You have unsaved changes. Do you want to save your current model before creating a new one?")) {
+                 await handleDiskSave();
+             }
+          }
+      }
+      setIsCreateModelModalOpen(true);
+  }, [currentModelId, modelsIndex, elements, relationships, colorSchemes, activeSchemeId, handleDiskSave]);
+
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const closeCanvasContextMenu = useCallback(() => setCanvasContextMenu(null), []);
 
   const handleNodeClick = useCallback((elementId: string) => {
+    // BULK EDIT INTERCEPTION
+    if (isBulkEditActive) {
+        if (bulkTagsToAdd.length === 0 && bulkTagsToRemove.length === 0) return;
+        
+        setElements(prev => prev.map(el => {
+            if (el.id === elementId) {
+                const currentTags = el.tags;
+                let newTags = [...currentTags];
+                let changed = false;
+                
+                // Remove tags (case-insensitive)
+                const lowerToRemove = bulkTagsToRemove.map(t => t.toLowerCase());
+                const filteredTags = newTags.filter(t => !lowerToRemove.includes(t.toLowerCase()));
+                
+                if (filteredTags.length !== newTags.length) {
+                    newTags = filteredTags;
+                    changed = true;
+                }
+
+                // Add tags (prevent duplicates case-insensitive)
+                const lowerCurrent = newTags.map(t => t.toLowerCase());
+                const toAdd = bulkTagsToAdd.filter(t => !lowerCurrent.includes(t.toLowerCase()));
+                
+                if (toAdd.length > 0) {
+                    newTags = [...newTags, ...toAdd];
+                    changed = true;
+                }
+                
+                if (changed) {
+                    return { ...el, tags: newTags, updatedAt: new Date().toISOString() };
+                }
+            }
+            return el;
+        }));
+        
+        // Do not select the node if in bulk mode
+        return;
+    }
+
+    // Normal Selection
     setSelectedElementId(elementId);
     setSelectedRelationshipId(null);
     setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
     closeContextMenu();
-  }, [closeContextMenu]);
+  }, [closeContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove]);
   
   const handleLinkClick = useCallback((relationshipId: string) => {
     setSelectedRelationshipId(relationshipId);
@@ -1691,17 +2131,10 @@ export default function App() {
 
   const handleNodeConnect = useCallback((sourceId: string, targetId: string) => {
     const currentScheme = colorSchemes.find(s => s.id === activeSchemeId);
-    let defaultLabel = 'related to';
+    let defaultLabel = '';
     
-    if (currentScheme) {
-        if (currentScheme.defaultRelationshipLabel) {
-            defaultLabel = currentScheme.defaultRelationshipLabel;
-        } else {
-            const defaultConstant = DEFAULT_COLOR_SCHEMES.find(d => d.id === currentScheme.id);
-            if (defaultConstant?.defaultRelationshipLabel) {
-                defaultLabel = defaultConstant.defaultRelationshipLabel;
-            }
-        }
+    if (currentScheme && currentScheme.defaultRelationshipLabel) {
+        defaultLabel = currentScheme.defaultRelationshipLabel;
     }
     
     const newRelId = generateUUID();
@@ -1723,13 +2156,13 @@ export default function App() {
     closeContextMenu();
   }, [activeSchemeId, colorSchemes, closeContextMenu]);
 
-  const handleNodeConnectToNew = useCallback((sourceId: string, coords: { x: number, y: number }) => {
+  const handleNodeConnectToNew = useCallback((sourceId: string, coords: { x: number; y: number }) => {
     const now = new Date().toISOString();
     const newElement: Element = {
       id: generateUUID(),
       name: 'New Element',
       notes: '',
-      tags: [],
+      tags: [...defaultTags],
       createdAt: now,
       updatedAt: now,
       x: coords.x,
@@ -1743,7 +2176,16 @@ export default function App() {
     setSelectedElementId(null);
     setSelectedRelationshipId(null);
     closeContextMenu();
-  }, [closeContextMenu]);
+  }, [defaultTags, closeContextMenu]);
+  
+  const handleUpdateDefaultRelationship = (newLabel: string) => {
+      if (!activeSchemeId) return;
+      setColorSchemes(prev => prev.map(s => 
+         s.id === activeSchemeId
+         ? { ...s, defaultRelationshipLabel: newLabel }
+         : s
+      ));
+  };
 
   const handleToggleFocusMode = () => {
     setFocusMode(prev => {
@@ -1753,8 +2195,17 @@ export default function App() {
     });
   };
 
-  const handleApplyMarkdown = (markdown: string) => {
-    const lines = markdown.split('\n').filter(line => {
+  const handleApplyMarkdown = (markdown: string, shouldMerge: boolean = false) => {
+    let processedMarkdown = markdown;
+    
+    // Pre-process shorthand: Relationship operators
+    // Replace /> with -[Counteracts]->
+    processedMarkdown = processedMarkdown.replace(/\s*\/>\s*/g, ' -[Counteracts]-> ');
+    // Replace > with -[Produces]->, but careful not to replace -> or -[...]->
+    // We use negative lookbehind and lookahead to avoid matching existing arrow syntax
+    processedMarkdown = processedMarkdown.replace(/(?<!\-|\[)>(?!\-|\])/g, ' -[Produces]-> ');
+
+    const lines = processedMarkdown.split('\n').filter(line => {
       const trimmed = line.trim();
       return trimmed !== '' && !trimmed.startsWith('#');
     });
@@ -1769,12 +2220,22 @@ export default function App() {
         let name: string;
         let tags: string[] = [];
 
+        // Standard tag parsing :tag,tag
         const lastColonIndex = workStr.lastIndexOf(':');
         const lastParenOpenIndex = workStr.lastIndexOf('(');
         if (lastColonIndex > -1 && lastColonIndex > lastParenOpenIndex) {
             const tagsStr = workStr.substring(lastColonIndex + 1);
             tags = tagsStr.split(',').map(t => t.trim()).filter(Boolean);
             workStr = workStr.substring(0, lastColonIndex).trim();
+        }
+
+        // Shorthand tag parsing (suffix + or -)
+        if (workStr.endsWith('+')) {
+            workStr = workStr.slice(0, -1).trim();
+            tags.push('Useful');
+        } else if (workStr.endsWith('-')) {
+            workStr = workStr.slice(0, -1).trim();
+            tags.push('Harmful');
         }
 
         name = workStr;
@@ -1855,38 +2316,129 @@ export default function App() {
           }
       }
     }
-
-    const existingElementsByName = new Map(elements.map(f => [f.name, f]));
-    const nextElements: Element[] = [];
-    const nameToIdMap = new Map<string, string>();
-    const newElementNames = new Set<string>();
-
-    parsedElements.forEach(({ tags }, name) => {
-        const existingElement = existingElementsByName.get(name);
-        if (existingElement) {
-            const updatedElement: Element = { ...existingElement, tags, updatedAt: new Date().toISOString() };
-            nextElements.push(updatedElement);
-            nameToIdMap.set(name, existingElement.id);
-        } else {
-            const now = new Date().toISOString();
-            const newElement: Element = {
-                id: generateUUID(),
-                name, tags, notes: '',
-                createdAt: now, updatedAt: now,
-            };
-            nextElements.push(newElement);
-            nameToIdMap.set(name, newElement.id);
-            newElementNames.add(name);
-        }
-    });
-
-    const nextRelationships: Relationship[] = parsedRels.map(({ sourceName, targetName, label, direction }) => ({
-        id: generateUUID(),
-        source: nameToIdMap.get(sourceName)!,
-        target: nameToIdMap.get(targetName)!,
-        label, direction, tags: []
-    }));
     
+    // PREPARE STATE UPDATES
+    
+    let nextElements: Element[] = [];
+    let nextRelationships: Relationship[] = [];
+    const newElementNames = new Set<string>();
+    
+    if (shouldMerge) {
+        // MERGE MODE
+        nextElements = [...elements];
+        nextRelationships = [...relationships];
+        
+        const existingMap = new Map<string, Element>();
+        const nameToIdMap = new Map<string, string>();
+        
+        nextElements.forEach(e => {
+            existingMap.set(e.name.toLowerCase(), e);
+            nameToIdMap.set(e.name.toLowerCase(), e.id);
+        });
+        
+        parsedElements.forEach(({ tags }, name) => {
+            const lowerName = name.toLowerCase();
+            const existing = existingMap.get(lowerName);
+            
+            if (existing) {
+                // Update tags (union)
+                const mergedTags = Array.from(new Set([...existing.tags, ...tags]));
+                if (mergedTags.length !== existing.tags.length || !mergedTags.every(t => existing.tags.includes(t))) {
+                    const updated = { ...existing, tags: mergedTags, updatedAt: new Date().toISOString() };
+                    const idx = nextElements.findIndex(e => e.id === existing.id);
+                    if (idx !== -1) nextElements[idx] = updated;
+                    existingMap.set(lowerName, updated);
+                }
+            } else {
+                // Create New
+                const now = new Date().toISOString();
+                const newId = generateUUID();
+                const newEl: Element = {
+                    id: newId,
+                    name, // Original casing
+                    tags,
+                    notes: '',
+                    createdAt: now,
+                    updatedAt: now
+                };
+                nextElements.push(newEl);
+                existingMap.set(lowerName, newEl);
+                nameToIdMap.set(lowerName, newId);
+                newElementNames.add(name);
+            }
+        });
+        
+        parsedRels.forEach(rel => {
+             const sId = nameToIdMap.get(rel.sourceName.toLowerCase());
+             const tId = nameToIdMap.get(rel.targetName.toLowerCase());
+             
+             if (sId && tId) {
+                 // Duplicate check
+                 const exists = nextRelationships.some(r => 
+                    r.source === sId && 
+                    r.target === tId && 
+                    r.label === rel.label && 
+                    r.direction === rel.direction
+                 );
+                 
+                 if (!exists) {
+                     nextRelationships.push({
+                        id: generateUUID(),
+                        source: sId,
+                        target: tId,
+                        label: rel.label,
+                        direction: rel.direction,
+                        tags: []
+                     });
+                 }
+             }
+        });
+
+    } else {
+        // REPLACE MODE
+        const nameToIdMap = new Map<string, string>();
+        
+        parsedElements.forEach(({ tags }, name) => {
+            // Check existing (case insensitive) to try and preserve IDs if possible
+            const existing = elements.find(e => e.name.toLowerCase() === name.toLowerCase());
+            if (existing) {
+                const updated = { ...existing, tags, updatedAt: new Date().toISOString() };
+                nextElements.push(updated);
+                nameToIdMap.set(name.toLowerCase(), existing.id);
+            } else {
+                const now = new Date().toISOString();
+                const newId = generateUUID();
+                const newEl: Element = {
+                    id: newId,
+                    name,
+                    tags,
+                    notes: '',
+                    createdAt: now,
+                    updatedAt: now,
+                };
+                nextElements.push(newEl);
+                nameToIdMap.set(name.toLowerCase(), newId);
+                newElementNames.add(name);
+            }
+        });
+
+        parsedRels.forEach(rel => {
+             const sId = nameToIdMap.get(rel.sourceName.toLowerCase());
+             const tId = nameToIdMap.get(rel.targetName.toLowerCase());
+             if (sId && tId) {
+                nextRelationships.push({
+                    id: generateUUID(),
+                    source: sId,
+                    target: tId,
+                    label: rel.label,
+                    direction: rel.direction,
+                    tags: []
+                });
+             }
+        });
+    }
+    
+    // POSITIONING LOGIC
     let placedNewElementsCount = 0;
     const positionNewElements = () => {
         nextElements.forEach(element => {
@@ -1922,11 +2474,14 @@ export default function App() {
     }
     
     positionNewElements();
-    positionNewElements();
+    positionNewElements(); // Second pass helps with chains
 
     setElements(nextElements);
     setRelationships(nextRelationships);
-    setIsMarkdownPanelOpen(false);
+    
+    if (!shouldMerge) {
+        setIsMarkdownPanelOpen(false);
+    }
   };
   
   const handleStartPhysicsLayout = () => {
@@ -2030,7 +2585,7 @@ export default function App() {
       />
       
       {currentModelId && (
-        <div className="absolute top-4 left-4 z-10 bg-gray-800 bg-opacity-80 p-2 rounded-lg flex items-center space-x-2">
+        <div className="absolute top-4 left-4 z-50 bg-gray-800 bg-opacity-80 p-2 rounded-lg flex items-center space-x-2">
             <div className="flex items-center space-x-2 text-gray-300">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4 8c2-2 4-2 6 0s4 2 6 0" />
@@ -2040,6 +2595,9 @@ export default function App() {
                 <span className="text-xl font-bold">Tapestry</span>
             </div>
             <div className="border-l border-gray-600 h-6 mx-1"></div>
+            <button onClick={handleNewModelClick} title="New Model..." className="p-2 rounded-md hover:bg-gray-700 transition">
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            </button>
             <button onClick={handleImportClick} title="Open Model..." className="p-2 rounded-md hover:bg-gray-700 transition">
                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
             </button>
@@ -2047,7 +2605,7 @@ export default function App() {
                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
             </button>
             <button onClick={() => setIsSettingsModalOpen(true)} title="Settings" className="p-2 rounded-md hover:bg-gray-700 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
             </button>
             <button onClick={() => setIsFilterPanelOpen(prev => !prev)} title="Filter by Tag" className="p-2 rounded-md hover:bg-gray-700 transition">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -2073,6 +2631,16 @@ export default function App() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M2 6V2h4 M22 6V2h-4 M2 18v4h4 M22 18v4h-4" />
                     </svg>
                 )}
+            </button>
+            <button onClick={() => setIsTablePanelOpen(prev => !prev)} title="Table View" className="p-2 rounded-md hover:bg-gray-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
+                </svg>
+            </button>
+            <button onClick={() => setIsMatrixPanelOpen(prev => !prev)} title="Matrix View" className="p-2 rounded-md hover:bg-gray-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
             </button>
             <button onClick={() => setIsMarkdownPanelOpen(prev => !prev)} title="Markdown View" className="p-2 rounded-md hover:bg-gray-700 transition">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
@@ -2118,7 +2686,7 @@ export default function App() {
                     </div>
                 )}
             </div>
-            <div className="relative">
+            <div className="relative" ref={helpMenuRef}>
             <button onClick={() => setIsHelpMenuOpen(p => !p)} title="Help" className="p-2 rounded-md hover:bg-gray-700 transition">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -2136,6 +2704,63 @@ export default function App() {
             <span className="text-gray-400 text-sm font-semibold pr-2">Current Model: {currentModelName}</span>
         </div>
       )}
+      
+      {currentModelId && (
+        <div className="absolute top-20 left-4 z-40 max-w-[90vw] pointer-events-none">
+            <div className="flex flex-wrap items-start gap-2">
+                <ToolsBar>
+                    <SchemaToolbar
+                        schemes={colorSchemes}
+                        activeSchemeId={activeSchemeId}
+                        onSchemeChange={setActiveSchemeId}
+                        activeColorScheme={activeColorScheme}
+                        onDefaultRelationshipChange={handleUpdateDefaultRelationship}
+                        defaultTags={defaultTags}
+                        onDefaultTagsChange={setDefaultTags}
+                        elements={elements}
+                        isCollapsed={activeTool !== 'schema'}
+                        onToggle={() => toggleTool('schema')}
+                    />
+                    <LayoutToolbar
+                        linkDistance={layoutParams.linkDistance}
+                        repulsion={layoutParams.repulsion}
+                        onLinkDistanceChange={(val) => setLayoutParams(p => ({...p, linkDistance: val}))}
+                        onRepulsionChange={(val) => setLayoutParams(p => ({...p, repulsion: val}))}
+                        onJiggle={() => setJiggleTrigger(prev => prev + 1)}
+                        isPhysicsActive={isPhysicsModeActive}
+                        isCollapsed={activeTool !== 'layout'}
+                        onToggle={() => toggleTool('layout')}
+                    />
+                    <AnalysisToolbar 
+                        elements={elements} 
+                        relationships={relationships}
+                        onBulkTag={handleBulkTagAction} 
+                        isCollapsed={activeTool !== 'analysis'}
+                        onToggle={() => toggleTool('analysis')}
+                    />
+                    <ScamperToolbar
+                        selectedElementId={selectedElementId}
+                        onScamper={handleScamperGenerate}
+                        isCollapsed={activeTool !== 'scamper'}
+                        onToggle={() => toggleTool('scamper')}
+                    />
+                    <BulkEditToolbar
+                        activeColorScheme={activeColorScheme}
+                        tagsToAdd={bulkTagsToAdd}
+                        tagsToRemove={bulkTagsToRemove}
+                        onTagsToAddChange={setBulkTagsToAdd}
+                        onTagsToRemoveChange={setBulkTagsToRemove}
+                        isActive={isBulkEditActive}
+                        onToggleActive={() => setIsBulkEditActive(p => !p)}
+                        isCollapsed={activeTool !== 'bulk'}
+                        onToggle={() => toggleTool('bulk')}
+                    />
+                </ToolsBar>
+                
+                <CommandBar onExecute={(md) => handleApplyMarkdown(md, true)} />
+            </div>
+        </div>
+      )}
 
       {isFilterPanelOpen && currentModelId && (
         <FilterPanel
@@ -2149,22 +2774,64 @@ export default function App() {
         />
       )}
       
-      {isMarkdownPanelOpen && currentModelId && (
-        <MarkdownPanel
-            initialText={generateMarkdownFromGraph(elements, relationships)}
-            onApply={handleApplyMarkdown}
-            onClose={() => setIsMarkdownPanelOpen(false)}
-            modelName={currentModelName}
-        />
-      )}
-      
-      {isJSONPanelOpen && currentModelId && (
-        <JSONPanel
-            initialData={{ elements, relationships, colorSchemes, activeSchemeId }}
-            onApply={handleApplyJSON}
-            onClose={() => setIsJSONPanelOpen(false)}
-            modelName={currentModelName}
-        />
+      {currentModelId && (
+        <RightPanelContainer
+            activeModelName={currentModelName}
+            isReportOpen={isReportPanelOpen}
+            isMarkdownOpen={isMarkdownPanelOpen}
+            isJSONOpen={isJSONPanelOpen}
+            isMatrixOpen={isMatrixPanelOpen}
+            isTableOpen={isTablePanelOpen}
+            onToggleReport={() => setIsReportPanelOpen(p => !p)}
+            onToggleMarkdown={() => setIsMarkdownPanelOpen(p => !p)}
+            onToggleJSON={() => setIsJSONPanelOpen(p => !p)}
+            onToggleMatrix={() => setIsMatrixPanelOpen(p => !p)}
+            onToggleTable={() => setIsTablePanelOpen(p => !p)}
+        >
+            {isReportPanelOpen && (
+                <ReportPanel
+                    elements={filteredElements}
+                    relationships={filteredRelationships}
+                    onClose={() => setIsReportPanelOpen(false)}
+                    onNodeClick={handleNodeClick}
+                />
+            )}
+            {isMarkdownPanelOpen && (
+                <MarkdownPanel
+                    initialText={generateMarkdownFromGraph(elements, relationships)}
+                    onApply={(md) => handleApplyMarkdown(md, false)}
+                    onClose={() => setIsMarkdownPanelOpen(false)}
+                    modelName={currentModelName}
+                />
+            )}
+            {isJSONPanelOpen && (
+                <JSONPanel
+                    initialData={{ elements, relationships, colorSchemes, activeSchemeId }}
+                    onApply={handleApplyJSON}
+                    onClose={() => setIsJSONPanelOpen(false)}
+                    modelName={currentModelName}
+                />
+            )}
+             {isMatrixPanelOpen && (
+                <MatrixPanel
+                    elements={filteredElements}
+                    relationships={filteredRelationships}
+                    onClose={() => setIsMatrixPanelOpen(false)}
+                />
+            )}
+            {isTablePanelOpen && (
+                <TablePanel
+                    elements={filteredElements}
+                    relationships={filteredRelationships}
+                    onUpdateElement={handleUpdateElement}
+                    onDeleteElement={handleDeleteElement}
+                    onAddElement={handleAddElementFromName}
+                    onAddRelationship={handleAddRelationshipDirect}
+                    onDeleteRelationship={handleDeleteRelationship}
+                    onClose={() => setIsTablePanelOpen(false)}
+                />
+            )}
+        </RightPanelContainer>
       )}
       
       <ChatPanel
@@ -2177,6 +2844,20 @@ export default function App() {
           onClose={() => setIsChatPanelOpen(false)}
           currentModelId={currentModelId}
           modelActions={aiActions}
+      />
+      
+      <ScamperModal
+        isOpen={isScamperModalOpen}
+        isLoading={isScamperLoading}
+        operator={currentScamperOperator ? `${currentScamperOperator.letter} - ${currentScamperOperator.name}` : ''}
+        sourceNodeName={selectedElement ? selectedElement.name : ''}
+        suggestions={scamperSuggestions}
+        onAccept={handleScamperAccept}
+        onReject={handleScamperReject}
+        onAcceptAll={handleScamperAcceptAll}
+        onRejectAll={handleScamperRejectAll}
+        onRegenerate={() => handleScamperGenerate(currentScamperOperator?.name || '', currentScamperOperator?.letter || '')}
+        onClose={() => setIsScamperModalOpen(false)}
       />
 
       {currentModelId ? (
@@ -2198,12 +2879,20 @@ export default function App() {
           focusMode={focusMode}
           setElements={setElements}
           isPhysicsModeActive={isPhysicsModeActive}
+          layoutParams={layoutParams}
+          onJiggleTrigger={jiggleTrigger}
+          isBulkEditActive={isBulkEditActive}
         />
       ) : (
         <div className="w-full h-full flex-col items-center justify-center bg-gray-900 text-white space-y-10 p-8 flex">
              <div className="text-center space-y-2">
-                <h1 className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">Tapestry</h1>
-                <p className="text-xl text-gray-400 font-light tracking-wide">Visual Knowledge Weaver</p>
+                <div className="flex items-center justify-center gap-4">
+                    <TapestryAnimator />
+                    <h1 className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">Tapestry</h1>
+                </div>
+                <div className="text-xl text-gray-400 font-light tracking-wide min-w-[300px]">
+                    <TextAnimator />
+                </div>
              </div>
              
              <div className="flex space-x-8">
@@ -2299,15 +2988,6 @@ export default function App() {
         ) : null}
       </div>
 
-      {isReportPanelOpen && currentModelId && (
-          <ReportPanel
-              elements={filteredElements}
-              relationships={filteredRelationships}
-              onClose={() => setIsReportPanelOpen(false)}
-              onNodeClick={handleNodeClick}
-          />
-      )}
-
       {contextMenu && currentModelId && (
         <ContextMenu
           x={contextMenu.x}
@@ -2337,13 +3017,17 @@ export default function App() {
             onToggleMarkdown={() => setIsMarkdownPanelOpen(p => !p)}
             onToggleJSON={() => setIsJSONPanelOpen(p => !p)}
             onToggleFilter={() => setIsFilterPanelOpen(p => !p)}
+            onToggleMatrix={() => setIsMatrixPanelOpen(p => !p)}
+            onToggleTable={() => setIsTablePanelOpen(p => !p)}
             onOpenModel={handleImportClick}
             onSaveModel={handleDiskSave}
-            onCreateModel={() => setIsCreateModelModalOpen(true)}
+            onCreateModel={handleNewModelClick}
             isReportOpen={isReportPanelOpen}
             isMarkdownOpen={isMarkdownPanelOpen}
             isJSONOpen={isJSONPanelOpen}
             isFilterOpen={isFilterPanelOpen}
+            isMatrixOpen={isMatrixPanelOpen}
+            isTableOpen={isTablePanelOpen}
         />
       )}
 
