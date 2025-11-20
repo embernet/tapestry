@@ -14,6 +14,27 @@ export const generateUUID = (): string => {
   });
 };
 
+/**
+ * Computes a simple hash of the data object to detect changes.
+ * This allows us to avoid autosaving or triggering conflicts when data is identical.
+ */
+export const computeContentHash = (data: any): string => {
+  try {
+    const str = JSON.stringify(data);
+    let hash = 0, i, chr;
+    if (str.length === 0) return hash.toString();
+    for (i = 0; i < str.length; i++) {
+      chr = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + chr;
+      hash |= 0; // Convert to 32bit integer
+    }
+    return hash.toString();
+  } catch (e) {
+    console.error("Error computing hash", e);
+    return generateUUID(); // Fallback to random ID if hashing fails
+  }
+};
+
 export const generateMarkdownFromGraph = (elements: Element[], relationships: Relationship[]): string => {
   const elementMap = new Map(elements.map(f => [f.id, f]));
   const handledElementIds = new Set<string>();

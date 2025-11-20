@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 
 interface MarkdownPanelProps {
@@ -93,10 +92,43 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
     URL.revokeObjectURL(url);
   };
 
-  const handleSelectFile = (shouldAppend: boolean) => {
+  const handleSelectFile = async (shouldAppend: boolean) => {
     isAppendingRef.current = shouldAppend;
     setIsImportModalOpen(false);
-    importFileRef.current?.click();
+
+    // Try File System Access API first for better UX (start in Documents)
+    if ('showOpenFilePicker' in window) {
+        try {
+            const pickerOptions = {
+                types: [{
+                    description: 'Markdown/Text Files',
+                    accept: { 'text/markdown': ['.md', '.txt'] }
+                }],
+                startIn: 'documents',
+            };
+            
+            // @ts-ignore - showOpenFilePicker is not yet in all TS definitions
+            const [fileHandle] = await window.showOpenFilePicker(pickerOptions);
+            const file = await fileHandle.getFile();
+            const content = await file.text();
+            
+            if (shouldAppend) {
+                setText(prev => `${prev}\n${content}`);
+            } else {
+                setText(content);
+            }
+        } catch (err: any) {
+            // If user cancels, AbortError is thrown, which we ignore.
+            // For other errors, we can fall back or log.
+            if (err.name !== 'AbortError') {
+                console.warn("File System Access API failed, falling back to input:", err);
+                importFileRef.current?.click();
+            }
+        }
+    } else {
+        // Fallback for browsers without File System Access API
+        importFileRef.current?.click();
+    }
   };
 
   const handleImportFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {

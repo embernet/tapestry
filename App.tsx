@@ -7,10 +7,11 @@ import ElementDetailsPanel from './components/ElementDetailsPanel';
 import RelationshipDetailsPanel from './components/RelationshipDetailsPanel';
 import AddRelationshipPanel from './components/AddRelationshipPanel';
 import MarkdownPanel from './components/MarkdownPanel';
+import JSONPanel from './components/JSONPanel';
 import FilterPanel from './components/FilterPanel';
 import { ReportPanel } from './components/ReportPanel';
 import ChatPanel from './components/ChatPanel';
-import { generateUUID, generateMarkdownFromGraph } from './utils';
+import { generateUUID, generateMarkdownFromGraph, computeContentHash } from './utils';
 
 
 // --- Storage Keys ---
@@ -38,6 +39,91 @@ const useClickOutside = <T extends HTMLElement,>(ref: React.RefObject<T>, handle
 };
 
 // --- Helper Components defined in App.tsx to reduce file count ---
+
+// Conflict Resolution Modal
+interface ConflictResolutionModalProps {
+  localMetadata: ModelMetadata;
+  diskMetadata: ModelMetadata;
+  localData: { elements: Element[], relationships: Relationship[] };
+  diskData: { elements: Element[], relationships: Relationship[] };
+  onChooseLocal: () => void;
+  onChooseDisk: () => void;
+  onCancel: () => void;
+}
+
+const ConflictResolutionModal: React.FC<ConflictResolutionModalProps> = ({ localMetadata, diskMetadata, localData, diskData, onChooseLocal, onChooseDisk, onCancel }) => {
+    const formatDate = (dateStr: string) => new Date(dateStr).toLocaleString();
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-4">
+            <div className="bg-gray-800 rounded-lg w-full max-w-3xl shadow-2xl border border-gray-600 text-white overflow-hidden">
+                <div className="p-6 border-b border-gray-700">
+                    <h2 className="text-2xl font-bold text-yellow-400 mb-2">Version Conflict Detected</h2>
+                    <p className="text-gray-300">
+                        A version of this model (<b>{diskMetadata.name}</b>) already exists in your browser's local storage, 
+                        and the content appears to be different.
+                    </p>
+                    <p className="text-gray-400 text-sm mt-2">Which version would you like to open?</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-0 divide-x divide-gray-700">
+                    {/* Local Version */}
+                    <div className="p-6 hover:bg-gray-750 transition">
+                        <h3 className="text-lg font-bold text-blue-400 mb-4">Local Recovery (Autosave)</h3>
+                        <div className="space-y-3 text-sm text-gray-300">
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Last Modified:</span>
+                                <span>{formatDate(localMetadata.updatedAt)}</span>
+                            </div>
+                             <div className="flex justify-between">
+                                <span className="text-gray-500">Elements:</span>
+                                <span>{localData.elements.length}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Relationships:</span>
+                                <span>{localData.relationships.length}</span>
+                            </div>
+                        </div>
+                         <button 
+                            onClick={onChooseLocal}
+                            className="mt-6 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-md transition duration-150"
+                        >
+                            Open Local Version
+                        </button>
+                    </div>
+
+                    {/* Disk Version */}
+                    <div className="p-6 hover:bg-gray-750 transition">
+                         <h3 className="text-lg font-bold text-green-400 mb-4">Disk File (Selected)</h3>
+                         <div className="space-y-3 text-sm text-gray-300">
+                             <div className="flex justify-between">
+                                <span className="text-gray-500">Last Modified:</span>
+                                <span>{formatDate(diskMetadata.updatedAt)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Elements:</span>
+                                <span>{diskData.elements.length}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Relationships:</span>
+                                <span>{diskData.relationships.length}</span>
+                            </div>
+                         </div>
+                         <button 
+                            onClick={onChooseDisk}
+                            className="mt-6 w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-md transition duration-150"
+                        >
+                            Open Disk File
+                        </button>
+                    </div>
+                </div>
+                <div className="p-4 border-t border-gray-700 bg-gray-900 bg-opacity-50 text-center">
+                    <button onClick={onCancel} className="text-gray-400 hover:text-white text-sm hover:underline">Cancel Operation</button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 // Node ContextMenu Component
 interface ContextMenuProps {
@@ -77,14 +163,17 @@ interface CanvasContextMenuProps {
   onAutoLayout: () => void;
   onToggleReport: () => void;
   onToggleMarkdown: () => void;
+  onToggleJSON: () => void;
   onToggleFilter: () => void;
   onOpenModel: () => void;
+  onSaveModel: () => void;
   onCreateModel: () => void;
   isReportOpen: boolean;
   isMarkdownOpen: boolean;
+  isJSONOpen: boolean;
   isFilterOpen: boolean;
 }
-const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ x, y, onClose, onZoomToFit, onAutoLayout, onToggleReport, onToggleMarkdown, onToggleFilter, onOpenModel, onCreateModel, isReportOpen, isMarkdownOpen, isFilterOpen }) => {
+const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ x, y, onClose, onZoomToFit, onAutoLayout, onToggleReport, onToggleMarkdown, onToggleJSON, onToggleFilter, onOpenModel, onSaveModel, onCreateModel, isReportOpen, isMarkdownOpen, isJSONOpen, isFilterOpen }) => {
   const menuRef = React.useRef<HTMLDivElement>(null);
   useClickOutside(menuRef, onClose);
 
@@ -105,10 +194,12 @@ const CanvasContextMenu: React.FC<CanvasContextMenuProps> = ({ x, y, onClose, on
       <div className="border-t border-gray-600 my-1"></div>
       <button onClick={createHandler(onToggleReport)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isReportOpen ? 'Hide' : 'Show'} Report View</button>
       <button onClick={createHandler(onToggleMarkdown)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isMarkdownOpen ? 'Hide' : 'Show'} Markdown View</button>
+      <button onClick={createHandler(onToggleJSON)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isJSONOpen ? 'Hide' : 'Show'} JSON View</button>
       <button onClick={createHandler(onToggleFilter)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">{isFilterOpen ? 'Hide' : 'Show'} Filter</button>
       <div className="border-t border-gray-600 my-1"></div>
-      <button onClick={createHandler(onOpenModel)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Open Model...</button>
-      <button onClick={createHandler(onCreateModel)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Create New Model...</button>
+      <button onClick={createHandler(onOpenModel)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Open...</button>
+      <button onClick={createHandler(onSaveModel)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">Save</button>
+      <button onClick={createHandler(onCreateModel)} className="block w-full text-left px-4 py-2 hover:bg-gray-700">New Model...</button>
     </div>
   );
 };
@@ -942,12 +1033,14 @@ export default function App() {
   const [isCreateModelModalOpen, setIsCreateModelModalOpen] = useState(false);
   const [isOpenModelModalOpen, setIsOpenModelModalOpen] = useState(false);
   const [isMarkdownPanelOpen, setIsMarkdownPanelOpen] = useState(false);
+  const [isJSONPanelOpen, setIsJSONPanelOpen] = useState(false);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isReportPanelOpen, setIsReportPanelOpen] = useState(false);
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isPatternGalleryModalOpen, setIsPatternGalleryModalOpen] = useState(false);
+  const [pendingImport, setPendingImport] = useState<{ localMetadata: ModelMetadata, diskMetadata: ModelMetadata, localData: any, diskData: any } | null>(null);
   
   const [tagFilter, setTagFilter] = useState<{ included: Set<string>, excluded: Set<string> }>({
     included: new Set(),
@@ -1055,9 +1148,6 @@ export default function App() {
               const defaultScheme = DEFAULT_COLOR_SCHEMES.find(d => d.id === s.id);
               if (defaultScheme && defaultScheme.relationshipDefinitions) {
                   // If it's a default scheme, prefer the robust definitions from constants
-                  // but we should probably try to preserve any custom labels the user might have added?
-                  // For simplicity, if it matches a default ID, we'll assume the user wants the rich default definitions
-                  // plus any extra labels they might have added as 'custom' definitions.
                   const defaultLabels = new Set(defaultScheme.relationshipDefinitions.map(d => d.label));
                   const extraLabels = s.relationshipLabels.filter(l => !defaultLabels.has(l));
                   
@@ -1082,10 +1172,7 @@ export default function App() {
       });
   }, []);
 
-  const handleLoadModel = useCallback((modelId: string) => {
-    const modelDataString = localStorage.getItem(`${MODEL_DATA_PREFIX}${modelId}`);
-    if (modelDataString) {
-      const data = JSON.parse(modelDataString);
+  const loadModelData = useCallback((data: any, modelId: string, modelMetadata?: ModelMetadata) => {
       setElements(data.elements || []);
       setRelationships(data.relationships || []);
       
@@ -1099,10 +1186,29 @@ export default function App() {
       setCurrentModelId(modelId);
       localStorage.setItem(LAST_OPENED_MODEL_ID_KEY, modelId);
       setIsOpenModelModalOpen(false);
-      setTagFilter({ included: new Set(), excluded: new Set() }); // Reset tag filters on model load
-      setDateFilter({ createdAfter: '', createdBefore: '', updatedAfter: '', updatedBefore: '' }); // Reset date filters
-    }
+      setTagFilter({ included: new Set(), excluded: new Set() });
+      setDateFilter({ createdAfter: '', createdBefore: '', updatedAfter: '', updatedBefore: '' });
+
+      if (modelMetadata) {
+        // Update index with new metadata (e.g. update filename/timestamp/hash)
+         setModelsIndex(prevIndex => {
+            const exists = prevIndex.find(m => m.id === modelId);
+            if (exists) {
+                return prevIndex.map(m => m.id === modelId ? { ...m, ...modelMetadata } : m);
+            } else {
+                return [...prevIndex, modelMetadata];
+            }
+         });
+      }
   }, [migrateLegacySchemes]);
+
+  const handleLoadModel = useCallback((modelId: string) => {
+    const modelDataString = localStorage.getItem(`${MODEL_DATA_PREFIX}${modelId}`);
+    if (modelDataString) {
+      const data = JSON.parse(modelDataString);
+      loadModelData(data, modelId);
+    }
+  }, [loadModelData]);
 
   useEffect(() => {
     if (!isInitialLoad) return;
@@ -1112,25 +1218,13 @@ export default function App() {
       const index = indexStr ? JSON.parse(indexStr) : [];
       setModelsIndex(index);
       
-      if (index.length === 0) {
-        setIsCreateModelModalOpen(true);
-      } else {
-        const lastId = localStorage.getItem(LAST_OPENED_MODEL_ID_KEY);
-        const modelToLoad = index.find((m: ModelMetadata) => m.id === lastId) || index[0];
-        if (modelToLoad) {
-          handleLoadModel(modelToLoad.id);
-        } else {
-          setIsCreateModelModalOpen(true);
-        }
-      }
     } catch (error) {
         console.error("Failed to load models index:", error);
         setModelsIndex([]);
-        setIsCreateModelModalOpen(true);
     }
     
     setIsInitialLoad(false);
-  }, [isInitialLoad, handleLoadModel]);
+  }, [isInitialLoad]);
 
   useEffect(() => {
     if (!isInitialLoad) {
@@ -1142,35 +1236,48 @@ export default function App() {
   useEffect(() => {
     if (currentModelId && !isInitialLoad) {
       const modelData = { elements, relationships, colorSchemes, activeSchemeId };
-      localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
+      const currentContentHash = computeContentHash(modelData);
+      
+      const currentMeta = modelsIndex.find(m => m.id === currentModelId);
+      
+      // Only autosave if the content hash has changed from what is stored in metadata
+      // If currentMeta is missing or contentHash differs, proceed to save
+      if (!currentMeta || currentMeta.contentHash !== currentContentHash) {
+          localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
 
-      setModelsIndex(prevIndex => {
-        const now = new Date().toISOString();
-        return prevIndex.map(m =>
-          m.id === currentModelId ? { ...m, updatedAt: now } : m
-        );
-      });
+          setModelsIndex(prevIndex => {
+            const now = new Date().toISOString();
+            return prevIndex.map(m =>
+              m.id === currentModelId ? { ...m, updatedAt: now, contentHash: currentContentHash } : m
+            );
+          });
+      }
     }
-  }, [elements, relationships, colorSchemes, activeSchemeId, currentModelId, isInitialLoad]);
+  }, [elements, relationships, colorSchemes, activeSchemeId, currentModelId, isInitialLoad, modelsIndex]);
 
   const handleCreateModel = useCallback((name: string, description: string) => {
     const now = new Date().toISOString();
-    const newModel: ModelMetadata = {
-      id: generateUUID(),
-      name,
-      description,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    setModelsIndex(prevIndex => [...prevIndex, newModel]);
-
+    
     const newModelData = {
       elements: [],
       relationships: [],
       colorSchemes: DEFAULT_COLOR_SCHEMES,
       activeSchemeId: DEFAULT_COLOR_SCHEMES[0]?.id || null,
     };
+    const initialHash = computeContentHash(newModelData);
+
+    const newModel: ModelMetadata = {
+      id: generateUUID(),
+      name,
+      description,
+      createdAt: now,
+      updatedAt: now,
+      filename: `${name.replace(/ /g, '_')}.json`,
+      contentHash: initialHash
+    };
+
+    setModelsIndex(prevIndex => [...prevIndex, newModel]);
+
     localStorage.setItem(`${MODEL_DATA_PREFIX}${newModel.id}`, JSON.stringify(newModelData));
 
     handleLoadModel(newModel.id);
@@ -1348,26 +1455,39 @@ export default function App() {
   }, [handleDeleteElement]);
 
 
-  const handleExport = useCallback(() => {
+  const handleDiskSave = useCallback(() => {
     if (!currentModelId) {
-        alert("No active model to export.");
+        alert("No active model to save.");
         return;
     }
     const modelMetadata = modelsIndex.find(m => m.id === currentModelId);
 
     if (!modelMetadata) {
-        alert("Could not find model metadata to export.");
+        alert("Could not find model metadata to save.");
         return;
     }
+    
+    // Update the UpdatedAt timestamp for the save
+    const now = new Date().toISOString();
+    
+    const modelData = {
+        elements,
+        relationships,
+        colorSchemes,
+        activeSchemeId,
+    };
+    const currentHash = computeContentHash(modelData);
+
+    const updatedMetadata = { 
+        ...modelMetadata, 
+        updatedAt: now, 
+        filename: modelMetadata.filename || `${modelMetadata.name.replace(/ /g, '_')}.json`,
+        contentHash: currentHash
+    };
 
     const exportData = {
-        metadata: modelMetadata,
-        data: {
-            elements,
-            relationships,
-            colorSchemes,
-            activeSchemeId,
-        },
+        metadata: updatedMetadata,
+        data: modelData,
     };
 
     const jsonString = JSON.stringify(exportData, null, 2);
@@ -1375,78 +1495,162 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${modelMetadata.name.replace(/ /g, '_')}_export.json`;
+    a.download = updatedMetadata.filename!;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    // Update local index and storage to reflect that we just saved to disk
+    // and the hash is now synced
+    setModelsIndex(prev => prev.map(m => m.id === currentModelId ? updatedMetadata : m));
+    localStorage.setItem(MODELS_INDEX_KEY, JSON.stringify(
+        modelsIndex.map(m => m.id === currentModelId ? updatedMetadata : m)
+    ));
+    localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
+    
   }, [currentModelId, modelsIndex, elements, relationships, colorSchemes, activeSchemeId]);
 
-  const handleImport = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+
+  const processImportedData = useCallback((text: string, filename?: string) => {
+        try {
+            const imported = JSON.parse(text);
+
+            let dataToImport: any = null;
+            let nameToUse = 'Imported Model';
+            let descToUse = '';
+            let existingId: string | null = null;
+            let importedHash: string = '';
+
+            // Check for full export structure (metadata + data)
+            if (imported.metadata && imported.data && Array.isArray(imported.data.elements)) {
+                dataToImport = imported.data;
+                nameToUse = imported.metadata.name || nameToUse;
+                descToUse = imported.metadata.description || '';
+                existingId = imported.metadata.id;
+                // Compute hash of the data being imported
+                importedHash = computeContentHash(dataToImport);
+            } 
+            // Check for raw data structure
+            else if (imported.elements && Array.isArray(imported.elements)) {
+                dataToImport = imported;
+                importedHash = computeContentHash(dataToImport);
+            }
+
+            if (!dataToImport) {
+                throw new Error('Invalid file format.');
+            }
+            
+            // Ensure relationships array exists
+            if (!dataToImport.relationships) dataToImport.relationships = [];
+            
+            // CONFLICT CHECK: Does a model with this ID already exist in localStorage?
+            if (existingId) {
+                const localDataStr = localStorage.getItem(`${MODEL_DATA_PREFIX}${existingId}`);
+                if (localDataStr) {
+                    const localIndex = modelsIndex.find(m => m.id === existingId);
+                    if (localIndex) {
+                        // If metadata has contentHash, use it. Otherwise compute it from raw local data.
+                        const localHash = localIndex.contentHash || computeContentHash(JSON.parse(localDataStr));
+                        
+                        // If the content hashes are different, we have a conflict.
+                        if (localHash !== importedHash) {
+                            setPendingImport({
+                                localMetadata: localIndex,
+                                diskMetadata: { 
+                                    ...imported.metadata, 
+                                    filename: filename || imported.metadata.filename,
+                                    contentHash: importedHash 
+                                },
+                                localData: JSON.parse(localDataStr),
+                                diskData: dataToImport
+                            });
+                            return; 
+                        }
+                    }
+                }
+            }
+            
+            // If no conflict, or raw data (new model), proceed to load
+            const now = new Date().toISOString();
+            const newModelId = existingId || generateUUID();
+            
+            // Handle name uniqueness if it's treated as a NEW model (no ID in file)
+            if (!existingId) {
+                let finalModelName = nameToUse;
+                let i = 1;
+                while(modelsIndex.some(m => m.name === finalModelName)) {
+                    i++;
+                    finalModelName = `${nameToUse} ${i}`;
+                }
+                nameToUse = finalModelName;
+            }
+            
+            const newMetadata: ModelMetadata = {
+                id: newModelId,
+                name: nameToUse,
+                description: descToUse,
+                createdAt: imported.metadata?.createdAt || now,
+                updatedAt: imported.metadata?.updatedAt || now,
+                filename: filename,
+                contentHash: importedHash
+            };
+            
+            const newModelData = {
+                elements: dataToImport.elements || [],
+                relationships: dataToImport.relationships || [],
+                colorSchemes: dataToImport.colorSchemes || DEFAULT_COLOR_SCHEMES,
+                activeSchemeId: dataToImport.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null,
+            };
+            
+            loadModelData(newModelData, newModelId, newMetadata);
+
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+            alert(`Failed to import file: ${message}`);
+            console.error("Import failed:", error);
+        }
+  }, [modelsIndex, loadModelData]);
+
+  const handleImportClick = useCallback(() => {
+      if (importFileRef.current) {
+          importFileRef.current.value = '';
+          importFileRef.current.click();
+      }
+  }, []);
+
+  const handleImportInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
-        try {
-            const text = e.target?.result as string;
-            const imported = JSON.parse(text);
-
-            if (!imported.metadata || !imported.metadata.name || !imported.data || !Array.isArray(imported.data.elements) || !Array.isArray(imported.data.relationships)) {
-                throw new Error('Invalid file format. The file must be a valid Tapestry export.');
-            }
-            
-            let modelName = imported.metadata.name;
-            if (modelsIndex.some(m => m.name === modelName)) {
-                modelName = `${modelName} (Imported)`;
-            }
-            let i = 1;
-            let finalModelName = modelName;
-            while(modelsIndex.some(m => m.name === finalModelName)) {
-                i++;
-                finalModelName = `${modelName} ${i}`;
-            }
-
-            if (window.confirm(`This will create a new model named "${finalModelName}". Proceed?`)) {
-                const now = new Date().toISOString();
-                const newModelId = generateUUID();
-                
-                const newMetadata: ModelMetadata = {
-                    id: newModelId,
-                    name: finalModelName,
-                    description: imported.metadata.description || '',
-                    createdAt: now,
-                    updatedAt: now,
-                };
-                
-                // Migrate schemes if necessary
-                let importedSchemes = imported.data.colorSchemes || DEFAULT_COLOR_SCHEMES;
-                importedSchemes = migrateLegacySchemes(importedSchemes);
-
-                const newModelData = {
-                    elements: imported.data.elements || [],
-                    relationships: imported.data.relationships || [],
-                    colorSchemes: importedSchemes,
-                    activeSchemeId: imported.data.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null,
-                };
-                
-                setModelsIndex(prev => [...prev, newMetadata]);
-                localStorage.setItem(`${MODEL_DATA_PREFIX}${newModelId}`, JSON.stringify(newModelData));
-                
-                handleLoadModel(newModelId);
-
-                alert(`Successfully imported model "${finalModelName}".`);
-            }
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-            alert(`Failed to import file: ${message}`);
-            console.error("Import failed:", error);
-        } finally {
-            if (importFileRef.current) importFileRef.current.value = '';
-        }
+        const text = e.target?.result as string;
+        processImportedData(text, file.name);
     };
     reader.readAsText(file);
-  }, [modelsIndex, handleLoadModel, migrateLegacySchemes]);
+  }, [processImportedData]);
+  
+  const handleApplyJSON = useCallback((data: any) => {
+      try {
+          if (data.elements && Array.isArray(data.elements)) {
+              setElements(data.elements);
+          }
+          if (data.relationships && Array.isArray(data.relationships)) {
+              setRelationships(data.relationships);
+          }
+          if (data.colorSchemes && Array.isArray(data.colorSchemes)) {
+              const migrated = migrateLegacySchemes(data.colorSchemes);
+              setColorSchemes(migrated);
+          }
+          if (data.activeSchemeId) {
+              setActiveSchemeId(data.activeSchemeId);
+          }
+          setIsJSONPanelOpen(false);
+      } catch (e) {
+          alert("Failed to apply JSON data: " + (e instanceof Error ? e.message : String(e)));
+      }
+  }, [migrateLegacySchemes]);
   
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const closeCanvasContextMenu = useCallback(() => setCanvasContextMenu(null), []);
@@ -1820,114 +2024,120 @@ export default function App() {
       <input
         type="file"
         ref={importFileRef}
-        onChange={handleImport}
+        onChange={handleImportInputChange}
         accept=".json"
         className="hidden"
       />
-      <div className="absolute top-4 left-4 z-10 bg-gray-800 bg-opacity-80 p-2 rounded-lg flex items-center space-x-2">
-        <div className="flex items-center space-x-2 text-gray-300">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 8c2-2 4-2 6 0s4 2 6 0" />
-                <path d="M4 12c2-2 4-2 6 0s4 2 6 0" />
-                <path d="M4 16c2-2 4-2 6 0s4 2 6 0" />
-            </svg>
-            <span className="text-xl font-bold">Tapestry</span>
-        </div>
-        <div className="border-l border-gray-600 h-6 mx-1"></div>
-        <button onClick={() => setIsOpenModelModalOpen(true)} title="Open Model" className="p-2 rounded-md hover:bg-gray-700 transition">
-           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-        </button>
-        <button onClick={() => importFileRef.current?.click()} title="Import" className="p-2 rounded-md hover:bg-gray-700 transition">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-        </button>
-        <button onClick={handleExport} title="Export" className="p-2 rounded-md hover:bg-gray-700 transition">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-        </button>
-        <button onClick={() => setIsSettingsModalOpen(true)} title="Settings" className="p-2 rounded-md hover:bg-gray-700 transition">
-           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-        </button>
-        <button onClick={() => setIsFilterPanelOpen(prev => !prev)} title="Filter by Tag" className="p-2 rounded-md hover:bg-gray-700 transition">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-          </svg>
-        </button>
-        <button onClick={handleToggleFocusMode} title={focusButtonTitle()} className="p-2 rounded-md hover:bg-gray-700 transition">
-            {focusMode === 'narrow' && (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <circle cx="12" cy="12" r="3" />
+      
+      {currentModelId && (
+        <div className="absolute top-4 left-4 z-10 bg-gray-800 bg-opacity-80 p-2 rounded-lg flex items-center space-x-2">
+            <div className="flex items-center space-x-2 text-gray-300">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 8c2-2 4-2 6 0s4 2 6 0" />
+                    <path d="M4 12c2-2 4-2 6 0s4 2 6 0" />
+                    <path d="M4 16c2-2 4-2 6 0s4 2 6 0" />
                 </svg>
-            )}
-            {focusMode === 'wide' && (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <circle cx="12" cy="12" r="10" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-            )}
-            {focusMode === 'zoom' && (
-                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <circle cx="12" cy="12" r="10" />
-                  <circle cx="12" cy="12" r="3" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2 6V2h4 M22 6V2h-4 M2 18v4h4 M22 18v4h-4" />
-                </svg>
-            )}
-        </button>
-        <button onClick={() => setIsMarkdownPanelOpen(prev => !prev)} title="Markdown View" className="p-2 rounded-md hover:bg-gray-700 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
-        </button>
-        <button onClick={() => setIsReportPanelOpen(prev => !prev)} title="Report View" className="p-2 rounded-md hover:bg-gray-700 transition">
+                <span className="text-xl font-bold">Tapestry</span>
+            </div>
+            <div className="border-l border-gray-600 h-6 mx-1"></div>
+            <button onClick={handleImportClick} title="Open Model..." className="p-2 rounded-md hover:bg-gray-700 transition">
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+            </button>
+            <button onClick={handleDiskSave} title="Save to Disk" className="p-2 rounded-md hover:bg-gray-700 transition">
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+            </button>
+            <button onClick={() => setIsSettingsModalOpen(true)} title="Settings" className="p-2 rounded-md hover:bg-gray-700 transition">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            </button>
+            <button onClick={() => setIsFilterPanelOpen(prev => !prev)} title="Filter by Tag" className="p-2 rounded-md hover:bg-gray-700 transition">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
             </svg>
-        </button>
-        <button onClick={() => setIsChatPanelOpen(prev => !prev)} title="AI Assistant" className="p-2 rounded-md hover:bg-gray-700 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-            </svg>
-        </button>
-        <button onClick={handleZoomToFit} title="Zoom to Fit" className="p-2 rounded-md hover:bg-gray-700 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
-            </svg>
-        </button>
-         <div className="bg-gray-700 rounded-md flex">
-            {!isPhysicsModeActive ? (
-                <button onClick={handleStartPhysicsLayout} title="Auto-Layout" className="p-2 hover:bg-gray-600 rounded-md transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} fill="currentColor">
-                        <circle cx="6" cy="18" r="3" />
-                        <circle cx="18" cy="6" r="3" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M 8 16 Q 4 12, 12 12 T 16 8" />
+            </button>
+            <button onClick={handleToggleFocusMode} title={focusButtonTitle()} className="p-2 rounded-md hover:bg-gray-700 transition">
+                {focusMode === 'narrow' && (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <circle cx="12" cy="12" r="3" />
                     </svg>
-                </button>
-            ) : (
-                <div className="flex items-center">
-                    <button onClick={handleAcceptLayout} title="Accept Layout" className="p-2 hover:bg-gray-600 rounded-md transition">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                )}
+                {focusMode === 'wide' && (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="3" />
+                    </svg>
+                )}
+                {focusMode === 'zoom' && (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="3" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2 6V2h4 M22 6V2h-4 M2 18v4h4 M22 18v4h-4" />
+                    </svg>
+                )}
+            </button>
+            <button onClick={() => setIsMarkdownPanelOpen(prev => !prev)} title="Markdown View" className="p-2 rounded-md hover:bg-gray-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+            </button>
+            <button onClick={() => setIsJSONPanelOpen(prev => !prev)} title="JSON View" className="p-2 rounded-md hover:bg-gray-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                </svg>
+            </button>
+            <button onClick={() => setIsReportPanelOpen(prev => !prev)} title="Report View" className="p-2 rounded-md hover:bg-gray-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            </button>
+            <button onClick={() => setIsChatPanelOpen(prev => !prev)} title="AI Assistant" className="p-2 rounded-md hover:bg-gray-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+            </button>
+            <button onClick={handleZoomToFit} title="Zoom to Fit" className="p-2 rounded-md hover:bg-gray-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+                </svg>
+            </button>
+            <div className="bg-gray-700 rounded-md flex">
+                {!isPhysicsModeActive ? (
+                    <button onClick={handleStartPhysicsLayout} title="Auto-Layout" className="p-2 hover:bg-gray-600 rounded-md transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} fill="currentColor">
+                            <circle cx="6" cy="18" r="3" />
+                            <circle cx="18" cy="6" r="3" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M 8 16 Q 4 12, 12 12 T 16 8" />
+                        </svg>
                     </button>
-                    <button onClick={handleRejectLayout} title="Reject Layout" className="p-2 hover:bg-gray-600 rounded-md transition">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
+                ) : (
+                    <div className="flex items-center">
+                        <button onClick={handleAcceptLayout} title="Accept Layout" className="p-2 hover:bg-gray-600 rounded-md transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                        </button>
+                        <button onClick={handleRejectLayout} title="Reject Layout" className="p-2 hover:bg-gray-600 rounded-md transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+                )}
+            </div>
+            <div className="relative">
+            <button onClick={() => setIsHelpMenuOpen(p => !p)} title="Help" className="p-2 rounded-md hover:bg-gray-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </button>
+            {isHelpMenuOpen && (
+                <HelpMenu 
+                    onClose={() => setIsHelpMenuOpen(false)} 
+                    onAbout={() => setIsAboutModalOpen(true)}
+                    onPatternGallery={() => setIsPatternGalleryModalOpen(true)}
+                />
             )}
+            </div>
+            <div className="border-l border-gray-600 h-6 mx-2"></div>
+            <span className="text-gray-400 text-sm font-semibold pr-2">Current Model: {currentModelName}</span>
         </div>
-        <div className="relative">
-          <button onClick={() => setIsHelpMenuOpen(p => !p)} title="Help" className="p-2 rounded-md hover:bg-gray-700 transition">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </button>
-          {isHelpMenuOpen && (
-              <HelpMenu 
-                  onClose={() => setIsHelpMenuOpen(false)} 
-                  onAbout={() => setIsAboutModalOpen(true)}
-                  onPatternGallery={() => setIsPatternGalleryModalOpen(true)}
-              />
-          )}
-        </div>
-        <div className="border-l border-gray-600 h-6 mx-2"></div>
-        <span className="text-gray-400 text-sm font-semibold pr-2">Current Model: {currentModelName}</span>
-      </div>
+      )}
 
-      {isFilterPanelOpen && (
+      {isFilterPanelOpen && currentModelId && (
         <FilterPanel
             allTags={allTags}
             tagCounts={tagCounts}
@@ -1939,7 +2149,7 @@ export default function App() {
         />
       )}
       
-      {isMarkdownPanelOpen && (
+      {isMarkdownPanelOpen && currentModelId && (
         <MarkdownPanel
             initialText={generateMarkdownFromGraph(elements, relationships)}
             onApply={handleApplyMarkdown}
@@ -1948,8 +2158,17 @@ export default function App() {
         />
       )}
       
+      {isJSONPanelOpen && currentModelId && (
+        <JSONPanel
+            initialData={{ elements, relationships, colorSchemes, activeSchemeId }}
+            onApply={handleApplyJSON}
+            onClose={() => setIsJSONPanelOpen(false)}
+            modelName={currentModelName}
+        />
+      )}
+      
       <ChatPanel
-          className={!isChatPanelOpen ? 'hidden' : ''}
+          className={(!isChatPanelOpen || !currentModelId) ? 'hidden' : ''}
           isOpen={isChatPanelOpen}
           elements={elements}
           relationships={relationships}
@@ -1981,13 +2200,72 @@ export default function App() {
           isPhysicsModeActive={isPhysicsModeActive}
         />
       ) : (
-        <div className="w-full h-full flex items-center justify-center">
-             {/* This space is intentionally left blank for the initial modal */}
+        <div className="w-full h-full flex-col items-center justify-center bg-gray-900 text-white space-y-10 p-8 flex">
+             <div className="text-center space-y-2">
+                <h1 className="text-6xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500">Tapestry</h1>
+                <p className="text-xl text-gray-400 font-light tracking-wide">Visual Knowledge Weaver</p>
+             </div>
+             
+             <div className="flex space-x-8">
+                <button
+                    onClick={() => setIsCreateModelModalOpen(true)}
+                    className="flex flex-col items-center justify-center w-56 h-56 bg-gray-800 border-2 border-gray-700 rounded-2xl hover:border-blue-500 hover:bg-gray-750 hover:scale-105 hover:shadow-lg hover:shadow-blue-500/20 transition-all group"
+                >
+                    <div className="bg-gray-700 rounded-full p-4 mb-4 group-hover:bg-blue-900 group-hover:bg-opacity-30 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                        </svg>
+                    </div>
+                    <span className="text-xl font-semibold text-gray-300 group-hover:text-white transition-colors">Create Model</span>
+                    <span className="text-sm text-gray-500 mt-2 text-center px-4 group-hover:text-gray-400">Start a new blank canvas</span>
+                </button>
+                
+                <button
+                    onClick={handleImportClick}
+                    className="flex flex-col items-center justify-center w-56 h-56 bg-gray-800 border-2 border-gray-700 rounded-2xl hover:border-green-500 hover:bg-gray-750 hover:scale-105 hover:shadow-lg hover:shadow-green-500/20 transition-all group"
+                >
+                     <div className="bg-gray-700 rounded-full p-4 mb-4 group-hover:bg-green-900 group-hover:bg-opacity-30 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400 group-hover:text-green-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                    </div>
+                    <span className="text-xl font-semibold text-gray-300 group-hover:text-white transition-colors">Open Model</span>
+                    <span className="text-sm text-gray-500 mt-2 text-center px-4 group-hover:text-gray-400">Open a JSON file from Disk</span>
+                </button>
+             </div>
+
+             {modelsIndex.length > 0 && (
+                 <div className="mt-8 w-full max-w-2xl">
+                    <div className="flex items-center justify-between mb-4 px-2">
+                        <h3 className="text-lg font-semibold text-gray-400">Recent Models (Recovered)</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {modelsIndex.slice(0, 4).map(model => (
+                             <button 
+                                key={model.id} 
+                                onClick={() => handleLoadModel(model.id)}
+                                className="bg-gray-800 hover:bg-gray-700 border border-gray-700 p-4 rounded-lg text-left transition group flex flex-col"
+                             >
+                                <span className="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">{model.name}</span>
+                                <span className="text-xs text-gray-500 mt-1">Last updated: {new Date(model.updatedAt).toLocaleDateString()}</span>
+                             </button>
+                        ))}
+                    </div>
+                     <div className="text-center mt-4">
+                        <button 
+                            onClick={() => setIsOpenModelModalOpen(true)}
+                            className="text-sm text-blue-400 hover:text-blue-300 hover:underline"
+                        >
+                            View All Recovered Models
+                        </button>
+                     </div>
+                 </div>
+             )}
         </div>
       )}
       
       <div className="flex-shrink-0 z-20">
-        {panelState.view === 'addRelationship' && addRelationshipSourceElement ? (
+        {panelState.view === 'addRelationship' && addRelationshipSourceElement && currentModelId ? (
             <AddRelationshipPanel
             sourceElement={addRelationshipSourceElement}
             targetElementId={panelState.targetElementId}
@@ -2000,7 +2278,7 @@ export default function App() {
             defaultLabel={activeColorScheme?.defaultRelationshipLabel}
             suggestedTags={Object.keys(activeColorScheme?.tagColors || {})}
             />
-        ) : selectedRelationship ? (
+        ) : selectedRelationship && currentModelId ? (
             <RelationshipDetailsPanel
                 relationship={selectedRelationship}
                 elements={elements}
@@ -2008,7 +2286,7 @@ export default function App() {
                 onDelete={handleDeleteRelationship}
                 suggestedLabels={activeRelationshipLabels}
             />
-        ) : selectedElement ? (
+        ) : selectedElement && currentModelId ? (
             <ElementDetailsPanel
                 element={selectedElement}
                 allElements={elements}
@@ -2021,7 +2299,7 @@ export default function App() {
         ) : null}
       </div>
 
-      {isReportPanelOpen && (
+      {isReportPanelOpen && currentModelId && (
           <ReportPanel
               elements={filteredElements}
               relationships={filteredRelationships}
@@ -2030,7 +2308,7 @@ export default function App() {
           />
       )}
 
-      {contextMenu && (
+      {contextMenu && currentModelId && (
         <ContextMenu
           x={contextMenu.x}
           y={contextMenu.y}
@@ -2048,7 +2326,7 @@ export default function App() {
         />
       )}
 
-      {canvasContextMenu && (
+      {canvasContextMenu && currentModelId && (
         <CanvasContextMenu
             x={canvasContextMenu.x}
             y={canvasContextMenu.y}
@@ -2057,11 +2335,14 @@ export default function App() {
             onAutoLayout={handleStartPhysicsLayout}
             onToggleReport={() => setIsReportPanelOpen(p => !p)}
             onToggleMarkdown={() => setIsMarkdownPanelOpen(p => !p)}
+            onToggleJSON={() => setIsJSONPanelOpen(p => !p)}
             onToggleFilter={() => setIsFilterPanelOpen(p => !p)}
-            onOpenModel={() => setIsOpenModelModalOpen(true)}
+            onOpenModel={handleImportClick}
+            onSaveModel={handleDiskSave}
             onCreateModel={() => setIsCreateModelModalOpen(true)}
             isReportOpen={isReportPanelOpen}
             isMarkdownOpen={isMarkdownPanelOpen}
+            isJSONOpen={isJSONPanelOpen}
             isFilterOpen={isFilterPanelOpen}
         />
       )}
@@ -2097,6 +2378,24 @@ export default function App() {
             setIsCreateModelModalOpen(true);
           }}
         />
+      )}
+      
+      {pendingImport && (
+          <ConflictResolutionModal 
+            localMetadata={pendingImport.localMetadata}
+            diskMetadata={pendingImport.diskMetadata}
+            localData={pendingImport.localData}
+            diskData={pendingImport.diskData}
+            onCancel={() => setPendingImport(null)}
+            onChooseLocal={() => {
+                handleLoadModel(pendingImport.localMetadata.id);
+                setPendingImport(null);
+            }}
+            onChooseDisk={() => {
+                loadModelData(pendingImport.diskData, pendingImport.diskMetadata.id, pendingImport.diskMetadata);
+                setPendingImport(null);
+            }}
+          />
       )}
 
       {isAboutModalOpen && <AboutModal onClose={() => setIsAboutModalOpen(false)} />}

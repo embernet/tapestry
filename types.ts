@@ -55,6 +55,7 @@ export interface D3Link extends d3.SimulationLinkDatum<D3Node> {
   target: string | D3Node;
   label: string;
   direction: RelationshipDirection;
+  tags: string[];
 }
 
 export interface ModelMetadata {
@@ -63,6 +64,8 @@ export interface ModelMetadata {
   description: string;
   createdAt: string;
   updatedAt: string;
+  filename?: string;
+  contentHash?: string; // Used to detect if content has changed
 }
 
 export interface PanelState {
