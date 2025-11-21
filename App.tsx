@@ -1,6 +1,7 @@
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion } from './types';
-import { DEFAULT_COLOR_SCHEMES, LINK_DISTANCE } from './constants';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig } from './types';
+import { DEFAULT_COLOR_SCHEMES, LINK_DISTANCE, DEFAULT_SYSTEM_PROMPT_CONFIG } from './constants';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
 import ElementDetailsPanel from './components/ElementDetailsPanel';
 import RelationshipDetailsPanel from './components/RelationshipDetailsPanel';
@@ -21,6 +22,7 @@ import CommandBar from './components/CommandBar';
 import MatrixPanel from './components/MatrixPanel';
 import TablePanel from './components/TablePanel';
 import RightPanelContainer from './components/RightPanelContainer';
+import PromptEditorModal from './components/PromptEditorModal';
 import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe } from './utils';
 import { GoogleGenAI, Type } from '@google/genai';
 
@@ -1054,6 +1056,7 @@ export default function App() {
   const [colorSchemes, setColorSchemes] = useState<ColorScheme[]>(DEFAULT_COLOR_SCHEMES);
   const [activeSchemeId, setActiveSchemeId] = useState<string | null>(DEFAULT_COLOR_SCHEMES[0]?.id || null);
   const [defaultTags, setDefaultTags] = useState<string[]>([]);
+  const [systemPromptConfig, setSystemPromptConfig] = useState<SystemPromptConfig>(DEFAULT_SYSTEM_PROMPT_CONFIG);
   
   // --- Layout Parameters State ---
   const [layoutParams, setLayoutParams] = useState({ linkDistance: 250, repulsion: -400 });
@@ -1134,6 +1137,7 @@ export default function App() {
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isPatternGalleryModalOpen, setIsPatternGalleryModalOpen] = useState(false);
+  const [isPromptEditorOpen, setIsPromptEditorOpen] = useState(false);
   const [pendingImport, setPendingImport] = useState<{ localMetadata: ModelMetadata, diskMetadata: ModelMetadata, localData: any, diskData: any } | null>(null);
   
   // SCAMPER State
@@ -1287,6 +1291,13 @@ export default function App() {
       setColorSchemes(loadedSchemes);
       setActiveSchemeId(data.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null);
       
+      // Load system prompts
+      if (data.systemPromptConfig) {
+          setSystemPromptConfig(data.systemPromptConfig);
+      } else {
+          setSystemPromptConfig(DEFAULT_SYSTEM_PROMPT_CONFIG);
+      }
+      
       setCurrentModelId(modelId);
       localStorage.setItem(LAST_OPENED_MODEL_ID_KEY, modelId);
       setIsOpenModelModalOpen(false);
@@ -1347,7 +1358,7 @@ export default function App() {
 
   useEffect(() => {
     if (currentModelId && !isInitialLoad) {
-      const modelData = { elements, relationships, colorSchemes, activeSchemeId };
+      const modelData = { elements, relationships, colorSchemes, activeSchemeId, systemPromptConfig };
       const currentContentHash = computeContentHash(modelData);
       
       const currentMeta = modelsIndex.find(m => m.id === currentModelId);
@@ -1365,7 +1376,7 @@ export default function App() {
           });
       }
     }
-  }, [elements, relationships, colorSchemes, activeSchemeId, currentModelId, isInitialLoad, modelsIndex]);
+  }, [elements, relationships, colorSchemes, activeSchemeId, currentModelId, isInitialLoad, modelsIndex, systemPromptConfig]);
 
   const handleCreateModel = useCallback((name: string, description: string) => {
     const now = new Date().toISOString();
@@ -1375,6 +1386,7 @@ export default function App() {
       relationships: [],
       colorSchemes: DEFAULT_COLOR_SCHEMES,
       activeSchemeId: DEFAULT_COLOR_SCHEMES[0]?.id || null,
+      systemPromptConfig: DEFAULT_SYSTEM_PROMPT_CONFIG,
     };
     const initialHash = computeContentHash(newModelData);
 
@@ -1783,6 +1795,7 @@ export default function App() {
         relationships,
         colorSchemes,
         activeSchemeId,
+        systemPromptConfig,
     };
     const currentHash = computeContentHash(modelData);
 
@@ -1853,7 +1866,7 @@ export default function App() {
         }
     }
     
-  }, [currentModelId, modelsIndex, elements, relationships, colorSchemes, activeSchemeId]);
+  }, [currentModelId, modelsIndex, elements, relationships, colorSchemes, activeSchemeId, systemPromptConfig]);
 
 
   const processImportedData = useCallback((text: string, filename?: string) => {
@@ -1947,6 +1960,7 @@ export default function App() {
                 relationships: dataToImport.relationships || [],
                 colorSchemes: dataToImport.colorSchemes || DEFAULT_COLOR_SCHEMES,
                 activeSchemeId: dataToImport.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null,
+                systemPromptConfig: dataToImport.systemPromptConfig || DEFAULT_SYSTEM_PROMPT_CONFIG,
             };
             
             loadModelData(newModelData, newModelId, newMetadata);
@@ -2026,6 +2040,9 @@ export default function App() {
           if (data.activeSchemeId) {
               setActiveSchemeId(data.activeSchemeId);
           }
+          if (data.systemPromptConfig) {
+              setSystemPromptConfig(data.systemPromptConfig);
+          }
           setIsJSONPanelOpen(false);
       } catch (e) {
           alert("Failed to apply JSON data: " + (e instanceof Error ? e.message : String(e)));
@@ -2035,7 +2052,7 @@ export default function App() {
   const handleNewModelClick = useCallback(async () => {
       if (currentModelId) {
           const currentMeta = modelsIndex.find(m => m.id === currentModelId);
-          const modelData = { elements, relationships, colorSchemes, activeSchemeId };
+          const modelData = { elements, relationships, colorSchemes, activeSchemeId, systemPromptConfig };
           const currentHash = computeContentHash(modelData);
           
           // Check if dirty: current state differs from last successful disk save state.
@@ -2050,7 +2067,7 @@ export default function App() {
           }
       }
       setIsCreateModelModalOpen(true);
-  }, [currentModelId, modelsIndex, elements, relationships, colorSchemes, activeSchemeId, handleDiskSave]);
+  }, [currentModelId, modelsIndex, elements, relationships, colorSchemes, activeSchemeId, systemPromptConfig, handleDiskSave]);
 
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const closeCanvasContextMenu = useCallback(() => setCanvasContextMenu(null), []);
@@ -2496,7 +2513,9 @@ export default function App() {
       const positionsMap = new Map(finalPositions.map((p: { id: string; x: number; y: number; }) => [p.id, p]));
       setElements(prev => prev.map(element => {
         const pos = positionsMap.get(element.id);
-        return pos ? { ...element, x: pos.x, y: pos.y, fx: pos.x, fy: pos.y } : element;
+        // Cast to tuple to fix type inference error
+        const posEntry = pos as { x: number; y: number } | undefined;
+        return posEntry ? { ...element, x: posEntry.x, y: posEntry.y, fx: posEntry.x, fy: posEntry.y } : element;
       }));
     }
     setIsPhysicsModeActive(false);
@@ -2806,7 +2825,7 @@ export default function App() {
             )}
             {isJSONPanelOpen && (
                 <JSONPanel
-                    initialData={{ elements, relationships, colorSchemes, activeSchemeId }}
+                    initialData={{ elements, relationships, colorSchemes, activeSchemeId, systemPromptConfig }}
                     onApply={handleApplyJSON}
                     onClose={() => setIsJSONPanelOpen(false)}
                     modelName={currentModelName}
@@ -2844,6 +2863,8 @@ export default function App() {
           onClose={() => setIsChatPanelOpen(false)}
           currentModelId={currentModelId}
           modelActions={aiActions}
+          onOpenPromptSettings={() => setIsPromptEditorOpen(true)}
+          systemPromptConfig={systemPromptConfig}
       />
       
       <ScamperModal
@@ -2859,6 +2880,17 @@ export default function App() {
         onRegenerate={() => handleScamperGenerate(currentScamperOperator?.name || '', currentScamperOperator?.letter || '')}
         onClose={() => setIsScamperModalOpen(false)}
       />
+
+      {isPromptEditorOpen && (
+          <PromptEditorModal
+            config={systemPromptConfig}
+            onClose={() => setIsPromptEditorOpen(false)}
+            onSave={(newConfig) => {
+                setSystemPromptConfig(newConfig);
+                setIsPromptEditorOpen(false);
+            }}
+          />
+      )}
 
       {currentModelId ? (
         <GraphCanvas

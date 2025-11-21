@@ -58,6 +58,11 @@ export interface D3Link extends d3.SimulationLinkDatum<D3Node> {
   tags: string[];
 }
 
+export interface SystemPromptConfig {
+  defaultPrompt: string;
+  userPrompt: string;
+}
+
 export interface ModelMetadata {
   id: string;
   name: string;
