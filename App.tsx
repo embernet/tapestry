@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig } from './types';
 import { DEFAULT_COLOR_SCHEMES, LINK_DISTANCE, DEFAULT_SYSTEM_PROMPT_CONFIG } from './constants';
@@ -2576,6 +2575,8 @@ export default function App() {
   const activeRelationshipLabels = useMemo(() => {
       return activeColorScheme?.relationshipDefinitions?.map(d => d.label) || [];
   }, [activeColorScheme]);
+  
+  const isRightPanelOpen = isReportPanelOpen || isMarkdownPanelOpen || isJSONPanelOpen || isMatrixPanelOpen || isTablePanelOpen;
 
 
   if (isInitialLoad && !isCreateModelModalOpen) {
@@ -2853,6 +2854,49 @@ export default function App() {
         </RightPanelContainer>
       )}
       
+      {/* Details Panel Floating Container */}
+      {currentModelId && ((panelState.view === 'addRelationship' && addRelationshipSourceElement) || selectedRelationship || selectedElement) && (
+        <div 
+            className="absolute top-20 bottom-4 z-30 transition-all duration-300 ease-in-out flex flex-col pointer-events-none"
+            style={{ right: isRightPanelOpen ? '632px' : '16px' }}
+        >
+            <div className="pointer-events-auto h-full">
+                {panelState.view === 'addRelationship' && addRelationshipSourceElement ? (
+                    <AddRelationshipPanel
+                    sourceElement={addRelationshipSourceElement}
+                    targetElementId={panelState.targetElementId}
+                    isNewTarget={panelState.isNewTarget}
+                    allElements={elements}
+                    onCreate={handleAddRelationship}
+                    onUpdateElement={handleUpdateElement}
+                    onCancel={handleCancelAddRelationship}
+                    suggestedLabels={activeRelationshipLabels}
+                    defaultLabel={activeColorScheme?.defaultRelationshipLabel}
+                    suggestedTags={Object.keys(activeColorScheme?.tagColors || {})}
+                    />
+                ) : selectedRelationship ? (
+                    <RelationshipDetailsPanel
+                        relationship={selectedRelationship}
+                        elements={elements}
+                        onUpdate={handleUpdateRelationship}
+                        onDelete={handleDeleteRelationship}
+                        suggestedLabels={activeRelationshipLabels}
+                    />
+                ) : selectedElement ? (
+                    <ElementDetailsPanel
+                        element={selectedElement}
+                        allElements={elements}
+                        relationships={relationships}
+                        onUpdate={handleUpdateElement}
+                        onDelete={handleDeleteElement}
+                        onClose={() => setSelectedElementId(null)}
+                        suggestedTags={Object.keys(activeColorScheme?.tagColors || {})}
+                    />
+                ) : null}
+            </div>
+        </div>
+      )}
+
       <ChatPanel
           className={(!isChatPanelOpen || !currentModelId) ? 'hidden' : ''}
           isOpen={isChatPanelOpen}
@@ -2984,41 +3028,6 @@ export default function App() {
              )}
         </div>
       )}
-      
-      <div className="flex-shrink-0 z-20">
-        {panelState.view === 'addRelationship' && addRelationshipSourceElement && currentModelId ? (
-            <AddRelationshipPanel
-            sourceElement={addRelationshipSourceElement}
-            targetElementId={panelState.targetElementId}
-            isNewTarget={panelState.isNewTarget}
-            allElements={elements}
-            onCreate={handleAddRelationship}
-            onUpdateElement={handleUpdateElement}
-            onCancel={handleCancelAddRelationship}
-            suggestedLabels={activeRelationshipLabels}
-            defaultLabel={activeColorScheme?.defaultRelationshipLabel}
-            suggestedTags={Object.keys(activeColorScheme?.tagColors || {})}
-            />
-        ) : selectedRelationship && currentModelId ? (
-            <RelationshipDetailsPanel
-                relationship={selectedRelationship}
-                elements={elements}
-                onUpdate={handleUpdateRelationship}
-                onDelete={handleDeleteRelationship}
-                suggestedLabels={activeRelationshipLabels}
-            />
-        ) : selectedElement && currentModelId ? (
-            <ElementDetailsPanel
-                element={selectedElement}
-                allElements={elements}
-                relationships={relationships}
-                onUpdate={handleUpdateElement}
-                onDelete={handleDeleteElement}
-                onClose={() => setSelectedElementId(null)}
-                suggestedTags={Object.keys(activeColorScheme?.tagColors || {})}
-            />
-        ) : null}
-      </div>
 
       {contextMenu && currentModelId && (
         <ContextMenu

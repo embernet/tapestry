@@ -67,7 +67,7 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
   }
 
   return (
-    <div className="bg-gray-800 border-l border-gray-700 h-full w-96 flex-shrink-0 z-20" onKeyDown={handleKeyDown}>
+    <div className="bg-gray-800 border border-gray-700 h-full w-96 rounded-lg shadow-2xl flex flex-col" onKeyDown={handleKeyDown}>
       <div className="p-6 flex flex-col h-full">
         <div className="flex-shrink-0 mb-6">
           <h2 className="text-2xl font-bold text-white">Relationship Details</h2>
