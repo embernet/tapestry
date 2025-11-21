@@ -29,7 +29,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSch
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isCreativeMode, setIsCreativeMode] = useState(false);
+  const [isCreativeMode, setIsCreativeMode] = useState(true);
   
   const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);

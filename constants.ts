@@ -11,12 +11,15 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
     id: 'scheme-useful-harmful',
     name: 'Useful Harmful',
     tagColors: {
+      'Context': '#6b7280',
       'Useful': '#22c55e',
       'Harmful': '#ef4444',
-      'Action': '#3b82f6',
       'Emotion': '#f97316',
-      'Context': '#6b7280',
+      'Action': '#3b82f6',
       'Trend': '#14b8a6', // teal-500
+      'Idea': '#efef10', 
+      'Knowledge': '#a855f7', // purple-500
+      'Topic': '#a855f7', // purple-500
     },
     relationshipDefinitions: [
       { label: 'Enables', description: 'allows another function to occur.' },
@@ -48,7 +51,7 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
       'Person': '#f97316',
       'Action': '#3b82f6',
       'Product': '#22c55e',
-      'Idea': '#eab308',
+      'Idea': '#efef10',
       'Topic': '#a855f7', // purple-500
       'Question': '#ec4899', // pink-500
       'Challenge': '#ef4444', // red-500

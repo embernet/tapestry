@@ -44,7 +44,7 @@ const CommandBar: React.FC<CommandBarProps> = ({ onExecute }) => {
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Element A -> Element B"
+                        placeholder="Element A -[relationship]> Element B; Element C"
                         className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none scrollbar-thin scrollbar-thumb-gray-600 flex-grow"
                         style={{ minHeight: '2.5rem' }}
                     />
