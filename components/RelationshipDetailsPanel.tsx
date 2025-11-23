@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Relationship, Element, RelationshipDirection } from '../types';
+import AttributesEditor from './AttributesEditor';
 
 interface RelationshipDetailsPanelProps {
   relationship: Relationship;
@@ -44,6 +45,14 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
     }
   };
 
+  const handleAttributesChange = (newAttributes: Record<string, string>) => {
+    const newData = { ...formData, attributes: newAttributes };
+    setFormData(newData);
+    if (relationship && formData.id) {
+        onUpdate(newData as Relationship);
+    }
+  };
+
   const handleBlur = () => {
     if (relationship && formData.id && JSON.stringify(formData) !== JSON.stringify(relationship)) {
       onUpdate(formData as Relationship);
@@ -67,8 +76,8 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
   }
 
   return (
-    <div className="bg-gray-800 border border-gray-700 h-full w-96 rounded-lg shadow-2xl flex flex-col" onKeyDown={handleKeyDown}>
-      <div className="p-6 flex flex-col h-full">
+    <div className="bg-gray-800 border border-gray-700 h-auto max-h-full w-96 rounded-lg shadow-2xl flex flex-col" onKeyDown={handleKeyDown}>
+      <div className="p-6 flex flex-col min-h-0">
         <div className="flex-shrink-0 mb-6">
           <h2 className="text-2xl font-bold text-white">Relationship Details</h2>
           <div className="flex items-center text-sm text-gray-400 mt-2 space-x-2">
@@ -131,10 +140,15 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
               <option value={RelationshipDirection.None}>None (—)</option>
             </select>
           </div>
+
+          <AttributesEditor 
+            attributes={formData.attributes || {}} 
+            onChange={handleAttributesChange} 
+          />
         </div>
         
-        <div className="flex-shrink-0 mt-auto pt-6 flex justify-between items-center">
-           <p className="text-xs text-gray-500">Changes are saved automatically.</p>
+        <div className="flex-shrink-0 mt-4 pt-4 border-t border-gray-700 flex justify-between items-center">
+           <p className="text-xs text-gray-500">Changes saved automatically.</p>
            <button
             onClick={handleDelete}
             className="text-sm text-red-400 hover:text-red-300 hover:bg-red-900 bg-opacity-50 px-3 py-1 rounded-md transition"

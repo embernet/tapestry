@@ -1,13 +1,26 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 
 interface CommandBarProps {
   onExecute: (markdown: string) => void;
+  isCollapsed?: boolean;
+  onToggle?: () => void;
 }
 
-const CommandBar: React.FC<CommandBarProps> = ({ onExecute }) => {
+const CommandBar: React.FC<CommandBarProps> = ({ onExecute, isCollapsed, onToggle }) => {
+  const [internalCollapsed, setInternalCollapsed] = useState(true);
   const [input, setInput] = useState('');
-  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Use prop if provided, else fallback to internal state
+  const collapsed = isCollapsed !== undefined ? isCollapsed : internalCollapsed;
+
+  const handleToggle = () => {
+      if (onToggle) {
+          onToggle();
+      } else {
+          setInternalCollapsed(!internalCollapsed);
+      }
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -24,17 +37,17 @@ const CommandBar: React.FC<CommandBarProps> = ({ onExecute }) => {
       <div className="flex items-stretch gap-0 bg-gray-800 bg-opacity-90 rounded-lg border border-gray-600 shadow-lg pointer-events-auto overflow-hidden">
         {/* Toggle Button */}
         <button 
-            onClick={() => setIsExpanded(!isExpanded)}
+            onClick={handleToggle}
             className="bg-gray-700 hover:bg-gray-600 border-r border-gray-600 w-20 flex flex-col items-center justify-center transition-colors h-20 flex-shrink-0 gap-1"
-            title={isExpanded ? "Collapse Command Bar" : "Open Command Bar"}
+            title={collapsed ? "Open Command Bar" : "Collapse Command Bar"}
         >
              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            {isExpanded ? null : <span className="text-[10px] text-gray-400 font-bold tracking-wider">CMD</span>}
+            {collapsed && <span className="text-[10px] text-gray-400 font-bold tracking-wider">CMD</span>}
         </button>
 
-        {isExpanded && (
+        {!collapsed && (
             <div className="flex items-center p-3 animate-fade-in bg-gray-800 h-20">
                 <div className="flex flex-col w-80 h-full justify-center">
                     <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">

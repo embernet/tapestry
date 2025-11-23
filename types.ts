@@ -15,6 +15,7 @@ export interface Relationship {
   label: string;
   direction: RelationshipDirection;
   tags: string[];
+  attributes?: Record<string, string>;
 }
 
 export interface Element {
@@ -22,12 +23,39 @@ export interface Element {
   name: string;
   notes: string;
   tags: string[];
+  attributes?: Record<string, string>;
   createdAt: string;
   updatedAt: string;
   x?: number;
   y?: number;
   fx?: number | null;
   fy?: number | null;
+}
+
+export interface TapestryDocument {
+  id: string;
+  title: string;
+  content: string;
+  folderId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TapestryFolder {
+  id: string;
+  name: string;
+  parentId: string | null; // For future nested folders
+  createdAt: string;
+}
+
+export interface HistoryEntry {
+  id: string;
+  tool: string;
+  subTool?: string;
+  toolParams?: any;
+  timestamp: string;
+  content: string;
+  summary?: string;
 }
 
 export interface RelationshipDefinition {
@@ -39,6 +67,7 @@ export interface ColorScheme {
   id: string;
   name: string;
   tagColors: { [tag: string]: string };
+  tagDescriptions?: { [tag: string]: string };
   relationshipDefinitions?: RelationshipDefinition[];
   relationshipLabels?: string[]; // Legacy support
   defaultRelationshipLabel?: string;
@@ -56,11 +85,19 @@ export interface D3Link extends d3.SimulationLinkDatum<D3Node> {
   label: string;
   direction: RelationshipDirection;
   tags: string[];
+  attributes?: Record<string, string>;
 }
 
 export interface SystemPromptConfig {
   defaultPrompt: string;
   userPrompt: string;
+  userContext?: string;
+  responseStyle?: string;
+  enabledTools?: string[];
+}
+
+export interface GlobalSettings {
+  toolsBarOpenByDefault: boolean;
 }
 
 export interface ModelMetadata {
@@ -89,11 +126,22 @@ export interface DateFilterState {
 }
 
 export interface ModelActions {
-  addElement: (data: { name: string; notes?: string; tags?: string[] }) => string;
-  updateElement: (name: string, data: { notes?: string; tags?: string[] }) => boolean;
+  addElement: (data: { name: string; notes?: string; tags?: string[]; attributes?: Record<string, string> }) => string;
+  updateElement: (name: string, data: Partial<Element>) => boolean;
   deleteElement: (name: string) => boolean;
   addRelationship: (sourceName: string, targetName: string, label: string, direction?: string) => boolean;
   deleteRelationship: (sourceName: string, targetName: string) => boolean;
+  setElementAttribute: (elementName: string, key: string, value: string) => boolean;
+  deleteElementAttribute: (elementName: string, key: string) => boolean;
+  setRelationshipAttribute: (sourceName: string, targetName: string, key: string, value: string) => boolean;
+  deleteRelationshipAttribute: (sourceName: string, targetName: string, key: string) => boolean;
+  
+  // Document Actions
+  readDocument: (title: string) => string | null;
+  createDocument: (title: string, content?: string) => string;
+  updateDocument: (title: string, content: string, mode: 'replace' | 'append') => boolean;
+  createFolder: (name: string, parentId?: string | null) => string;
+  moveDocument: (docId: string, folderId: string | null) => boolean;
 }
 
 export interface ScamperSuggestion {
@@ -103,3 +151,34 @@ export interface ScamperSuggestion {
   relationshipLabel: string;
   status: 'pending' | 'accepted' | 'rejected';
 }
+
+export interface PanelLayout {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  zIndex: number;
+  isFloating: boolean;
+}
+
+// --- New Feature Types ---
+
+export type SimulationNodeState = 'neutral' | 'increased' | 'decreased';
+
+export interface StorySlide {
+  id: string;
+  title: string;
+  description: string;
+  camera: { x: number; y: number; k: number };
+  selectedElementId: string | null;
+}
+
+// ---
+
+export type TrizToolType = 'contradiction' | 'principles' | 'ariz' | 'sufield' | 'trends' | null;
+export type LssToolType = 'dmaic' | '5whys' | 'fishbone' | 'fmea' | 'vsm' | null;
+export type TocToolType = 'crt' | 'ec' | 'frt' | 'tt' | null;
+export type SsmToolType = 'rich_picture' | 'catwoe' | 'activity_models' | 'comparison' | null;
+export type SwotToolType = 'matrix' | null;
+export type MiningToolType = 'dashboard' | null;
+export type TagCloudToolType = 'cloud' | null;

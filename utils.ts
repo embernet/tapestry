@@ -48,6 +48,14 @@ export const generateMarkdownFromGraph = (elements: Element[], relationships: Re
   const handledElementIds = new Set<string>();
   const lines: string[] = [];
 
+  const formatAttributes = (attributes?: Record<string, string>) => {
+    if (!attributes || Object.keys(attributes).length === 0) return '';
+    const attrStr = Object.entries(attributes)
+      .map(([k, v]) => `${k}="${v}"`)
+      .join(', ');
+    return ` {${attrStr}}`;
+  };
+
   const formatElement = (element: Element) => {
     // Quote name if it contains characters that could be ambiguous for the parser.
     const needsQuotes = /[():]/.test(element.name);
@@ -56,30 +64,54 @@ export const generateMarkdownFromGraph = (elements: Element[], relationships: Re
     if (element.tags && element.tags.length > 0) {
       str += `:${element.tags.join(',')}`;
     }
+    
+    str += formatAttributes(element.attributes);
     return str;
   };
 
   // Group relationships by source, label, and direction to handle one-to-many syntax
-  const relGroups = new Map<string, string[]>(); // key: `sourceId:label:direction`, value: formatted target strings
+  // Note: We do NOT group relationships that have custom attributes to ensure attributes are clearly associated with the specific link.
+  const relGroups = new Map<string, { target: Element, rel: Relationship }[]>(); 
+
   relationships.forEach(rel => {
       const source = elementMap.get(rel.source as string);
       const target = elementMap.get(rel.target as string);
       if (!source || !target) return;
 
+      // If relationship has attributes, print it on its own line immediately, don't group.
+      if (rel.attributes && Object.keys(rel.attributes).length > 0) {
+        const sourceStr = formatElement(source);
+        const targetStr = formatElement(target);
+        const attrs = formatAttributes(rel.attributes);
+        let connector = '';
+        switch (rel.direction) {
+            case RelationshipDirection.From: connector = ` <-[${rel.label}]- `; break;
+            case RelationshipDirection.None: connector = ` -[${rel.label}]- `; break;
+            default: connector = ` -[${rel.label}]-> `; break;
+        }
+        lines.push(`${sourceStr}${connector}${targetStr}${attrs}`);
+        handledElementIds.add(source.id);
+        handledElementIds.add(target.id);
+        return;
+      }
+
       const key = `${source.id}:${rel.label}:${rel.direction}`;
       if (!relGroups.has(key)) {
           relGroups.set(key, []);
       }
-      relGroups.get(key)!.push(formatElement(target));
+      relGroups.get(key)!.push({ target, rel });
 
       handledElementIds.add(source.id);
       handledElementIds.add(target.id);
   });
 
-  relGroups.forEach((targetStrs, key) => {
+  relGroups.forEach((targets, key) => {
       const [sourceId, label, direction] = key.split(':');
       const source = elementMap.get(sourceId)!;
       const sourceStr = formatElement(source);
+      
+      // Format targets
+      const targetStrs = targets.map(t => formatElement(t.target));
 
       let connector = '';
       switch (direction as RelationshipDirection) {
@@ -117,6 +149,12 @@ export const generateElementMarkdown = (
   const lines: string[] = [`## ${element.name}`];
   
   if (element.tags.length > 0) lines.push(`**Tags:** ${element.tags.join(', ')}`);
+  if (element.attributes && Object.keys(element.attributes).length > 0) {
+      lines.push("**Attributes:**");
+      Object.entries(element.attributes).forEach(([k, v]) => {
+          lines.push(`- ${k}: ${v}`);
+      });
+  }
   if (element.notes) lines.push(`**Notes:**\n${element.notes}`);
 
   const elementRels = relationships.filter(r => r.source === element.id || r.target === element.id);
@@ -133,7 +171,13 @@ export const generateElementMarkdown = (
         case RelationshipDirection.None: arrow = `---[${rel.label}]---`; break;
         default: arrow = `--[${rel.label}]-->`; break;
       }
-      lines.push(`- \`${sourceElement.name}\` ${arrow} \`${targetElement.name}\``);
+      
+      let relStr = `- \`${sourceElement.name}\` ${arrow} \`${targetElement.name}\``;
+      if (rel.attributes && Object.keys(rel.attributes).length > 0) {
+          const attrStr = Object.entries(rel.attributes).map(([k, v]) => `${k}=${v}`).join(', ');
+          relStr += ` *{${attrStr}}*`;
+      }
+      lines.push(relStr);
     });
   }
   

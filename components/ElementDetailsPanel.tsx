@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Element, Relationship } from '../types';
+import { Element, Relationship, ColorScheme } from '../types';
 import ElementEditor from './ElementEditor';
 import { generateElementMarkdown } from '../utils';
 
@@ -11,10 +10,14 @@ interface ElementDetailsPanelProps {
   onUpdate: (element: Element) => void;
   onDelete: (elementId: string) => void;
   onClose: () => void;
-  suggestedTags?: string[];
+  colorSchemes: ColorScheme[];
+  activeSchemeId: string | null;
 }
 
-const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, allElements, relationships, onUpdate, onDelete, onClose, suggestedTags = [] }) => {
+const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ 
+    element, allElements, relationships, onUpdate, onDelete, onClose, 
+    colorSchemes, activeSchemeId 
+}) => {
   const [formData, setFormData] = useState<Partial<Element>>({});
   const [isCopied, setIsCopied] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -64,7 +67,13 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, allE
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === 'Enter' || event.key === 'Escape') {
-      (event.target as HTMLElement).blur();
+      const target = event.target as HTMLElement;
+      // Avoid blurring if inside an input that handles its own Enter (like tag input)
+      // ElementEditor tag input stops propagation, so this likely only catches other inputs.
+      // However, generic blurring on Enter is useful for Name/Notes.
+      if (target.tagName.toLowerCase() !== 'textarea') {
+          target.blur();
+      }
     }
   };
   
@@ -77,8 +86,8 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, allE
   }
 
   return (
-    <div className="bg-gray-800 border border-gray-700 h-full w-96 rounded-lg shadow-2xl flex flex-col" onKeyDown={handleKeyDown}>
-      <div className="p-6 flex flex-col h-full">
+    <div className="bg-gray-800 border border-gray-700 h-auto max-h-full w-96 rounded-lg shadow-2xl flex flex-col" onKeyDown={handleKeyDown}>
+      <div className="p-6 flex flex-col min-h-0">
         <div className="flex-shrink-0 mb-6 flex justify-between items-start">
           <h2 className="text-2xl font-bold text-white">Element Details</h2>
           <div className="flex space-x-2">
@@ -115,7 +124,8 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, allE
             onDataChange={handleDataChange}
             onBlur={handleBlur}
             nameInputRef={nameInputRef}
-            suggestedTags={suggestedTags}
+            colorSchemes={colorSchemes}
+            activeSchemeId={activeSchemeId}
           />
           <div className="text-xs text-gray-500 pt-4 space-y-1 mt-4">
               <p>Created: {formatDate(element.createdAt)}</p>
@@ -123,8 +133,8 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ element, allE
           </div>
         </div>
         
-        <div className="flex-shrink-0 mt-auto pt-6 flex justify-between items-center">
-          <p className="text-xs text-gray-500">Changes are saved automatically.</p>
+        <div className="flex-shrink-0 mt-4 pt-4 border-t border-gray-700 flex justify-between items-center">
+          <p className="text-xs text-gray-500">Changes saved automatically.</p>
           <button
             onClick={handleDelete}
             className="text-sm text-red-400 hover:text-red-300 hover:bg-red-900 bg-opacity-50 px-3 py-1 rounded-md transition"

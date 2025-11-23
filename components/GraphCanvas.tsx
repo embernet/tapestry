@@ -1,6 +1,7 @@
+
 import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
 import * as d3 from 'd3';
-import { Element, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection } from '../types';
+import { Element, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection, SimulationNodeState } from '../types';
 import { LINK_DISTANCE, NODE_MAX_WIDTH, NODE_PADDING, DEFAULT_NODE_COLOR } from '../constants';
 
 interface GraphCanvasProps {
@@ -23,11 +24,14 @@ interface GraphCanvasProps {
   layoutParams: { linkDistance: number; repulsion: number };
   onJiggleTrigger?: number;
   isBulkEditActive: boolean;
+  simulationState?: Record<string, SimulationNodeState>;
 }
 
 export interface GraphCanvasRef {
   getFinalNodePositions: () => { id: string; x: number; y: number }[];
   zoomToFit: () => void;
+  getCamera: () => { x: number; y: number; k: number };
+  setCamera: (x: number, y: number, k: number) => void;
 }
 
 /**
@@ -236,7 +240,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   isPhysicsModeActive,
   layoutParams,
   onJiggleTrigger,
-  isBulkEditActive
+  isBulkEditActive,
+  simulationState
 }, ref) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
@@ -273,7 +278,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
 
     if (boundsWidth <= 0 || boundsHeight <= 0) return;
 
-    const padding = 0.9;
+    // Increased padding from 0.9 to 0.8 to provide more space around the model
+    const padding = 0.8;
     let scale = padding * Math.min(width / boundsWidth, height / boundsHeight);
     
     if (limitMaxZoom && scale > 1) {
@@ -304,6 +310,15 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       return [];
     },
     zoomToFit: (nodes?: any, limit?: boolean) => internalZoomToFit(nodes, limit),
+    getCamera: () => {
+        const transform = d3.zoomTransform(svgRef.current!);
+        return { x: transform.x, y: transform.y, k: transform.k };
+    },
+    setCamera: (x: number, y: number, k: number) => {
+        if (!svgRef.current || !zoomRef.current) return;
+        const svg = d3.select(svgRef.current);
+        svg.transition().duration(750).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(x, y).scale(k));
+    }
   }));
 
   const highlightedNodeIds = useMemo(() => {
@@ -338,13 +353,17 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   useEffect(() => {
       if (simulationRef.current && isPhysicsModeActive) {
           const sim = simulationRef.current;
-          sim.force('link', d3.forceLink<D3Node, D3Link>([]).id(d => d.id).distance(layoutParams.linkDistance));
-          sim.force('charge', d3.forceManyBody().strength(layoutParams.repulsion));
           
-          // Re-initialize links to apply new distance
-          const simGetter = sim as any;
-          const links = simGetter.force('link').links();
-          sim.force('link', d3.forceLink<D3Node, D3Link>(links).id(d => d.id).distance(layoutParams.linkDistance));
+          // Update existing forces rather than replacing them to maintain state
+          const linkForce = sim.force('link') as d3.ForceLink<D3Node, D3Link>;
+          if (linkForce) {
+              linkForce.distance(layoutParams.linkDistance);
+          }
+
+          const chargeForce = sim.force('charge') as d3.ForceManyBody<D3Node>;
+          if (chargeForce) {
+              chargeForce.strength(layoutParams.repulsion);
+          }
 
           sim.alpha(0.3).restart();
       }
@@ -496,9 +515,24 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
             }
             return DEFAULT_NODE_COLOR;
         })
-        .attr('stroke', d => (d.id === selectedElementId ? '#60a5fa' : '#cbd5e1'))
-        .style('transition', 'stroke 0.2s ease, stroke-width 0.2s ease')
-        .attr('stroke-width', d => (d.id === selectedElementId ? 3 : 1.5))
+        .attr('stroke', d => {
+            if (simulationState && simulationState[d.id]) {
+                const state = simulationState[d.id];
+                if (state === 'increased') return '#22c55e'; // Green
+                if (state === 'decreased') return '#ef4444'; // Red
+            }
+            return (d.id === selectedElementId ? '#60a5fa' : '#cbd5e1');
+        })
+        .style('transition', 'stroke 0.2s ease, stroke-width 0.2s ease, filter 0.2s ease')
+        .attr('stroke-width', d => {
+            if (simulationState && simulationState[d.id] !== 'neutral') return 4;
+            return (d.id === selectedElementId ? 3 : 1.5);
+        })
+        .attr('filter', d => {
+            if (simulationState && simulationState[d.id] === 'increased') return 'url(#glow-green)';
+            if (simulationState && simulationState[d.id] === 'decreased') return 'url(#glow-red)';
+            return null;
+        })
         .attr('rx', 8).attr('ry', 8);
 
     node.append('foreignObject')
@@ -563,6 +597,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     if (isBulkEditActive) {
         cursorStyle = bulkCursor;
         moveZoneCursor = bulkCursor;
+    } else if (simulationState) {
+        cursorStyle = 'pointer'; // Click to stimulate
+        moveZoneCursor = 'pointer';
     } else if (isPhysicsModeActive) {
         cursorStyle = 'grab';
     } else {
@@ -632,7 +669,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         }
       });
 
-  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive]);
+  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState]);
 
   return (
     <div className="w-full h-full flex-grow bg-gray-900 cursor-grab active:cursor-grabbing" onContextMenu={handleCanvasContextMenu}>
@@ -658,6 +695,22 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
             orient="auto">
             <path d="M10,-5L0,0L10,5" fill="#6b7280"></path>
           </marker>
+          <filter id="glow-green" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+            <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#22c55e" floodOpacity="0.8" />
+          </filter>
+          <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+            <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#ef4444" floodOpacity="0.8" />
+          </filter>
         </defs>
         <g ref={gRef}></g>
       </svg>

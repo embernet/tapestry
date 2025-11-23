@@ -1,13 +1,16 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Element, Relationship, RelationshipDirection } from '../types';
+import { Element, Relationship, RelationshipDirection, TapestryDocument, TapestryFolder } from '../types';
 import { generateElementMarkdown } from '../utils';
 
 interface ReportPanelProps {
   elements: Element[];
   relationships: Relationship[];
+  documents?: TapestryDocument[];
+  folders?: TapestryFolder[];
   onClose: () => void;
   onNodeClick: (elementId: string) => void;
+  onOpenDocument?: (docId: string) => void;
 }
 
 // Sub-component for a clickable element link
@@ -82,6 +85,41 @@ const ElementReportSection: React.FC<{
   );
 };
 
+// Documents Section
+const DocumentsSection: React.FC<{ 
+    documents: TapestryDocument[], 
+    folders: TapestryFolder[], 
+    onOpenDocument: (id: string) => void 
+}> = ({ documents, folders, onOpenDocument }) => {
+    if (!documents || documents.length === 0) return null;
+
+    return (
+        <div className="py-6 border-t border-gray-600">
+            <h2 className="text-xl font-bold text-white mb-3">Documents</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                {documents.map(doc => {
+                    const folder = doc.folderId ? folders.find(f => f.id === doc.folderId) : null;
+                    return (
+                        <div 
+                            key={doc.id} 
+                            onClick={() => onOpenDocument(doc.id)}
+                            className="bg-gray-700 hover:bg-gray-600 p-2 rounded cursor-pointer flex items-center gap-2 transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                            </svg>
+                            <div>
+                                <span className="text-blue-300 font-semibold">{doc.title}</span>
+                                {folder && <span className="text-gray-400 text-xs ml-2">in {folder.name}</span>}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 // Main WYSIWYG view component
 const WysiwigReport: React.FC<{
   elements: Element[];
@@ -91,7 +129,10 @@ const WysiwigReport: React.FC<{
   tagStats: Map<string, number>;
   onNodeClick: (elementId: string) => void;
   elementRelCounts: Map<string, number>;
-}> = ({ elements, relationships, elementMap, relStats, tagStats, onNodeClick, elementRelCounts }) => {
+  documents?: TapestryDocument[];
+  folders?: TapestryFolder[];
+  onOpenDocument?: (id: string) => void;
+}> = ({ elements, relationships, elementMap, relStats, tagStats, onNodeClick, elementRelCounts, documents, folders, onOpenDocument }) => {
   if (elements.length === 0) {
     return <p className="text-gray-500 p-4">No elements to display based on the current filter.</p>;
   }
@@ -115,8 +156,13 @@ const WysiwigReport: React.FC<{
         </ul>
       </div>
 
+      {/* Documents */}
+      {documents && documents.length > 0 && onOpenDocument && folders && (
+          <DocumentsSection documents={documents} folders={folders} onOpenDocument={onOpenDocument} />
+      )}
+
       {/* Details */}
-      <div className="divide-y divide-gray-700">
+      <div className="divide-y divide-gray-700 border-t border-gray-600 mt-4">
         {elements.map(element => {
           const elementRels = relationships.filter(r => r.source === element.id || r.target === element.id);
           return <ElementReportSection key={element.id} element={element} elementRels={elementRels} elementMap={elementMap} onNodeClick={onNodeClick} />;
@@ -197,7 +243,7 @@ const generateMarkdownReport = (
 };
 
 
-export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationships, onClose, onNodeClick }) => {
+export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationships, onClose, onNodeClick, documents, folders, onOpenDocument }) => {
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<'wysiwig' | 'markdown'>('wysiwig');
 
@@ -418,6 +464,9 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationship
             tagStats={tagStats}
             onNodeClick={onNodeClick}
             elementRelCounts={elementRelCounts}
+            documents={documents}
+            folders={folders}
+            onOpenDocument={onOpenDocument}
           />
         ) : (
           <textarea

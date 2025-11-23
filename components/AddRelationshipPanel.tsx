@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Element, Relationship, RelationshipDirection } from '../types';
+import { Element, Relationship, RelationshipDirection, ColorScheme } from '../types';
 import ElementEditor from './ElementEditor';
 
 // Define a type for the data needed to create a new element.
@@ -16,7 +15,8 @@ interface AddRelationshipPanelProps {
   isNewTarget?: boolean;
   suggestedLabels?: string[];
   defaultLabel?: string;
-  suggestedTags?: string[];
+  colorSchemes: ColorScheme[];
+  activeSchemeId: string | null;
 }
 
 const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
@@ -29,7 +29,8 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   isNewTarget,
   suggestedLabels = [],
   defaultLabel = '',
-  suggestedTags = [],
+  colorSchemes,
+  activeSchemeId,
 }) => {
   const [selectedTargetId, setSelectedTargetId] = useState<string>(targetElementId || 'NEW_ELEMENT');
   const [elementEditorData, setElementEditorData] = useState<Partial<Element>>({
@@ -46,11 +47,6 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   const targetElement = useMemo(() => allElements.find(f => f.id === targetElementId), [allElements, targetElementId]);
 
   useEffect(() => {
-    // Focus logic:
-    // 1. If creating a NEW target (dragged to empty space), focus the new element name.
-    // 2. If dragging to an EXISTING target, focus the label input.
-    // 3. If manually changing dropdown to 'NEW_ELEMENT', focus the new element name.
-    
     const focusTimeout = setTimeout(() => {
         if (isNewTarget || selectedTargetId === 'NEW_ELEMENT') {
              newElementNameInputRef.current?.focus();
@@ -67,8 +63,6 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
     if (isNewTarget && targetElement) {
         setElementEditorData(targetElement);
     } else if (selectedTargetId === 'NEW_ELEMENT' && !isNewTarget) {
-        // Reset editor data only if switching to new element mode manually, 
-        // not if we are already in "new target" mode from a drag.
         setElementEditorData(prev => ({ ...prev, name: '', notes: '', tags: [] }));
     }
   }, [targetElementId, isNewTarget, targetElement, selectedTargetId]);
@@ -84,7 +78,6 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
             alert("Please provide a name for the new element.");
             return;
         }
-        // Update the newly created element, then create the relationship to it
         onUpdateElement(elementEditorData as Element);
         onCreate({ source: sourceElement.id, target: targetElementId, label: label.trim(), direction });
     } else if (selectedTargetId === 'NEW_ELEMENT') {
@@ -112,103 +105,118 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   const showElementEditor = isNewTarget || selectedTargetId === 'NEW_ELEMENT';
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    // Pressing Enter in any field (except textarea) should submit the form.
     if (event.key === 'Enter' && (event.target as HTMLElement).tagName.toLowerCase() !== 'textarea') {
       event.preventDefault();
       handleSubmit();
     }
-    // Pressing Escape should cancel.
     if (event.key === 'Escape') {
       onCancel();
     }
   };
+  
+  const handleLabelSelect = (l: string) => {
+      setLabel(l);
+  };
 
   return (
-    <div className="bg-gray-800 border border-gray-700 h-full w-96 rounded-lg shadow-2xl flex flex-col" onKeyDown={handleKeyDown}>
-      <div className="p-6 flex flex-col h-full">
-        <div className="flex-shrink-0 mb-6">
-          <h2 className="text-2xl font-bold text-white">Add Relationship</h2>
-          <p className="text-gray-400 mt-1">From: <span className="font-semibold text-blue-400">{sourceElement.name}</span></p>
-        </div>
+    <div className="bg-gray-800 border border-gray-700 h-auto max-h-full w-96 rounded-lg shadow-2xl flex flex-col" onKeyDown={handleKeyDown}>
+      <div className="p-6 flex flex-col min-h-0">
+        <h2 className="text-2xl font-bold text-white mb-6 flex-shrink-0">Add Relationship</h2>
 
-        <div className="flex-grow space-y-4 text-gray-300 overflow-y-auto pr-2">
-          {/* Relationship Fields */}
+        <div className="flex-grow space-y-4 overflow-y-auto pr-2">
           <div>
-            <label className="block text-sm font-medium">Label</label>
+            <label className="block text-sm font-medium text-gray-400">Source Element</label>
+            <div className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-gray-300 cursor-not-allowed">
+              {sourceElement.name}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-400">Target Element</label>
+            {isNewTarget ? (
+               <div className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white font-semibold">
+                 New Element (Creating...)
+               </div>
+            ) : (
+                <select
+                value={selectedTargetId}
+                onChange={(e) => setSelectedTargetId(e.target.value)}
+                className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                <option value="NEW_ELEMENT">+ Create New Element</option>
+                {availableTargets.map(element => (
+                    <option key={element.id} value={element.id}>{element.name}</option>
+                ))}
+                </select>
+            )}
+          </div>
+
+          {showElementEditor && (
+             <div className="border-l-2 border-blue-500 pl-4 mt-2">
+                 <h3 className="text-sm font-bold text-blue-400 mb-2">New Element Details</h3>
+                 <ElementEditor 
+                    elementData={elementEditorData} 
+                    onDataChange={handleElementEditorChange}
+                    nameInputRef={newElementNameInputRef}
+                    colorSchemes={colorSchemes}
+                    activeSchemeId={activeSchemeId}
+                 />
+             </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-400">Relationship Label</label>
             <input
               ref={labelInputRef}
-              list="relationship-labels"
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              placeholder="e.g., works at, is related to"
+              placeholder="e.g., causes, depends on"
               className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
-            <datalist id="relationship-labels">
-                {suggestedLabels.map(l => <option key={l} value={l} />)}
-            </datalist>
+            {suggestedLabels.length > 0 && (
+                <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">Schema Relationships:</p>
+                    <div className="flex flex-wrap gap-1">
+                        {suggestedLabels.map(l => {
+                            const isSelected = label === l;
+                            return (
+                                <button
+                                    key={l}
+                                    type="button"
+                                    onClick={() => handleLabelSelect(l)}
+                                    className={`text-xs px-2 py-1 rounded-full border transition-colors ${
+                                        isSelected 
+                                        ? 'bg-blue-600 border-blue-500 text-white' 
+                                        : 'bg-gray-800 border-gray-600 text-gray-400 hover:bg-gray-700'
+                                    }`}
+                                >
+                                    {l}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
           </div>
-          <div>
-            <label className="block text-sm font-medium">Direction</label>
+          
+           <div>
+            <label className="block text-sm font-medium text-gray-400">Direction</label>
             <select
               value={direction}
               onChange={(e) => setDirection(e.target.value as RelationshipDirection)}
               className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value={RelationshipDirection.To}>{sourceElement.name} → Target</option>
-              <option value={RelationshipDirection.From}>Target → {sourceElement.name}</option>
-              <option value={RelationshipDirection.None}>{sourceElement.name} — Target</option>
+              <option value={RelationshipDirection.To}>Forward (→)</option>
+              <option value={RelationshipDirection.From}>Reverse (←)</option>
+              <option value={RelationshipDirection.None}>None (—)</option>
             </select>
           </div>
-          
-          {isNewTarget ? (
-             <div>
-                <label className="block text-sm font-medium">Target</label>
-                <p className="mt-1 p-2 bg-gray-700 rounded-md font-semibold italic text-gray-400">New Element</p>
-             </div>
-          ) : (
-             <div>
-              <label className="block text-sm font-medium">Target</label>
-              <select
-                value={selectedTargetId}
-                onChange={(e) => setSelectedTargetId(e.target.value)}
-                className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="NEW_ELEMENT">-- Create New Element --</option>
-                {availableTargets.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
-            </div>
-          )}
-          
-          {/* New Element Fields (using ElementEditor) */}
-          {showElementEditor && (
-            <div className="pt-4 mt-4 border-t border-gray-700">
-              <h3 className="text-lg font-semibold text-white mb-4">
-                {isNewTarget ? `Edit New Element` : `New Element Details`}
-              </h3>
-              <ElementEditor
-                elementData={elementEditorData}
-                onDataChange={handleElementEditorChange}
-                nameInputRef={newElementNameInputRef}
-                suggestedTags={suggestedTags}
-              />
-            </div>
-          )}
         </div>
-        
-        <div className="flex-shrink-0 mt-auto pt-6 flex justify-end items-center space-x-4">
-          <button
-            onClick={onCancel}
-            className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150"
-          >
-            Create
-          </button>
+
+        <div className="mt-8 flex justify-end space-x-4 pt-4 border-t border-gray-700 flex-shrink-0">
+          <button onClick={onCancel} className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Cancel</button>
+          <button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Add Relationship</button>
         </div>
       </div>
     </div>

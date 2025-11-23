@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { Element, Relationship } from '../types';
 
@@ -7,9 +8,12 @@ interface AnalysisToolbarProps {
   onBulkTag: (elementIds: string[], tag: string, mode: 'add' | 'remove') => void;
   isCollapsed: boolean;
   onToggle: () => void;
+  isSimulationMode: boolean;
+  onToggleSimulation: () => void;
+  onResetSimulation: () => void;
 }
 
-const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationships, onBulkTag, isCollapsed, onToggle }) => {
+const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationships, onBulkTag, isCollapsed, onToggle, isSimulationMode, onToggleSimulation, onResetSimulation }) => {
   const [isShiftPressed, setIsShiftPressed] = useState(false);
 
   useEffect(() => {
@@ -182,8 +186,41 @@ const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationshi
                         </div>
                     </div>
 
+                    {/* Simulation Section (NEW) */}
+                    <div className="flex flex-col justify-center h-full px-2 border-r border-gray-600 pr-4">
+                        <span className="text-[10px] font-bold uppercase tracking-wider mb-2 text-blue-400">
+                            SIMULATION
+                        </span>
+                        <div className="flex gap-2 items-center">
+                            <button 
+                                onClick={onToggleSimulation}
+                                className={`text-xs px-3 py-1.5 rounded border transition-colors flex items-center gap-2 font-bold ${isSimulationMode ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-700 border-gray-600 text-gray-300 hover:text-white'}`}
+                                title="Toggle Impact Simulation Mode"
+                            >
+                                {isSimulationMode ? (
+                                    <>
+                                        <span className="animate-pulse">●</span> Active
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>▶</span> Play
+                                    </>
+                                )}
+                            </button>
+                            {isSimulationMode && (
+                                <button 
+                                    onClick={onResetSimulation}
+                                    className="bg-gray-700 hover:bg-gray-600 text-xs px-2 py-1.5 rounded border border-gray-600 transition-colors text-gray-300 hover:text-white"
+                                    title="Reset Simulation"
+                                >
+                                    Reset
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Actions Section */}
-                    <div className="flex flex-col justify-center h-full">
+                    <div className="flex flex-col justify-center h-full pl-2">
                         <span className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${isShiftPressed ? 'text-red-400' : 'text-gray-400'}`}>
                             ANALYSIS ACTIONS - {isShiftPressed ? 'UNTAG' : 'TAG'}
                         </span>

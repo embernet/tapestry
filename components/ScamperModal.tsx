@@ -14,6 +14,7 @@ interface ScamperModalProps {
   onRejectAll: () => void;
   onRegenerate: () => void;
   onClose: () => void;
+  onLogHistory: (tool: string, content: string, summary?: string, subTool?: string, toolParams?: any) => void;
 }
 
 const ScamperModal: React.FC<ScamperModalProps> = ({
