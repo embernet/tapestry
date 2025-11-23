@@ -12,7 +12,11 @@ interface TablePanelProps {
   onAddRelationship: (relationship: Omit<Relationship, 'id' | 'tags'>) => void;
   onDeleteRelationship: (relationshipId: string) => void;
   onClose: () => void;
+  onNodeClick?: (id: string) => void;
+  selectedElementId?: string | null;
 }
+
+type SortKey = 'name' | 'tags' | 'notes' | 'relations';
 
 const TablePanel: React.FC<TablePanelProps> = ({
   elements,
@@ -22,11 +26,21 @@ const TablePanel: React.FC<TablePanelProps> = ({
   onAddElement,
   onAddRelationship,
   onDeleteRelationship,
-  onClose
+  onClose,
+  onNodeClick,
+  selectedElementId
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [newElementName, setNewElementName] = useState('');
   const [activeRelModalElementId, setActiveRelModalElementId] = useState<string | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig(current => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
 
   const sortedElements = useMemo(() => {
     let filtered = elements;
@@ -37,8 +51,27 @@ const TablePanel: React.FC<TablePanelProps> = ({
             e.tags.some(t => t.toLowerCase().includes(lower))
         );
     }
-    return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
-  }, [elements, searchTerm]);
+    
+    return [...filtered].sort((a, b) => {
+        let valA: any;
+        let valB: any;
+
+        if (sortConfig.key === 'tags') {
+            valA = a.tags.join(', ').toLowerCase();
+            valB = b.tags.join(', ').toLowerCase();
+        } else if (sortConfig.key === 'relations') {
+            valA = relationships.filter(r => r.source === a.id || r.target === a.id).length;
+            valB = relationships.filter(r => r.source === b.id || r.target === b.id).length;
+        } else if (sortConfig.key === 'name' || sortConfig.key === 'notes') {
+             valA = (a[sortConfig.key] || '').toLowerCase();
+             valB = (b[sortConfig.key] || '').toLowerCase();
+        }
+
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+  }, [elements, searchTerm, sortConfig, relationships]);
 
   const handleNameChange = (id: string, newName: string) => {
     const element = elements.find(e => e.id === id);
@@ -67,6 +100,11 @@ const TablePanel: React.FC<TablePanelProps> = ({
           onAddElement(newElementName.trim());
           setNewElementName('');
       }
+  };
+
+  const renderSortIcon = (key: SortKey) => {
+      if (sortConfig.key !== key) return <span className="ml-1 text-gray-600">⇅</span>;
+      return sortConfig.direction === 'asc' ? <span className="ml-1 text-blue-400">↑</span> : <span className="ml-1 text-blue-400">↓</span>;
   };
 
   return (
@@ -103,25 +141,39 @@ const TablePanel: React.FC<TablePanelProps> = ({
 
       <div className="flex-grow overflow-auto p-4">
           <table className="w-full text-left border-collapse">
-              <thead className="text-xs text-gray-400 uppercase bg-gray-700 sticky top-0 z-10 shadow-sm">
+              <thead className="text-xs text-gray-400 uppercase bg-gray-700 sticky top-0 z-10 shadow-sm select-none">
                   <tr>
-                      <th className="px-4 py-3 rounded-tl-lg w-1/4">Name</th>
-                      <th className="px-4 py-3 w-1/5">Tags</th>
-                      <th className="px-4 py-3 w-1/3">Notes</th>
-                      <th className="px-4 py-3 text-center w-24">Relations</th>
+                      <th className="px-4 py-3 rounded-tl-lg w-1/4 cursor-pointer hover:bg-gray-600 transition-colors" onClick={() => handleSort('name')}>
+                          Name {renderSortIcon('name')}
+                      </th>
+                      <th className="px-4 py-3 w-1/5 cursor-pointer hover:bg-gray-600 transition-colors" onClick={() => handleSort('tags')}>
+                          Tags {renderSortIcon('tags')}
+                      </th>
+                      <th className="px-4 py-3 w-1/3 cursor-pointer hover:bg-gray-600 transition-colors" onClick={() => handleSort('notes')}>
+                          Notes {renderSortIcon('notes')}
+                      </th>
+                      <th className="px-4 py-3 text-center w-24 cursor-pointer hover:bg-gray-600 transition-colors" onClick={() => handleSort('relations')}>
+                          Relations {renderSortIcon('relations')}
+                      </th>
                       <th className="px-4 py-3 text-center rounded-tr-lg w-16">Action</th>
                   </tr>
               </thead>
               <tbody className="divide-y divide-gray-700 text-sm">
                   {sortedElements.map(el => {
                       const relCount = relationships.filter(r => r.source === el.id || r.target === el.id).length;
+                      const isSelected = selectedElementId === el.id;
                       return (
-                        <tr key={el.id} className="hover:bg-gray-750 transition-colors group">
+                        <tr 
+                            key={el.id} 
+                            onClick={() => onNodeClick && onNodeClick(el.id)}
+                            className={`hover:bg-gray-700 transition-colors group cursor-pointer ${isSelected ? 'bg-blue-900/30' : ''}`}
+                        >
                             <td className="px-2 py-2 align-top">
                                 <input 
                                     type="text" 
                                     defaultValue={el.name}
                                     onBlur={(e) => handleNameChange(el.id, e.target.value)}
+                                    onClick={(e) => e.stopPropagation()} // Prevent triggering row click when focusing input
                                     className="w-full bg-transparent border border-transparent hover:border-gray-600 focus:border-blue-500 rounded px-2 py-1 text-white focus:outline-none font-semibold"
                                 />
                             </td>
@@ -130,6 +182,7 @@ const TablePanel: React.FC<TablePanelProps> = ({
                                     type="text" 
                                     defaultValue={el.tags.join(', ')}
                                     onBlur={(e) => handleTagsChange(el.id, e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
                                     placeholder="tag1, tag2"
                                     className="w-full bg-transparent border border-transparent hover:border-gray-600 focus:border-blue-500 rounded px-2 py-1 text-gray-300 focus:outline-none text-xs"
                                 />
@@ -138,6 +191,7 @@ const TablePanel: React.FC<TablePanelProps> = ({
                                 <textarea 
                                     defaultValue={el.notes}
                                     onBlur={(e) => handleNotesChange(el.id, e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
                                     rows={1}
                                     className="w-full bg-transparent border border-transparent hover:border-gray-600 focus:border-blue-500 rounded px-2 py-1 text-gray-400 focus:outline-none text-xs resize-none focus:h-20 transition-all overflow-hidden focus:overflow-auto"
                                     placeholder="Add notes..."
@@ -146,7 +200,7 @@ const TablePanel: React.FC<TablePanelProps> = ({
                             </td>
                             <td className="px-2 py-2 align-top text-center">
                                 <button 
-                                    onClick={() => setActiveRelModalElementId(el.id)}
+                                    onClick={(e) => { e.stopPropagation(); setActiveRelModalElementId(el.id); }}
                                     className="bg-gray-700 hover:bg-blue-600 text-gray-300 hover:text-white px-2 py-1 rounded text-xs transition-colors min-w-[2rem]"
                                 >
                                     {relCount}
@@ -154,7 +208,7 @@ const TablePanel: React.FC<TablePanelProps> = ({
                             </td>
                             <td className="px-2 py-2 align-top text-center">
                                 <button 
-                                    onClick={() => onDeleteElement(el.id)}
+                                    onClick={(e) => { e.stopPropagation(); onDeleteElement(el.id); }}
                                     className="text-gray-600 hover:text-red-400 p-1 rounded transition opacity-0 group-hover:opacity-100"
                                     title="Delete Element"
                                 >

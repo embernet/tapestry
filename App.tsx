@@ -44,7 +44,7 @@ import HistoryItemPanel from './components/HistoryItemPanel';
 import { DocumentManagerPanel, DocumentEditorPanel } from './components/DocumentPanel';
 import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe } from './utils';
 import { GoogleGenAI, Type } from '@google/genai';
-import { TextAnimator, ConflictResolutionModal, ContextMenu, CanvasContextMenu, CreateModelModal, OpenModelModal, HelpMenu, PatternGalleryModal, AboutModal, TAPESTRY_PATTERNS, TapestryBanner, SchemaUpdateModal } from './components/ModalComponents';
+import { TextAnimator, ConflictResolutionModal, ContextMenu, CanvasContextMenu, CreateModelModal, SaveAsModal, OpenModelModal, HelpMenu, PatternGalleryModal, AboutModal, TAPESTRY_PATTERNS, TapestryBanner, SchemaUpdateModal } from './components/ModalComponents';
 
 // Explicitly define coordinate type to fix type inference issues
 type Coords = { x: number; y: number };
@@ -383,6 +383,7 @@ export default function App() {
   const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number, y: number } | null>(null);
   const [panelState, setPanelState] = useState<PanelState>({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
   const [isCreateModelModalOpen, setIsCreateModelModalOpen] = useState(false);
+  const [isSaveAsModalOpen, setIsSaveAsModalOpen] = useState(false);
   const [isOpenModelModalOpen, setIsOpenModelModalOpen] = useState(false);
   const [isMarkdownPanelOpen, setIsMarkdownPanelOpen] = useState(false);
   const [isJSONPanelOpen, setIsJSONPanelOpen] = useState(false);
@@ -801,6 +802,54 @@ export default function App() {
     } catch (err: any) { if (err.name !== 'AbortError') { console.error("Save failed:", err); alert("Failed to save file. You can try using the 'Export' feature in JSON view as a backup."); } }
   }, [currentModelId, modelsIndex, elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides]);
 
+  const handleSaveAs = useCallback((name: string, description: string) => {
+    if (!currentModelId) return;
+    
+    const now = new Date().toISOString();
+    const newId = generateUUID();
+    
+    // Prepare Data (Clone current state)
+    const modelData = { 
+        elements, relationships, documents, folders, 
+        colorSchemes, activeSchemeId, systemPromptConfig, 
+        history, slides 
+    };
+    const currentHash = computeContentHash(modelData);
+    
+    // Prepare Metadata
+    const newMetadata: ModelMetadata = {
+        id: newId,
+        name,
+        description,
+        createdAt: now,
+        updatedAt: now,
+        filename: `${name.replace(/ /g, '_')}.json`,
+        contentHash: currentHash
+    };
+
+    // Storage Operations
+    try {
+        localStorage.setItem(`${MODEL_DATA_PREFIX}${newId}`, JSON.stringify(modelData));
+        
+        setModelsIndex(prev => {
+            const newIndex = [...prev, newMetadata];
+            localStorage.setItem(MODELS_INDEX_KEY, JSON.stringify(newIndex));
+            return newIndex;
+        });
+
+        // Switch Context
+        setCurrentModelId(newId);
+        setIsSaveAsModalOpen(false);
+        
+        // Reset file handle as this is a new "file" in memory
+        currentFileHandleRef.current = null;
+        
+    } catch (e) {
+        console.error("Save As failed", e);
+        alert("Failed to save copy. Local storage might be full.");
+    }
+  }, [currentModelId, elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides]);
+
   // (Import/Export logic identical to original, omitted for brevity)
   const processImportedData = useCallback((text: string, filename?: string) => {
         try {
@@ -1149,7 +1198,7 @@ export default function App() {
     const staticPanels: PanelDefinition[] = [
         { id: 'report', title: 'Report', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>, content: <ReportPanel elements={filteredElements} relationships={filteredRelationships} onClose={() => setIsReportPanelOpen(false)} onNodeClick={handleNodeClick} documents={documents} folders={folders} onOpenDocument={(id) => handleOpenDocument(id, 'report')} />, isOpen: isReportPanelOpen, onToggle: () => setIsReportPanelOpen(prev => !prev) },
         { id: 'documents', title: 'Documents', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>, content: <DocumentManagerPanel documents={documents} folders={folders} onOpenDocument={handleOpenDocument} onCreateFolder={handleCreateFolder} onCreateDocument={handleCreateDocument} onDeleteDocument={handleDeleteDocument} onDeleteFolder={handleDeleteFolder} onClose={() => setIsDocumentPanelOpen(false)} />, isOpen: isDocumentPanelOpen, onToggle: () => setIsDocumentPanelOpen(prev => !prev) },
-        { id: 'table', title: 'Table', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" /></svg>, content: <TablePanel elements={filteredElements} relationships={filteredRelationships} onUpdateElement={handleUpdateElement} onDeleteElement={handleDeleteElement} onAddElement={handleAddElementFromName} onAddRelationship={handleAddRelationshipDirect} onDeleteRelationship={handleDeleteRelationship} onClose={() => setIsTablePanelOpen(false)} />, isOpen: isTablePanelOpen, onToggle: () => setIsTablePanelOpen(prev => !prev) },
+        { id: 'table', title: 'Table', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" /></svg>, content: <TablePanel elements={filteredElements} relationships={filteredRelationships} onUpdateElement={handleUpdateElement} onDeleteElement={handleDeleteElement} onAddElement={handleAddElementFromName} onAddRelationship={handleAddRelationshipDirect} onDeleteRelationship={handleDeleteRelationship} onClose={() => setIsTablePanelOpen(false)} onNodeClick={handleNodeClick} selectedElementId={selectedElementId} />, isOpen: isTablePanelOpen, onToggle: () => setIsTablePanelOpen(prev => !prev) },
         { id: 'matrix', title: 'Matrix', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>, content: <MatrixPanel elements={filteredElements} relationships={filteredRelationships} onClose={() => setIsMatrixPanelOpen(false)} />, isOpen: isMatrixPanelOpen, onToggle: () => setIsMatrixPanelOpen(prev => !prev) },
         { id: 'grid', title: 'Grid', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /></svg>, content: <GridPanel elements={filteredElements} activeColorScheme={activeColorScheme} onClose={() => setIsGridPanelOpen(false)} onNodeClick={handleNodeClick} />, isOpen: isGridPanelOpen, onToggle: () => setIsGridPanelOpen(prev => !prev) },
         { id: 'kanban', title: 'Kanban', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>, content: <KanbanPanel elements={filteredElements} modelActions={aiActions} onClose={() => setIsKanbanPanelOpen(false)} />, isOpen: isKanbanPanelOpen, onToggle: () => setIsKanbanPanelOpen(prev => !prev) },
@@ -1172,7 +1221,7 @@ export default function App() {
     }).filter((p): p is PanelDefinition => p !== null);
 
     return [...staticPanels, ...docPanels, ...historyItemPanels];
-  }, [ isReportPanelOpen, isDocumentPanelOpen, isTablePanelOpen, isMatrixPanelOpen, isGridPanelOpen, isMarkdownPanelOpen, isJSONPanelOpen, isHistoryPanelOpen, isKanbanPanelOpen, isPresentationPanelOpen, filteredElements, filteredRelationships, elements, relationships, documents, folders, openDocIds, currentModelName, activeColorScheme, history, slides, detachedHistoryIds, handleNodeClick, handleUpdateElement, handleDeleteElement, handleAddElementFromName, handleAddRelationshipDirect, handleDeleteRelationship, handleApplyMarkdown, handleApplyJSON, handleOpenDocument, handleCreateFolder, handleCreateDocument, handleDeleteDocument, handleDeleteFolder, handleUpdateDocument, handleDetachHistory, handleReopenHistory, handleAnalyzeWithChat, handleDeleteHistory, aiActions, handleCaptureSlide, handlePlayPresentation ]);
+  }, [ isReportPanelOpen, isDocumentPanelOpen, isTablePanelOpen, isMatrixPanelOpen, isGridPanelOpen, isMarkdownPanelOpen, isJSONPanelOpen, isHistoryPanelOpen, isKanbanPanelOpen, isPresentationPanelOpen, filteredElements, filteredRelationships, elements, relationships, documents, folders, openDocIds, currentModelName, activeColorScheme, history, slides, detachedHistoryIds, handleNodeClick, handleUpdateElement, handleDeleteElement, handleAddElementFromName, handleAddRelationshipDirect, handleDeleteRelationship, handleApplyMarkdown, handleApplyJSON, handleOpenDocument, handleCreateFolder, handleCreateDocument, handleDeleteDocument, handleDeleteFolder, handleUpdateDocument, handleDetachHistory, handleReopenHistory, handleAnalyzeWithChat, handleDeleteHistory, aiActions, handleCaptureSlide, handlePlayPresentation, selectedElementId ]); // Added selectedElementId to deps
 
   if (isInitialLoad && !isCreateModelModalOpen) { return ( <div className="w-screen h-screen flex items-center justify-center bg-gray-900 text-white"> Loading... </div> ); }
   const focusButtonTitle = () => { if (focusMode === 'narrow') return 'Switch to Wide Focus'; if (focusMode === 'wide') return 'Switch to Zoom Focus'; return 'Switch to Narrow Focus'; };
@@ -1243,6 +1292,10 @@ export default function App() {
                             <button onClick={() => { handleNewModelClick(); setIsMainMenuOpen(false); }} className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3">
                                 <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                                 New Model...
+                            </button>
+                            <button onClick={() => { setIsSaveAsModalOpen(true); setIsMainMenuOpen(false); }} className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3">
+                                <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                                Save As...
                             </button>
                             <button onClick={() => { handleImportClick(); setIsMainMenuOpen(false); }} className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3">
                                 <svg className="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
@@ -1917,6 +1970,7 @@ export default function App() {
             onOpenModel={handleImportClick}
             onSaveModel={handleDiskSave}
             onCreateModel={handleNewModelClick}
+            onSaveAs={() => setIsSaveAsModalOpen(true)}
             isReportOpen={isReportPanelOpen}
             isMarkdownOpen={isMarkdownPanelOpen}
             isJSONOpen={isJSONPanelOpen}
@@ -1932,6 +1986,15 @@ export default function App() {
           onCreate={handleCreateModel}
           onClose={() => setIsCreateModelModalOpen(false)}
           isInitialSetup={!modelsIndex || modelsIndex.length === 0}
+        />
+      )}
+
+      {isSaveAsModalOpen && (
+        <SaveAsModal
+            currentName={modelsIndex.find(m => m.id === currentModelId)?.name || ''}
+            currentDesc={modelsIndex.find(m => m.id === currentModelId)?.description || ''}
+            onSave={handleSaveAs}
+            onClose={() => setIsSaveAsModalOpen(false)}
         />
       )}
 

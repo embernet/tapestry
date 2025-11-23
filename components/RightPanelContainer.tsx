@@ -118,7 +118,7 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
     if (type !== 'tab-detach') {
         bringToFront(panelId);
     } else {
-        // Activate tab on press
+        // Activate tab on press (bring to front in dock)
         onActiveDockedIdChange(panelId);
     }
 
@@ -145,7 +145,7 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
 
     // Handle Tab Detach Threshold
     if (type === 'tab-detach' && !hasDetached) {
-        // Threshold check (e.g. 10px)
+        // Threshold check (10px)
         if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
             // Calculate float position (centered on mouse)
             const newW = DEFAULT_WIDTH;
@@ -199,20 +199,50 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
   const floatingPanels = openPanels.filter(p => layouts[p.id]?.isFloating);
   const dockedPanels = openPanels.filter(p => !layouts[p.id]?.isFloating);
 
+  const handleCloseDock = () => {
+    // Only close docked panels, leave floating ones alone
+    dockedPanels.forEach(panel => {
+        if (panel.isOpen) {
+            panel.onToggle();
+        }
+    });
+  };
+
   return (
     <>
       {/* --- DOCKED CONTAINER --- */}
       {dockedPanels.length > 0 && (
         <div className="absolute top-20 right-4 bottom-4 w-[600px] z-30 flex flex-col bg-gray-800 border border-gray-700 rounded-lg shadow-2xl overflow-hidden transition-all">
+          
+          {/* Dock Toolbar */}
+          <div className="flex items-center justify-between h-8 px-3 bg-gray-900 border-b border-gray-700 select-none">
+             <div className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-wider">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z" />
+                    <path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z" />
+                </svg>
+                Dock
+             </div>
+             <button 
+                onClick={handleCloseDock}
+                className="text-gray-500 hover:text-red-400 transition-colors p-1 rounded hover:bg-gray-800"
+                title="Close Dock (closes all docked tabs)"
+             >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+             </button>
+          </div>
+
           {/* Tab Bar */}
-          <div className="flex items-center bg-gray-900 border-b border-gray-700 overflow-x-auto scrollbar-hide h-12">
+          <div className="flex items-center bg-gray-800 border-b border-gray-700 overflow-x-auto scrollbar-hide h-10">
             {dockedPanels.map(panel => (
               <div
                 key={panel.id}
-                className={`group relative flex items-center h-full px-4 py-2 cursor-pointer select-none border-r border-gray-800 min-w-[100px] transition-colors ${
+                className={`group relative flex items-center h-full px-4 py-2 cursor-pointer select-none border-r border-gray-700 min-w-[100px] transition-colors ${
                   panel.id === activeDockedId 
                     ? 'bg-gray-800 text-blue-400 border-t-2 border-t-blue-400' 
-                    : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
+                    : 'text-gray-400 hover:bg-gray-700 hover:text-gray-200 bg-gray-900/50'
                 }`}
                 onMouseDown={(e) => handleMouseDown(e, panel.id, 'tab-detach')}
                 title="Click to activate, Drag to detach"
@@ -226,7 +256,7 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
                     className="ml-2 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 p-0.5 rounded"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                     </svg>
                 </button>
               </div>
