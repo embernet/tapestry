@@ -4,7 +4,7 @@ import { ColorScheme, SystemPromptConfig } from './types';
 export const NODE_MAX_WIDTH = 160;
 export const NODE_PADDING = 10;
 export const LINK_DISTANCE = 250;
-export const DEFAULT_NODE_COLOR = '#6b7280'; // gray-500
+export const DEFAULT_NODE_COLOR = '#e2e8f0'; // slate-200
 
 export const AVAILABLE_AI_TOOLS = [
     { 
@@ -49,6 +49,41 @@ export const AVAILABLE_AI_TOOLS = [
     }
 ];
 
+export const DEFAULT_TOOL_PROMPTS: Record<string, string> = {
+    scamper: `You are an expert in the SCAMPER ideation technique. Help the user generate creative ideas by modifying existing concepts.
+Generate distinct, creative ideas that emerge from applying the specific operator.`,
+    triz: `You are an expert TRIZ Master. Analyze the provided graph model. Use the specific TRIZ tool requested (Contradiction Matrix, 40 Principles, ARIZ, etc.) to solve the problem.
+
+OUTPUT FORMAT:
+Return a JSON object with two fields:
+1. "analysis": A detailed MARKDOWN string explaining your findings. Structure it with headers.
+2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`,
+    lss: `You are an expert Master Black Belt in Lean Six Sigma. Analyze the provided graph model using data-driven quality strategies.
+
+OUTPUT FORMAT:
+Return a JSON object with two fields:
+1. "analysis": A detailed MARKDOWN string explaining your findings using LSS terminology (Sigma level, Variance, Waste/Muda, Root Cause, RPN).
+2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`,
+    toc: `You are an expert in the Theory of Constraints (TOC). Analyze the provided graph model to identify bottlenecks and constraints.
+
+OUTPUT FORMAT:
+Return a JSON object with two fields:
+1. "analysis": A detailed MARKDOWN string explaining your findings using TOC terminology (UDEs, Constraints, Injections, etc.).
+2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`,
+    ssm: `You are an expert in Soft Systems Methodology (SSM). Analyze the provided graph model to explore complex, unstructured problems.
+
+OUTPUT FORMAT:
+Return a JSON object with two fields:
+1. "analysis": A detailed MARKDOWN string explaining your findings using SSM terminology.
+2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`,
+    swot: `You are a Strategic Analyst specializing in SWOT Analysis. Analyze the provided graph model to identify Strengths, Weaknesses, Opportunities, and Threats.
+
+OUTPUT FORMAT:
+Return a JSON object with two fields:
+1. "analysis": A detailed MARKDOWN string explaining your findings, organized by Strength, Weakness, Opportunity, Threat.
+2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`
+};
+
 export const DEFAULT_SYSTEM_PROMPT_CONFIG: SystemPromptConfig = {
   defaultPrompt: `You are an expert analyst inside a visual knowledge graph innovation system (Tapestry). The user is always asking questions in the context of the currently loaded knowledge graph (or a selected subgraph). This graph represents a full causal, logical, and systemic model — never treat the user’s question as an isolated general-knowledge query.
 
@@ -66,7 +101,8 @@ Response style: precise, context-aware, and deeply faithful to the graph. Cite e
   userPrompt: "",
   userContext: "",
   responseStyle: "",
-  enabledTools: AVAILABLE_AI_TOOLS.map(t => t.id)
+  enabledTools: AVAILABLE_AI_TOOLS.map(t => t.id),
+  toolPrompts: DEFAULT_TOOL_PROMPTS
 };
 
 export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
@@ -74,15 +110,15 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
     id: 'scheme-useful-harmful',
     name: 'Useful Harmful',
     tagColors: {
-      'Context': '#6b7280',
-      'Useful': '#22c55e',
-      'Harmful': '#ef4444',
-      'Emotion': '#f97316',
-      'Action': '#3b82f6',
-      'Trend': '#14b8a6', // teal-500
-      'Idea': '#efef10', 
-      'Knowledge': '#a855f7', // purple-500
-      'Topic': '#a855f7', // purple-500
+      'Context': '#e2e8f0', // slate-200
+      'Useful': '#86efac', // green-300
+      'Harmful': '#fca5a5', // red-300
+      'Emotion': '#fda4af', // rose-300
+      'Action': '#93c5fd', // blue-300
+      'Trend': '#5eead4', // teal-300
+      'Idea': '#fcd34d', // amber-300
+      'Knowledge': '#c4b5fd', // violet-300
+      'Topic': '#d8b4fe', // purple-300
     },
     tagDescriptions: {
       'Context': 'Background information, environment, or setting that frames the situation.',
@@ -121,17 +157,19 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
     id: 'scheme-networking',
     name: 'Networking',
     tagColors: {
-      'Organisation': '#7e22ce', // purple-700
-      'Person': '#f97316',
-      'Action': '#3b82f6',
-      'Product': '#22c55e',
-      'Idea': '#efef10',
-      'Topic': '#a855f7', // purple-500
-      'Question': '#ec4899', // pink-500
-      'Challenge': '#ef4444', // red-500
-      'Trend': '#14b8a6', // teal-500
+      'Context': '#e2e8f0', // slate-200
+      'Organisation': '#d8b4fe', // purple-300
+      'Person': '#fdba74', // orange-300
+      'Action': '#93c5fd', // blue-300
+      'Product': '#86efac', // green-300
+      'Idea': '#fcd34d', // amber-300
+      'Topic': '#c4b5fd', // violet-300
+      'Question': '#f9a8d4', // pink-300
+      'Challenge': '#fca5a5', // red-300
+      'Trend': '#5eead4', // teal-300
     },
     tagDescriptions: {
+      'Context': 'Background information, environment, or setting that frames the situation.',
       'Organisation': 'A company, institution, NGO, or government body.',
       'Person': 'An individual stakeholder, employee, or contact.',
       'Action': 'A specific activity, project, or initiative being undertaken.',
@@ -165,21 +203,23 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
     id: 'scheme-project-management',
     name: 'Project & Stakeholders',
     tagColors: {
-      'Project': '#2563eb',    // Blue-600
-      'Stakeholder': '#4f46e5', // Indigo
-      'Goal': '#16a34a',       // Green
-      'Risk': '#dc2626',       // Red
-      'Milestone': '#ca8a04',  // Yellow/Gold
-      'Task': '#0891b2',       // Cyan
-      'Resource': '#6b7280',   // Gray
-      'Constraint': '#ea580c', // Orange
-      'Deliverable': '#9333ea', // Purple
-      'Organisation': '#7e22ce', // purple-700 (Deep Purple)
-      'Topic': '#a855f7',      // purple-500 (Same as Useful/Harmful)
-      'Knowledge': '#a855f7',  // purple-500 (Same as Useful/Harmful)
-      'Action': '#3b82f6'      // blue-500 (Same as Useful/Harmful)
+      'Context': '#e2e8f0',    // slate-200
+      'Project': '#7dd3fc',    // sky-300
+      'Stakeholder': '#fdba74', // orange-300
+      'Goal': '#86efac',       // green-300
+      'Risk': '#fca5a5',       // red-300
+      'Milestone': '#fcd34d',  // amber-300
+      'Task': '#93c5fd',       // blue-300
+      'Resource': '#bef264',   // lime-300
+      'Constraint': '#cbd5e1', // slate-300
+      'Deliverable': '#a5b4fc', // indigo-300
+      'Organisation': '#d8b4fe', // purple-300
+      'Topic': '#c4b5fd', // violet-300
+      'Knowledge': '#c4b5fd', // violet-300
+      'Action': '#93c5fd'      // blue-300
     },
     tagDescriptions: {
+      'Context': 'Background information, environment, or setting that frames the situation.',
       'Project': 'The overall initiative or undertaking being modeled.',
       'Stakeholder': 'Individuals, groups, or organizations with an interest or influence in the project.',
       'Goal': 'The desired outcome or primary objective of the project.',
@@ -218,15 +258,17 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
     id: 'scheme-systems-thinking',
     name: 'Systems Thinking',
     tagColors: {
-      'Variable': '#3b82f6', // Blue
-      'Stock': '#22c55e',    // Green
-      'Flow': '#14b8a6',     // Teal
-      'Delay': '#6b7280',    // Gray
-      'Goal': '#a855f7',     // Purple
-      'Feedback Loop': '#f97316', // Orange
-      'External Factor': '#ef4444' // Red
+      'Context': '#e2e8f0',  // slate-200
+      'Variable': '#93c5fd', // blue-300
+      'Stock': '#86efac',    // green-300
+      'Flow': '#5eead4',     // teal-300
+      'Delay': '#e2e8f0',    // slate-200
+      'Goal': '#86efac',     // green-300
+      'Feedback Loop': '#fdba74', // orange-300
+      'External Factor': '#fca5a5' // red-300
     },
     tagDescriptions: {
+      'Context': 'Background information, environment, or setting that frames the situation.',
       'Variable': 'A factor that can change or be changed within the system.',
       'Stock': 'An accumulation of material or information that has built up over time.',
       'Flow': 'Movement of material or information into or out of a stock.',
@@ -249,15 +291,17 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
     id: 'scheme-design-thinking',
     name: 'Design Thinking',
     tagColors: {
-      'Persona': '#f97316',  // Orange
-      'Need': '#ef4444',     // Red
-      'Insight': '#a855f7',  // Purple
-      'Idea': '#facc15',     // Yellow
-      'Prototype': '#22c55e',// Green
-      'Test': '#3b82f6',     // Blue
-      'Constraint': '#6b7280' // Gray
+      'Context': '#e2e8f0',  // slate-200
+      'Persona': '#fdba74',  // orange-300
+      'Need': '#fca5a5',     // red-300
+      'Insight': '#c4b5fd',  // violet-300
+      'Idea': '#fcd34d',     // amber-300
+      'Prototype': '#86efac',// green-300
+      'Test': '#7dd3fc',     // sky-300
+      'Constraint': '#cbd5e1' // slate-300
     },
     tagDescriptions: {
+      'Context': 'Background information, environment, or setting that frames the situation.',
       'Persona': 'A fictional character representing a user type.',
       'Need': 'A user requirement or desire (explicit or latent).',
       'Insight': 'A deep understanding of a user or problem, often counter-intuitive.',
@@ -280,15 +324,17 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
     id: 'scheme-theory-of-change',
     name: 'Theory of Change',
     tagColors: {
-      'Input': '#6b7280',    // Gray
-      'Activity': '#3b82f6', // Blue
-      'Output': '#14b8a6',   // Teal
-      'Outcome': '#22c55e',  // Green
-      'Impact': '#facc15',   // Gold
-      'Assumption': '#ec4899', // Pink
-      'Risk': '#ef4444'      // Red
+      'Context': '#e2e8f0',  // slate-200
+      'Input': '#e2e8f0',    // slate-200
+      'Activity': '#93c5fd', // blue-300
+      'Output': '#5eead4',   // teal-300
+      'Outcome': '#86efac',  // green-300
+      'Impact': '#fcd34d',   // amber-300
+      'Assumption': '#f9a8d4', // pink-300
+      'Risk': '#fca5a5'      // red-300
     },
     tagDescriptions: {
+      'Context': 'Background information, environment, or setting that frames the situation.',
       'Input': 'Resources invested (money, time, staff).',
       'Activity': 'What the program does with the inputs.',
       'Output': 'Direct, tangible products of the activities.',
@@ -310,17 +356,19 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
     id: 'scheme-business-model',
     name: 'Business Model',
     tagColors: {
-      'Value Prop': '#facc15',     // Gold
-      'Customer': '#f97316',       // Orange
-      'Channel': '#3b82f6',        // Blue
-      'Relationship': '#ec4899',   // Pink
-      'Revenue': '#22c55e',        // Green
-      'Key Resource': '#6b7280',   // Gray
-      'Key Activity': '#14b8a6',   // Teal
-      'Key Partner': '#a855f7',    // Purple
-      'Cost': '#ef4444'            // Red
+      'Context': '#e2e8f0',        // slate-200
+      'Value Prop': '#fcd34d',     // amber-300
+      'Customer': '#fdba74',       // orange-300
+      'Channel': '#7dd3fc',        // sky-300
+      'Relationship': '#f9a8d4',   // pink-300
+      'Revenue': '#86efac',        // green-300
+      'Key Resource': '#bef264',   // lime-300
+      'Key Activity': '#93c5fd',   // blue-300
+      'Key Partner': '#d8b4fe',    // purple-300
+      'Cost': '#fca5a5'            // red-300
     },
     tagDescriptions: {
+      'Context': 'Background information, environment, or setting that frames the situation.',
       'Value Prop': 'The bundle of products and services that create value for a specific customer segment.',
       'Customer': 'The different groups of people or organizations an enterprise aims to reach and serve.',
       'Channel': 'How a company communicates with and reaches its customer segments.',
@@ -346,14 +394,16 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
     id: 'scheme-root-cause',
     name: 'Root Cause Analysis',
     tagColors: {
-      'Problem': '#ef4444',    // Red
-      'Symptom': '#f97316',    // Orange
-      'Cause': '#a855f7',      // Purple
-      'Root Cause': '#111827', // Dark/Black
-      'Solution': '#22c55e',   // Green
-      'Evidence': '#3b82f6'    // Blue
+      'Context': '#e2e8f0',    // slate-200
+      'Problem': '#fca5a5',    // red-300
+      'Symptom': '#fda4af',    // rose-300
+      'Cause': '#c4b5fd',      // violet-300
+      'Root Cause': '#cbd5e1', // slate-300
+      'Solution': '#86efac',   // green-300
+      'Evidence': '#7dd3fc'    // sky-300
     },
     tagDescriptions: {
+      'Context': 'Background information, environment, or setting that frames the situation.',
       'Problem': 'The main issue being investigated.',
       'Symptom': 'A visible sign or indication of the problem.',
       'Cause': 'A reason contributing to the problem.',
@@ -374,14 +424,16 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
     id: 'scheme-user-journey',
     name: 'User Journey Map',
     tagColors: {
-      'User': '#3b82f6',       // Blue
-      'Step': '#6b7280',       // Gray
-      'Touchpoint': '#14b8a6', // Teal
-      'Emotion': '#ec4899',    // Pink
-      'Pain Point': '#ef4444', // Red
-      'Opportunity': '#facc15' // Gold
+      'Context': '#e2e8f0',    // slate-200
+      'User': '#fdba74',       // orange-300
+      'Step': '#e2e8f0',       // slate-200
+      'Touchpoint': '#5eead4', // teal-300
+      'Emotion': '#fda4af',    // rose-300
+      'Pain Point': '#fca5a5', // red-300
+      'Opportunity': '#fcd34d' // amber-300
     },
     tagDescriptions: {
+      'Context': 'Background information, environment, or setting that frames the situation.',
       'User': 'The person experiencing the journey.',
       'Step': 'A distinct action or phase in the timeline.',
       'Touchpoint': 'A point of interaction between the user and the product/service.',

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Element, Relationship, RelationshipDirection, ColorScheme } from '../types';
 import ElementEditor from './ElementEditor';
@@ -119,11 +120,14 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   };
 
   return (
-    <div className="bg-gray-800 border border-gray-700 h-auto max-h-full w-96 rounded-lg shadow-2xl flex flex-col" onKeyDown={handleKeyDown}>
-      <div className="p-6 flex flex-col min-h-0">
-        <h2 className="text-2xl font-bold text-white mb-6 flex-shrink-0">Add Relationship</h2>
+    <div className="bg-gray-800 border border-gray-700 w-96 flex flex-col h-full min-h-0" onKeyDown={handleKeyDown}>
+        {/* Header */}
+        <div className="p-6 pb-4 flex-shrink-0 bg-gray-800 z-10 border-b border-gray-700">
+            <h2 className="text-2xl font-bold text-white">Add Relationship</h2>
+        </div>
 
-        <div className="flex-grow space-y-4 overflow-y-auto pr-2">
+        {/* Scrollable Content */}
+        <div className="flex-grow space-y-4 overflow-y-auto px-6 py-4 custom-scrollbar">
           <div>
             <label className="block text-sm font-medium text-gray-400">Source Element</label>
             <div className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-gray-300 cursor-not-allowed">
@@ -160,6 +164,8 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
                     nameInputRef={newElementNameInputRef}
                     colorSchemes={colorSchemes}
                     activeSchemeId={activeSchemeId}
+                    // In Add Relationship, we want the name input inside the editor block
+                    hideName={false} 
                  />
              </div>
           )}
@@ -214,11 +220,11 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
           </div>
         </div>
 
-        <div className="mt-8 flex justify-end space-x-4 pt-4 border-t border-gray-700 flex-shrink-0">
+        {/* Footer */}
+        <div className="p-6 pt-4 border-t border-gray-700 flex-shrink-0 flex justify-end space-x-4 bg-gray-800 rounded-b-lg">
           <button onClick={onCancel} className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Cancel</button>
           <button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Add Relationship</button>
         </div>
-      </div>
     </div>
   );
 };

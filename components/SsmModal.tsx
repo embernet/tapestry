@@ -4,6 +4,7 @@ import { Element, Relationship, SsmToolType, ModelActions, TapestryDocument, Tap
 import { generateMarkdownFromGraph } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
+import { DEFAULT_TOOL_PROMPTS } from '../constants';
 
 interface SsmModalProps {
   isOpen: boolean;
@@ -19,9 +20,8 @@ interface SsmModalProps {
   documents: TapestryDocument[];
   folders: TapestryFolder[];
   onUpdateDocument: (docId: string, updates: Partial<TapestryDocument>) => void;
+  customPrompt?: string;
 }
-
-// --- Sub Components ---
 
 const RichPicturePanel: React.FC<{ onGenerate: (topic: string) => void, isLoading: boolean, initialParams?: any }> = ({ onGenerate, isLoading, initialParams }) => {
     const [topic, setTopic] = useState(initialParams?.topic || '');
@@ -117,9 +117,7 @@ const ComparisonPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> 
     );
 };
 
-// --- Main Modal ---
-
-const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, initialParams, documents, folders, onUpdateDocument }) => {
+const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -158,16 +156,8 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
           const graphMarkdown = generateMarkdownFromGraph(elements, relationships);
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           
-          let systemInstruction = `You are an expert in Soft Systems Methodology (SSM). Analyze the provided graph model.
-          GRAPH CONTEXT:
-          ${graphMarkdown}
+          const systemPromptBase = customPrompt || DEFAULT_TOOL_PROMPTS['ssm'];
           
-          OUTPUT FORMAT:
-          Return a JSON object with two fields:
-          1. "analysis": A detailed MARKDOWN string explaining your findings using SSM terminology.
-          2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.
-          `;
-
           let userPrompt = "";
           let subjectName = "";
 
@@ -202,7 +192,7 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
               model: 'gemini-2.5-flash',
               contents: userPrompt,
               config: {
-                  systemInstruction,
+                  systemInstruction: `${systemPromptBase}\nGRAPH CONTEXT:\n${graphMarkdown}`,
                   responseMimeType: "application/json",
                   responseSchema: {
                       type: Type.OBJECT,
@@ -274,7 +264,6 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
               setGeneratedDocId(newDocId);
           }
 
-          // Log to history
           if (onLogHistory) {
               const actionSummary = actions.map((a: any) => {
                   if (a.name === 'addElement') return `- Add Node: ${a.args.name}`;
@@ -323,6 +312,13 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
       }
   };
 
+  const handleChat = () => {
+      if (onAnalyze && analysisText) {
+          onAnalyze(analysisText);
+          onClose();
+      }
+  };
+
   const handleDelete = () => {
       setAnalysisText('');
       setSuggestions([]);
@@ -362,6 +358,7 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
             {/* Right: Results */}
             <div className="w-2/3 p-6 overflow-y-auto flex flex-col gap-6 bg-gray-900 relative">
                 
+                {/* Results UI ... */}
                 {analysisText && (
                     <div className="absolute top-4 right-6 flex gap-2 z-10">
                         <button onClick={handleCopy} className="p-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition" title="Copy">
@@ -370,6 +367,9 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
                             ) : (
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                             )}
+                        </button>
+                        <button onClick={handleChat} className="p-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-blue-400 transition" title="Ask AI">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
                         </button>
                         <button onClick={handleDelete} className="p-1.5 rounded bg-gray-700 hover:bg-red-900/50 text-gray-300 hover:text-red-400 transition" title="Clear">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -437,16 +437,16 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
                 {!analysisText && !isLoading && (
                     <div className="flex flex-col items-center justify-center h-full text-gray-600 opacity-50">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        <p>Select a Soft Systems tool to map unstructured problems.</p>
+                        <p>Select an SSM tool to explore complex problems.</p>
                     </div>
                 )}
                 
                 {isLoading && (
                     <div className="flex flex-col items-center justify-center h-full">
                         <div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                        <p className="text-cyan-400 animate-pulse text-sm">Exploring Problem Space...</p>
+                        <p className="text-cyan-400 animate-pulse text-sm">Analyzing Soft Systems...</p>
                     </div>
                 )}
             </div>

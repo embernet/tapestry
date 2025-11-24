@@ -7,7 +7,7 @@ import { LINK_DISTANCE, NODE_MAX_WIDTH, NODE_PADDING, DEFAULT_NODE_COLOR } from 
 interface GraphCanvasProps {
   elements: Element[];
   relationships: Relationship[];
-  onNodeClick: (elementId: string) => void;
+  onNodeClick: (elementId: string, event: MouseEvent) => void;
   onLinkClick: (relationshipId: string) => void;
   onCanvasClick: () => void;
   onCanvasDoubleClick: (coords: { x: number, y: number }) => void;
@@ -17,6 +17,7 @@ interface GraphCanvasProps {
   onNodeConnectToNew: (sourceId: string, coords: { x: number, y: number }) => void;
   activeColorScheme: ColorScheme | undefined;
   selectedElementId: string | null;
+  multiSelection: Set<string>;
   selectedRelationshipId: string | null;
   focusMode: 'narrow' | 'wide' | 'zoom';
   setElements: React.Dispatch<React.SetStateAction<Element[]>>;
@@ -25,6 +26,7 @@ interface GraphCanvasProps {
   onJiggleTrigger?: number;
   isBulkEditActive: boolean;
   simulationState?: Record<string, SimulationNodeState>;
+  analysisHighlights?: Map<string, string>;
 }
 
 export interface GraphCanvasRef {
@@ -75,7 +77,7 @@ function getRectIntersection(sNode: D3Node, tNode: { x?: number; y?: number }) {
 
 const createDragHandler = (
   setElementsState: React.Dispatch<React.SetStateAction<Element[]>>,
-  onNodeClickCallback: (elementId: string) => void,
+  onNodeClickCallback: (elementId: string, event: MouseEvent) => void,
   onNodeConnectCallback: (sourceId: string, targetId: string) => void,
   onNodeConnectToNew: (sourceId: string, coords: { x: number, y: number }) => void
 ) => {
@@ -148,7 +150,7 @@ const createDragHandler = (
 
     // If we haven't moved significantly, treat it as a click
     if (!hasMoved) {
-        onNodeClickCallback(d.id);
+        onNodeClickCallback(d.id, event.sourceEvent);
         return; 
     }
 
@@ -176,7 +178,7 @@ const createDragHandler = (
     .on('end', dragended);
 };
 
-const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>, onNodeClickCallback: (elementId: string) => void) => {
+const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>, onNodeClickCallback: (elementId: string, event: MouseEvent) => void) => {
   let startX = 0;
   let startY = 0;
   let hasMoved = false;
@@ -209,7 +211,7 @@ const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>, onN
     // In physics mode, typical D3 drag swallows click events. 
     // We manually trigger click if no movement occurred.
     if (!hasMoved) {
-        onNodeClickCallback(d.id);
+        onNodeClickCallback(d.id, event.sourceEvent);
     }
     d.fx = null;
     d.fy = null;
@@ -234,6 +236,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   onNodeConnectToNew,
   activeColorScheme,
   selectedElementId,
+  multiSelection,
   selectedRelationshipId,
   focusMode,
   setElements,
@@ -241,7 +244,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   layoutParams,
   onJiggleTrigger,
   isBulkEditActive,
-  simulationState
+  simulationState,
+  analysisHighlights
 }, ref) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
@@ -323,12 +327,26 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
 
   const highlightedNodeIds = useMemo(() => {
     const ids = new Set<string>();
-    if (selectedElementId) {
-        ids.add(selectedElementId);
-        relationships.forEach(rel => {
-            if (rel.source === selectedElementId) ids.add(rel.target as string);
-            if (rel.target === selectedElementId) ids.add(rel.source as string);
+    if (multiSelection.size > 0) {
+        // If multi-selection is active, highlight all selected nodes
+        multiSelection.forEach(id => {
+            ids.add(id);
         });
+        // Highlight internal connections between selected nodes if multiple
+        if (multiSelection.size > 1) {
+             relationships.forEach(rel => {
+                if (multiSelection.has(rel.source as string) && multiSelection.has(rel.target as string)) {
+                    // Keep them visible, effectively handled by node opacity check logic
+                }
+            });
+        }
+        // Ensure primary selection connections shown if only one
+        if (multiSelection.size === 1 && selectedElementId) {
+             relationships.forEach(rel => {
+                if (rel.source === selectedElementId) ids.add(rel.target as string);
+                if (rel.target === selectedElementId) ids.add(rel.source as string);
+            });
+        }
     } else if (selectedRelationshipId) {
         const rel = relationships.find(r => r.id === selectedRelationshipId);
         if (rel) {
@@ -337,7 +355,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         }
     }
     return ids;
-  }, [selectedElementId, selectedRelationshipId, relationships]);
+  }, [selectedElementId, selectedRelationshipId, relationships, multiSelection]);
 
   useEffect(() => {
     if (focusMode === 'zoom' && highlightedNodeIds.size > 0 && simulationRef.current) {
@@ -440,11 +458,15 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .style('transition', 'opacity 0.3s ease, stroke 0.2s ease, stroke-width 0.2s ease')
       .attr('opacity', l => {
         if (focusMode === 'narrow') return 1.0;
-        if (!selectedElementId && !selectedRelationshipId) return 1.0;
+        if (multiSelection.size === 0 && !selectedElementId && !selectedRelationshipId) return 1.0;
         if (selectedRelationshipId) return l.id === selectedRelationshipId ? 1.0 : 0.2;
-        const sourceId = typeof l.source === 'object' ? (l.source as D3Node).id : l.source;
-        const targetId = typeof l.target === 'object' ? (l.target as D3Node).id : l.target;
-        return (sourceId === selectedElementId || targetId === selectedElementId) ? 1.0 : 0.2;
+        
+        const sourceId = typeof l.source === 'object' ? (l.source as D3Node).id : l.source as string;
+        const targetId = typeof l.target === 'object' ? (l.target as D3Node).id : l.target as string;
+        
+        // Highlight link if connected to selection
+        const isConnectedToSelection = multiSelection.has(sourceId) || multiSelection.has(targetId);
+        return isConnectedToSelection ? 1.0 : 0.2;
       })
       .on('click', (event, d) => {
         event.stopPropagation();
@@ -484,11 +506,14 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .style('fill', d => (d.id === selectedRelationshipId ? '#60a5fa' : '#9ca3af'))
       .attr('opacity', l => {
         if (focusMode === 'narrow') return 1.0;
-        if (!selectedElementId && !selectedRelationshipId) return 1.0;
+        if (multiSelection.size === 0 && !selectedElementId && !selectedRelationshipId) return 1.0;
         if (selectedRelationshipId) return l.id === selectedRelationshipId ? 1.0 : 0.2;
-        const sourceId = typeof l.source === 'object' ? (l.source as D3Node).id : l.source;
-        const targetId = typeof l.target === 'object' ? (l.target as D3Node).id : l.target;
-        return (sourceId === selectedElementId || targetId === selectedElementId) ? 1.0 : 0.2;
+        
+        const sourceId = typeof l.source === 'object' ? (l.source as D3Node).id : l.source as string;
+        const targetId = typeof l.target === 'object' ? (l.target as D3Node).id : l.target as string;
+        
+        const isConnectedToSelection = multiSelection.has(sourceId) || multiSelection.has(targetId);
+        return isConnectedToSelection ? 1.0 : 0.2;
       });
 
     const node = nodeGroup.selectAll<SVGGElement, D3Node>('.node')
@@ -499,7 +524,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .style('transition', 'opacity 0.3s ease')
       .attr('opacity', d => {
           if (focusMode === 'narrow') return 1.0;
-          return ((!selectedElementId && !selectedRelationshipId) || highlightedNodeIds.has(d.id)) ? 1.0 : 0.2;
+          return ((multiSelection.size === 0 && !selectedRelationshipId) || highlightedNodeIds.has(d.id)) ? 1.0 : 0.2;
       });
 
     (node.selectAll('*') as any).remove(); 
@@ -521,16 +546,35 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
                 if (state === 'increased') return '#22c55e'; // Green
                 if (state === 'decreased') return '#ef4444'; // Red
             }
-            return (d.id === selectedElementId ? '#60a5fa' : '#cbd5e1');
+            if (analysisHighlights && analysisHighlights.has(d.id)) {
+                return analysisHighlights.get(d.id)!;
+            }
+            // Multi-selection highlight
+            if (multiSelection.has(d.id)) return '#eab308'; // Yellow-500
+            
+            return '#cbd5e1'; // Default border
         })
         .style('transition', 'stroke 0.2s ease, stroke-width 0.2s ease, filter 0.2s ease')
         .attr('stroke-width', d => {
             if (simulationState && simulationState[d.id] !== 'neutral') return 4;
-            return (d.id === selectedElementId ? 3 : 1.5);
+            if (analysisHighlights && analysisHighlights.has(d.id)) return 4;
+            if (multiSelection.has(d.id)) return 4;
+            return 1.5;
         })
         .attr('filter', d => {
             if (simulationState && simulationState[d.id] === 'increased') return 'url(#glow-green)';
             if (simulationState && simulationState[d.id] === 'decreased') return 'url(#glow-red)';
+            if (analysisHighlights && analysisHighlights.has(d.id)) {
+                const color = analysisHighlights.get(d.id);
+                if (color === '#ef4444') return 'url(#glow-red)';
+                if (color === '#f97316') return 'url(#glow-orange)';
+                if (color === '#3b82f6') return 'url(#glow-blue)';
+                if (color === '#22c55e') return 'url(#glow-green)';
+                if (color === '#a855f7') return 'url(#glow-purple)';
+                if (color === '#eab308') return 'url(#glow-yellow)';
+                if (color === '#fcd34d') return 'url(#glow-yellow)';
+            }
+            if (multiSelection.has(d.id)) return 'url(#glow-yellow)';
             return null;
         })
         .attr('rx', 8).attr('ry', 8);
@@ -669,7 +713,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         }
       });
 
-  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState]);
+  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, multiSelection, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState, analysisHighlights]);
 
   return (
     <div className="w-full h-full flex-grow bg-gray-900 cursor-grab active:cursor-grabbing" onContextMenu={handleCanvasContextMenu}>
@@ -710,6 +754,38 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
                 <feMergeNode in="SourceGraphic"/>
             </feMerge>
             <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#ef4444" floodOpacity="0.8" />
+          </filter>
+          <filter id="glow-yellow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+            <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#eab308" floodOpacity="0.8" />
+          </filter>
+          <filter id="glow-blue" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+            <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#3b82f6" floodOpacity="0.8" />
+          </filter>
+          <filter id="glow-orange" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+            <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#f97316" floodOpacity="0.8" />
+          </filter>
+          <filter id="glow-purple" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
+            <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#a855f7" floodOpacity="0.8" />
           </filter>
         </defs>
         <g ref={gRef}></g>

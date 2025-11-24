@@ -5,9 +5,10 @@ interface CommandBarProps {
   onExecute: (markdown: string) => void;
   isCollapsed?: boolean;
   onToggle?: () => void;
+  onOpenHistory?: () => void;
 }
 
-const CommandBar: React.FC<CommandBarProps> = ({ onExecute, isCollapsed, onToggle }) => {
+const CommandBar: React.FC<CommandBarProps> = ({ onExecute, isCollapsed, onToggle, onOpenHistory }) => {
   const [internalCollapsed, setInternalCollapsed] = useState(true);
   const [input, setInput] = useState('');
 
@@ -72,13 +73,24 @@ const CommandBar: React.FC<CommandBarProps> = ({ onExecute, isCollapsed, onToggl
                             setInput('');
                         }
                     }}
-                    className="ml-3 bg-green-700 hover:bg-green-600 text-white rounded self-center h-10 w-10 flex items-center justify-center shadow-lg"
+                    className="ml-3 bg-green-700 hover:bg-green-600 text-white rounded self-center h-10 w-10 flex items-center justify-center shadow-lg flex-shrink-0"
                     title="Execute"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
                     </svg>
                 </button>
+                {onOpenHistory && (
+                    <button
+                        onClick={onOpenHistory}
+                        className="ml-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded self-center h-10 w-10 flex items-center justify-center shadow-lg transition-colors flex-shrink-0"
+                        title="Command History"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                        </svg>
+                    </button>
+                )}
             </div>
         )}
       </div>

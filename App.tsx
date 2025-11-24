@@ -42,7 +42,7 @@ import SettingsModal from './components/SettingsModal';
 import HistoryPanel from './components/HistoryPanel';
 import HistoryItemPanel from './components/HistoryItemPanel';
 import { DocumentManagerPanel, DocumentEditorPanel } from './components/DocumentPanel';
-import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe } from './utils';
+import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe, generateSelectionReport } from './utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { TextAnimator, ConflictResolutionModal, ContextMenu, CanvasContextMenu, CreateModelModal, SaveAsModal, OpenModelModal, HelpMenu, PatternGalleryModal, AboutModal, TAPESTRY_PATTERNS, TapestryBanner, SchemaUpdateModal } from './components/ModalComponents';
 
@@ -119,6 +119,10 @@ export default function App() {
   // --- Simulation State ---
   const [simulationState, setSimulationState] = useState<Record<string, SimulationNodeState>>({});
   const [isSimulationMode, setIsSimulationMode] = useState(false);
+  
+  // --- Analysis Highlights & Filtering ---
+  const [analysisHighlights, setAnalysisHighlights] = useState<Map<string, string>>(new Map());
+  const [analysisFilterState, setAnalysisFilterState] = useState<{ mode: 'hide' | 'hide_others' | 'none', ids: Set<string> }>({ mode: 'none', ids: new Set() });
 
   // --- Story/Presentation State ---
   const [slides, setSlides] = useState<StorySlide[]>([]);
@@ -158,6 +162,9 @@ export default function App() {
   // --- Schema Update Notification State ---
   const [schemaUpdateChanges, setSchemaUpdateChanges] = useState<string[]>([]);
   const [isSchemaUpdateModalOpen, setIsSchemaUpdateModalOpen] = useState(false);
+
+  // --- Internal Clipboard for Copy/Paste ---
+  const [internalClipboard, setInternalClipboard] = useState<{ elements: Element[], relationships: Relationship[] } | null>(null);
 
   // Load Global Settings on Mount
   useEffect(() => {
@@ -377,6 +384,7 @@ export default function App() {
   const [modelsIndex, setModelsIndex] = useState<ModelMetadata[]>([]);
   const [currentModelId, setCurrentModelId] = useState<string | null>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+  const [multiSelection, setMultiSelection] = useState<Set<string>>(new Set()); // New state for multi-selection
   const [selectedRelationshipId, setSelectedRelationshipId] = useState<string | null>(null);
   const [focusMode, setFocusMode] = useState<'narrow' | 'wide' | 'zoom'>('narrow');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, elementId: string } | null>(null);
@@ -437,7 +445,37 @@ export default function App() {
   const allTags = useMemo(() => { const tags = new Set<string>(); elements.forEach(element => { element.tags.forEach(tag => tags.add(tag)); }); return Array.from(tags).sort(); }, [elements]);
   const tagCounts = useMemo(() => { const counts = new Map<string, number>(); elements.forEach(element => { element.tags.forEach(tag => { counts.set(tag, (counts.get(tag) || 0) + 1); }); }); return counts; }, [elements]);
   useEffect(() => { setTagFilter(prevFilter => { const allTagsSet = new Set(allTags); const newIncluded = new Set<string>(); for (const tag of allTags) { const wasPreviouslyIncluded = prevFilter.included.has(tag); const wasPreviouslyExcluded = prevFilter.excluded.has(tag); if (wasPreviouslyIncluded) { newIncluded.add(tag); } else if (!wasPreviouslyExcluded) { newIncluded.add(tag); } } const newExcluded = new Set<string>(); for (const tag of prevFilter.excluded) { if (allTagsSet.has(tag)) { newExcluded.add(tag); } } return { included: newIncluded, excluded: newExcluded }; }); }, [allTags]);
-  const filteredElements = useMemo(() => { const { included, excluded } = tagFilter; const matchesDate = (element: Element) => { const createdDate = element.createdAt.substring(0, 10); const updatedDate = element.updatedAt.substring(0, 10); if (dateFilter.createdAfter && createdDate < dateFilter.createdAfter) return false; if (dateFilter.createdBefore && createdDate > dateFilter.createdBefore) return false; if (dateFilter.updatedAfter && updatedDate < dateFilter.updatedAfter) return false; if (dateFilter.updatedBefore && updatedDate > dateFilter.updatedBefore) return false; return true; }; return elements.filter(element => { if (!matchesDate(element)) return false; if (excluded.size === 0 && included.size === allTags.length) return true; if (element.tags.some(tag => excluded.has(tag))) return false; if (element.tags.length === 0) return true; return element.tags.some(tag => included.has(tag)); }); }, [elements, tagFilter, allTags, dateFilter]);
+  
+  const filteredElements = useMemo(() => { 
+      const { included, excluded } = tagFilter; 
+      const matchesDate = (element: Element) => { 
+          const createdDate = element.createdAt.substring(0, 10); 
+          const updatedDate = element.updatedAt.substring(0, 10); 
+          if (dateFilter.createdAfter && createdDate < dateFilter.createdAfter) return false; 
+          if (dateFilter.createdBefore && createdDate > dateFilter.createdBefore) return false; 
+          if (dateFilter.updatedAfter && updatedDate < dateFilter.updatedAfter) return false; 
+          if (dateFilter.updatedBefore && updatedDate > dateFilter.updatedBefore) return false; 
+          return true; 
+      }; 
+      
+      return elements.filter(element => { 
+          if (!matchesDate(element)) return false; 
+          
+          // Analysis Filters (Hide/Hide Others)
+          if (analysisFilterState.mode === 'hide') {
+              if (analysisFilterState.ids.has(element.id)) return false;
+          } else if (analysisFilterState.mode === 'hide_others') {
+              if (!analysisFilterState.ids.has(element.id)) return false;
+          }
+
+          // Tag Filters
+          if (excluded.size === 0 && included.size === allTags.length) return true; 
+          if (element.tags.some(tag => excluded.has(tag))) return false; 
+          if (element.tags.length === 0) return true; 
+          return element.tags.some(tag => included.has(tag)); 
+      }); 
+  }, [elements, tagFilter, allTags, dateFilter, analysisFilterState]);
+
   const filteredRelationships = useMemo(() => { const { included, excluded } = tagFilter; const visibleElementIds = new Set(filteredElements.map(f => f.id)); return relationships.filter(rel => visibleElementIds.has(rel.source as string) && visibleElementIds.has(rel.target as string)); }, [relationships, filteredElements, tagFilter, allTags]);
 
   const currentModelName = useMemo(() => modelsIndex.find(m => m.id === currentModelId)?.name || 'Loading...', [modelsIndex, currentModelId]);
@@ -471,14 +509,8 @@ export default function App() {
             const missingTags = defaultTagKeys.filter(key => !currentTagKeys.includes(key));
 
             if (missingTags.length > 0) {
-                // Merge tags: Default (new) + Existing (overrides default values if conflict)
-                // But we want to KEEP existing if they differ, and ADD new ones.
-                // { ...default, ...s } would mean s overrides default.
-                // If s has 'Action': 'blue', and default has 'Action': 'red', we keep 'blue'. Correct.
-                // If s doesn't have 'Organisation', default does, we get 'Organisation'. Correct.
                 s.tagColors = { ...defaultScheme.tagColors, ...s.tagColors };
                 
-                // Merge descriptions similarly
                 const currentDescs = s.tagDescriptions || {};
                 const defaultDescs = defaultScheme.tagDescriptions || {};
                 s.tagDescriptions = { ...defaultDescs, ...currentDescs };
@@ -514,6 +546,10 @@ export default function App() {
     setOpenDocIds([]); 
     setDetachedHistoryIds([]);
     setPanelLayouts({});
+    setAnalysisHighlights(new Map()); // Clear highlights on load
+    setAnalysisFilterState({ mode: 'none', ids: new Set() }); // Reset analysis filters
+    setMultiSelection(new Set()); // Reset multi selection
+    setSelectedElementId(null);
     
     let loadedSchemes = data.colorSchemes || DEFAULT_COLOR_SCHEMES;
     
@@ -572,10 +608,10 @@ export default function App() {
   useEffect(() => { if (currentModelId && !isInitialLoad) { const modelData = { elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides }; const currentContentHash = computeContentHash(modelData); const currentMeta = modelsIndex.find(m => m.id === currentModelId); if (!currentMeta || currentMeta.contentHash !== currentContentHash) { localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData)); setModelsIndex(prevIndex => { const now = new Date().toISOString(); return prevIndex.map(m => m.id === currentModelId ? { ...m, updatedAt: now, contentHash: currentContentHash } : m); }); } } }, [elements, relationships, documents, folders, colorSchemes, activeSchemeId, currentModelId, isInitialLoad, modelsIndex, systemPromptConfig, history, slides]);
   
   const handleCreateModel = useCallback((name: string, description: string) => { const now = new Date().toISOString(); const newModelData = { elements: [], relationships: [], documents: [], folders: [], colorSchemes: DEFAULT_COLOR_SCHEMES, activeSchemeId: DEFAULT_COLOR_SCHEMES[0]?.id || null, systemPromptConfig: DEFAULT_SYSTEM_PROMPT_CONFIG, history: [], slides: [] }; const initialHash = computeContentHash(newModelData); const newModel: ModelMetadata = { id: generateUUID(), name, description, createdAt: now, updatedAt: now, filename: `${name.replace(/ /g, '_')}.json`, contentHash: initialHash, }; setModelsIndex(prevIndex => [...prevIndex, newModel]); localStorage.setItem(`${MODEL_DATA_PREFIX}${newModel.id}`, JSON.stringify(newModelData)); currentFileHandleRef.current = null; handleLoadModel(newModel.id); setIsCreateModelModalOpen(false); }, [handleLoadModel]);
-  const handleAddElement = useCallback((coords: { x: number; y: number }) => { const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.y, }; setElements(prev => [...prev, newElement]); setSelectedElementId(newElement.id); setSelectedRelationshipId(null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); }, [defaultTags]);
+  const handleAddElement = useCallback((coords: { x: number; y: number }) => { const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.y, }; setElements(prev => [...prev, newElement]); setSelectedElementId(newElement.id); setMultiSelection(new Set([newElement.id])); setSelectedRelationshipId(null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); }, [defaultTags]);
   const handleAddElementFromName = useCallback((name: string) => { const centerX = window.innerWidth / 2; const centerY = window.innerHeight / 2; const randomOffset = () => (Math.random() - 0.5) * 100; const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: name, notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: centerX + randomOffset(), y: centerY + randomOffset(), fx: null, fy: null, }; setElements(prev => [...prev, newElement]); }, [defaultTags]);
   const handleUpdateElement = useCallback((updatedElement: Element) => { setElements(prev => prev.map(f => f.id === updatedElement.id ? { ...updatedElement, updatedAt: new Date().toISOString() } : f)); }, []);
-  const handleDeleteElement = useCallback((elementId: string) => { setElements(prev => prev.filter(f => f.id !== elementId)); setRelationships(prev => prev.filter(r => r.source !== elementId && r.target !== elementId)); if (selectedElementId === elementId) { setSelectedElementId(null); } }, [selectedElementId]);
+  const handleDeleteElement = useCallback((elementId: string) => { setElements(prev => prev.filter(f => f.id !== elementId)); setRelationships(prev => prev.filter(r => r.source !== elementId && r.target !== elementId)); if (selectedElementId === elementId) { setSelectedElementId(null); } if (multiSelection.has(elementId)) { const next = new Set(multiSelection); next.delete(elementId); setMultiSelection(next); } }, [selectedElementId, multiSelection]);
   const handleBulkTagAction = useCallback((elementIds: string[], tag: string, mode: 'add' | 'remove') => { setElements(prev => prev.map(e => { if (elementIds.includes(e.id)) { let newTags = [...e.tags]; if (mode === 'add') { if (!newTags.includes(tag)) { newTags.push(tag); } else { return e; } } else { if (newTags.includes(tag)) { newTags = newTags.filter(t => t !== tag); } else { return e; } } return { ...e, tags: newTags, updatedAt: new Date().toISOString() }; } return e; })); }, []);
   const handleAddRelationship = useCallback((relationship: Omit<Relationship, 'id' | 'tags'>, newElementData?: Omit<Element, 'id' | 'createdAt' | 'updatedAt'>) => { let finalRelationship: Relationship = { ...relationship, id: generateUUID(), tags: [] }; if (newElementData) { const now = new Date().toISOString(); const newElement: Element = { ...newElementData, id: generateUUID(), createdAt: now, updatedAt: now, }; setElements(prev => [...prev, newElement]); finalRelationship.target = newElement.id; } setRelationships(prev => [...prev, finalRelationship]); if (newElementData) { setSelectedElementId(panelState.sourceElementId || null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); } else { setSelectedRelationshipId(finalRelationship.id); setSelectedElementId(null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); } }, [panelState.sourceElementId]);
   const handleAddRelationshipDirect = useCallback((relationship: Omit<Relationship, 'id' | 'tags'>) => { const newRel: Relationship = { ...relationship, id: generateUUID(), tags: [] }; setRelationships(prev => [...prev, newRel]); }, []);
@@ -943,16 +979,49 @@ export default function App() {
       setSimulationState(newSimState);
   };
 
-  const handleNodeClick = useCallback((elementId: string) => { 
+  const handleAnalysisHighlight = useCallback((highlightMap: Map<string, string>) => {
+      setAnalysisHighlights(highlightMap);
+  }, []);
+
+  const handleAnalysisFilter = useCallback((mode: 'hide' | 'hide_others' | 'none', ids: Set<string>) => {
+      setAnalysisFilterState({ mode, ids });
+  }, []);
+
+  const handleNodeClick = useCallback((elementId: string, event: MouseEvent) => { 
       if (isSimulationMode) {
           runImpactSimulation(elementId);
           return;
       }
-      if (isBulkEditActive) { if (bulkTagsToAdd.length === 0 && bulkTagsToRemove.length === 0) return; setElements(prev => prev.map(el => { if (el.id === elementId) { const currentTags = el.tags; let newTags = [...currentTags]; let changed = false; const lowerToRemove = bulkTagsToRemove.map(t => t.toLowerCase()); const filteredTags = newTags.filter(t => !lowerToRemove.includes(t.toLowerCase())); if (filteredTags.length !== newTags.length) { newTags = filteredTags; changed = true; } const lowerCurrent = newTags.map(t => t.toLowerCase()); const toAdd = bulkTagsToAdd.filter(t => !lowerCurrent.includes(t.toLowerCase())); if (toAdd.length > 0) { newTags = [...newTags, ...toAdd]; changed = true; } if (changed) { return { ...el, tags: newTags, updatedAt: new Date().toISOString() }; } } return el; })); return; } setSelectedElementId(elementId); setSelectedRelationshipId(null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); 
-  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState]);
+      if (isBulkEditActive) { if (bulkTagsToAdd.length === 0 && bulkTagsToRemove.length === 0) return; setElements(prev => prev.map(el => { if (el.id === elementId) { const currentTags = el.tags; let newTags = [...currentTags]; let changed = false; const lowerToRemove = bulkTagsToRemove.map(t => t.toLowerCase()); const filteredTags = newTags.filter(t => !lowerToRemove.includes(t.toLowerCase())); if (filteredTags.length !== newTags.length) { newTags = filteredTags; changed = true; } const lowerCurrent = newTags.map(t => t.toLowerCase()); const toAdd = bulkTagsToAdd.filter(t => !lowerCurrent.includes(t.toLowerCase())); if (toAdd.length > 0) { newTags = [...newTags, ...toAdd]; changed = true; } if (changed) { return { ...el, tags: newTags, updatedAt: new Date().toISOString() }; } } return el; })); return; } 
+      
+      // Multi-Selection Logic
+      if (event.ctrlKey || event.metaKey) {
+          const newMulti = new Set(multiSelection);
+          if (newMulti.has(elementId)) {
+              newMulti.delete(elementId);
+          } else {
+              newMulti.add(elementId);
+          }
+          setMultiSelection(newMulti);
+          // If added, set as primary for details panel
+          if (newMulti.has(elementId)) {
+              setSelectedElementId(elementId);
+          } else if (selectedElementId === elementId) {
+              // If primary deselected, unset primary or pick another
+              setSelectedElementId(newMulti.size > 0 ? Array.from(newMulti).pop() || null : null);
+          }
+      } else {
+          setMultiSelection(new Set([elementId]));
+          setSelectedElementId(elementId);
+      }
+
+      setSelectedRelationshipId(null); 
+      setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); 
+      handleCloseContextMenu(); 
+  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState, multiSelection, selectedElementId]);
   
-  const handleLinkClick = useCallback((relationshipId: string) => { setSelectedRelationshipId(relationshipId); setSelectedElementId(null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); }, [handleCloseContextMenu]);
-  const handleCanvasClick = useCallback(() => { setSelectedElementId(null); setSelectedRelationshipId(null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseCanvasContextMenu(); }, [handleCloseContextMenu, handleCloseCanvasContextMenu]);
+  const handleLinkClick = useCallback((relationshipId: string) => { setSelectedRelationshipId(relationshipId); setSelectedElementId(null); setMultiSelection(new Set()); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); }, [handleCloseContextMenu]);
+  const handleCanvasClick = useCallback(() => { setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseCanvasContextMenu(); setAnalysisHighlights(new Map()); }, [handleCloseContextMenu, handleCloseCanvasContextMenu]);
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, elementId: string) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, elementId }); handleCloseCanvasContextMenu(); }, [handleCloseCanvasContextMenu]);
   const handleCanvasContextMenu = useCallback((event: React.MouseEvent) => { event.preventDefault(); setCanvasContextMenu({ x: event.clientX, y: event.clientY }); handleCloseContextMenu(); }, [handleCloseContextMenu]);
   const handleNodeConnect = useCallback((sourceId: string, targetId: string) => { const currentScheme = colorSchemes.find(s => s.id === activeSchemeId); let defaultLabel = ''; if (currentScheme && currentScheme.defaultRelationshipLabel) { defaultLabel = currentScheme.defaultRelationshipLabel; } const newRelId = generateUUID(); const newRel: Relationship = { id: newRelId, source: sourceId, target: targetId, label: defaultLabel, direction: RelationshipDirection.To, tags: [] }; setRelationships(prev => [...prev, newRel]); setSelectedRelationshipId(newRelId); setSelectedElementId(null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); }, [activeSchemeId, colorSchemes, handleCloseContextMenu]);
@@ -960,10 +1029,81 @@ export default function App() {
   const handleUpdateDefaultRelationship = (newLabel: string) => { if (!activeSchemeId) return; setColorSchemes(prev => prev.map(s => s.id === activeSchemeId ? { ...s, defaultRelationshipLabel: newLabel } : s)); };
   const handleToggleFocusMode = () => { setFocusMode(prev => { if (prev === 'narrow') return 'wide'; if (prev === 'wide') return 'zoom'; return 'narrow'; }); };
   
-  // ... (handleApplyMarkdown omitted for brevity, assumed unchanged from previous steps)
-  // For context, I'm just skipping redeclaring huge functions if they didn't change logically for this specific request, 
-  // but in a real diff I'd keep them. I will include it here to be safe as the prompt requests full file content usually.
-  
+  // --- Copy / Paste Handlers ---
+  const handleCopy = async () => {
+      const idsToCopy = multiSelection.size > 0 ? Array.from(multiSelection) : (selectedElementId ? [selectedElementId] : []);
+      if (idsToCopy.length === 0) return;
+
+      const selectedEls = elements.filter(e => idsToCopy.includes(e.id));
+      const selectedRels = relationships.filter(r => idsToCopy.includes(r.source as string) && idsToCopy.includes(r.target as string));
+
+      // Format 1: Human-readable Text Report
+      const textReport = generateSelectionReport(selectedEls, selectedRels);
+      
+      // Format 2: Store data in internal clipboard for App pasting
+      setInternalClipboard({ 
+          elements: selectedEls, 
+          relationships: selectedRels 
+      });
+
+      try {
+          await navigator.clipboard.writeText(textReport);
+          alert(`Copied ${selectedEls.length} items to clipboard (Text Report). App-data ready for paste.`);
+      } catch (err) {
+          console.warn("Copy failed", err);
+          alert("Failed to copy text to system clipboard.");
+      }
+  };
+
+  const handlePaste = () => {
+      if (!internalClipboard) {
+          alert("Internal clipboard is empty.");
+          return;
+      }
+
+      const { elements: pastedElements, relationships: pastedRelationships } = internalClipboard;
+      
+      if (pastedElements.length === 0) return;
+
+      // Process Paste: Remap IDs and Offset Positions
+      const idMap = new Map<string, string>();
+      const now = new Date().toISOString();
+      
+      // 1. Map IDs
+      pastedElements.forEach((el: Element) => {
+          idMap.set(el.id, generateUUID());
+      });
+
+      // 2. Create New Elements
+      const newElements = pastedElements.map((el: Element) => ({
+          ...el,
+          id: idMap.get(el.id)!,
+          x: (el.x || 0) + 50, // Offset
+          y: (el.y || 0) + 50,
+          fx: (el.fx ? el.fx + 50 : null), // Only offset fx/fy if they exist
+          fy: (el.fy ? el.fy + 50 : null),
+          createdAt: now,
+          updatedAt: now
+      }));
+
+      // 3. Create New Relationships
+      const newRelationships = pastedRelationships.map((rel: Relationship) => ({
+          ...rel,
+          id: generateUUID(),
+          source: idMap.get(rel.source as string) || rel.source, // Should map, fallback safe
+          target: idMap.get(rel.target as string) || rel.target
+      }));
+
+      // 4. Update State
+      setElements(prev => [...prev, ...newElements]);
+      setRelationships(prev => [...prev, ...newRelationships]);
+      
+      // 5. Select pasted items
+      const newSelection = new Set(newElements.map((e: Element) => e.id));
+      setMultiSelection(newSelection);
+      if (newElements.length > 0) setSelectedElementId(newElements[0].id);
+  };
+
   const handleApplyMarkdown = (markdown: string, shouldMerge: boolean = false) => { 
     let processedMarkdown = markdown; 
     processedMarkdown = processedMarkdown.replace(/\s*\/>\s*/g, ' -[Counteracts]-> '); 
@@ -1193,14 +1333,86 @@ export default function App() {
   const activeRelationshipLabels = useMemo(() => { return activeColorScheme?.relationshipDefinitions?.map(d => d.label) || []; }, [activeColorScheme]);
   const isRightPanelOpen = isReportPanelOpen || isMarkdownPanelOpen || isJSONPanelOpen || isMatrixPanelOpen || isTablePanelOpen || isGridPanelOpen || isDocumentPanelOpen || isHistoryPanelOpen || isKanbanPanelOpen || isPresentationPanelOpen || openDocIds.length > 0 || detachedHistoryIds.length > 0;
 
+  // --- New Command Handlers ---
+  const handleOpenCommandHistory = useCallback(() => {
+    const cmdFolder = foldersRef.current.find(f => f.name === "CMD" && !f.parentId);
+    let folderId = cmdFolder?.id;
+    
+    // If folder doesn't exist, create it and the doc
+    if (!folderId) {
+         folderId = generateUUID();
+         const newFolder: TapestryFolder = { id: folderId, name: "CMD", parentId: null, createdAt: new Date().toISOString() };
+         setFolders(prev => [...prev, newFolder]);
+         foldersRef.current.push(newFolder); // optimistic update for immediate use below
+    }
+    
+    let historyDoc = documentsRef.current.find(d => d.folderId === folderId && d.title === "History");
+    let docId = historyDoc?.id;
+
+    if (!historyDoc) {
+        docId = generateUUID();
+        const newDoc: TapestryDocument = {
+            id: docId,
+            title: "History",
+            content: "# Command History\n",
+            folderId: folderId,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        setDocuments(prev => [...prev, newDoc]);
+        documentsRef.current.push(newDoc); // optimistic
+    }
+
+    if (docId) {
+        handleOpenDocument(docId, 'report');
+    }
+  }, [handleOpenDocument]);
+
+  const handleCommandExecution = useCallback((markdown: string) => {
+    // 1. Execute
+    handleApplyMarkdown(markdown, true);
+
+    // 2. Log
+    const timestamp = new Date().toLocaleString();
+    const logEntry = `\n\n[${timestamp}] \`${markdown}\``;
+
+    let cmdFolder = foldersRef.current.find(f => f.name === "CMD" && !f.parentId);
+    let folderId = cmdFolder?.id;
+
+    if (!folderId) {
+        folderId = generateUUID();
+        const newFolder: TapestryFolder = { id: folderId, name: "CMD", parentId: null, createdAt: new Date().toISOString() };
+        setFolders(prev => [...prev, newFolder]);
+        // We don't strictly need to update ref here if we use functional update for documents that doesn't rely on ref, 
+        // but consisteny is good.
+        foldersRef.current.push(newFolder);
+    }
+
+    setDocuments(prev => {
+        const historyDoc = prev.find(d => d.folderId === folderId && d.title === "History");
+        if (historyDoc) {
+            return prev.map(d => d.id === historyDoc.id ? { ...d, content: (d.content || "") + logEntry, updatedAt: new Date().toISOString() } : d);
+        } else {
+            return [...prev, {
+                id: generateUUID(),
+                title: "History",
+                content: `# Command History${logEntry}`,
+                folderId: folderId!,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            }];
+        }
+    });
+  }, [handleApplyMarkdown]);
+
   // Construct dynamic panel definitions
   const panelDefinitions: PanelDefinition[] = useMemo(() => {
     const staticPanels: PanelDefinition[] = [
-        { id: 'report', title: 'Report', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>, content: <ReportPanel elements={filteredElements} relationships={filteredRelationships} onClose={() => setIsReportPanelOpen(false)} onNodeClick={handleNodeClick} documents={documents} folders={folders} onOpenDocument={(id) => handleOpenDocument(id, 'report')} />, isOpen: isReportPanelOpen, onToggle: () => setIsReportPanelOpen(prev => !prev) },
+        { id: 'report', title: 'Report', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>, content: <ReportPanel elements={filteredElements} relationships={filteredRelationships} onClose={() => setIsReportPanelOpen(false)} onNodeClick={(id) => handleNodeClick(id, new MouseEvent('click'))} documents={documents} folders={folders} onOpenDocument={(id) => handleOpenDocument(id, 'report')} />, isOpen: isReportPanelOpen, onToggle: () => setIsReportPanelOpen(prev => !prev) },
         { id: 'documents', title: 'Documents', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>, content: <DocumentManagerPanel documents={documents} folders={folders} onOpenDocument={handleOpenDocument} onCreateFolder={handleCreateFolder} onCreateDocument={handleCreateDocument} onDeleteDocument={handleDeleteDocument} onDeleteFolder={handleDeleteFolder} onClose={() => setIsDocumentPanelOpen(false)} />, isOpen: isDocumentPanelOpen, onToggle: () => setIsDocumentPanelOpen(prev => !prev) },
-        { id: 'table', title: 'Table', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" /></svg>, content: <TablePanel elements={filteredElements} relationships={filteredRelationships} onUpdateElement={handleUpdateElement} onDeleteElement={handleDeleteElement} onAddElement={handleAddElementFromName} onAddRelationship={handleAddRelationshipDirect} onDeleteRelationship={handleDeleteRelationship} onClose={() => setIsTablePanelOpen(false)} onNodeClick={handleNodeClick} selectedElementId={selectedElementId} />, isOpen: isTablePanelOpen, onToggle: () => setIsTablePanelOpen(prev => !prev) },
+        { id: 'table', title: 'Table', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" /></svg>, content: <TablePanel elements={filteredElements} relationships={filteredRelationships} onUpdateElement={handleUpdateElement} onDeleteElement={handleDeleteElement} onAddElement={handleAddElementFromName} onAddRelationship={handleAddRelationshipDirect} onDeleteRelationship={handleDeleteRelationship} onClose={() => setIsTablePanelOpen(false)} onNodeClick={(id) => handleNodeClick(id, new MouseEvent('click'))} selectedElementId={selectedElementId} />, isOpen: isTablePanelOpen, onToggle: () => setIsTablePanelOpen(prev => !prev) },
         { id: 'matrix', title: 'Matrix', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>, content: <MatrixPanel elements={filteredElements} relationships={filteredRelationships} onClose={() => setIsMatrixPanelOpen(false)} />, isOpen: isMatrixPanelOpen, onToggle: () => setIsMatrixPanelOpen(prev => !prev) },
-        { id: 'grid', title: 'Grid', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /></svg>, content: <GridPanel elements={filteredElements} activeColorScheme={activeColorScheme} onClose={() => setIsGridPanelOpen(false)} onNodeClick={handleNodeClick} />, isOpen: isGridPanelOpen, onToggle: () => setIsGridPanelOpen(prev => !prev) },
+        { id: 'grid', title: 'Grid', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /></svg>, content: <GridPanel elements={filteredElements} activeColorScheme={activeColorScheme} onClose={() => setIsGridPanelOpen(false)} onNodeClick={(id) => handleNodeClick(id, new MouseEvent('click'))} />, isOpen: isGridPanelOpen, onToggle: () => setIsGridPanelOpen(prev => !prev) },
         { id: 'kanban', title: 'Kanban', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>, content: <KanbanPanel elements={filteredElements} modelActions={aiActions} onClose={() => setIsKanbanPanelOpen(false)} />, isOpen: isKanbanPanelOpen, onToggle: () => setIsKanbanPanelOpen(prev => !prev) },
         { id: 'presentation', title: 'Story', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>, content: <PresentationPanel slides={slides} onSlidesChange={setSlides} onCaptureSlide={handleCaptureSlide} onPlay={handlePlayPresentation} onClose={() => setIsPresentationPanelOpen(false)} />, isOpen: isPresentationPanelOpen, onToggle: () => setIsPresentationPanelOpen(prev => !prev) },
         { id: 'markdown', title: 'Markdown', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>, content: <MarkdownPanel initialText={generateMarkdownFromGraph(elements, relationships)} onApply={(md) => handleApplyMarkdown(md, false)} onClose={() => setIsMarkdownPanelOpen(false)} modelName={currentModelName} />, isOpen: isMarkdownPanelOpen, onToggle: () => setIsMarkdownPanelOpen(prev => !prev) },
@@ -1381,6 +1593,20 @@ export default function App() {
                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
                 </button>
                 <div className="border-l border-gray-600 h-6 mx-1"></div>
+                
+                {/* Copy / Paste */}
+                <button onClick={handleCopy} title="Copy Selected (Report)" className="p-2 rounded-md hover:bg-gray-700 transition text-gray-400 hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                    </svg>
+                </button>
+                <button onClick={handlePaste} title="Paste (Add to Model)" className="p-2 rounded-md hover:bg-gray-700 transition text-gray-400 hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                </button>
+
+                <div className="border-l border-gray-600 h-6 mx-1"></div>
                 <button onClick={() => setIsToolsPanelOpen(p => !p)} title="Toggle Tools Panel" className={`p-2 rounded-md hover:bg-gray-700 transition ${isToolsPanelOpen ? 'bg-gray-700 text-white' : 'text-blue-400'}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.9 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
@@ -1535,7 +1761,9 @@ export default function App() {
                 <AnalysisToolbar 
                     elements={elements} 
                     relationships={relationships}
-                    onBulkTag={handleBulkTagAction} 
+                    onBulkTag={handleBulkTagAction}
+                    onHighlight={handleAnalysisHighlight}
+                    onFilter={handleAnalysisFilter}
                     isCollapsed={activeTool !== 'analysis'}
                     onToggle={() => toggleTool('analysis')}
                     isSimulationMode={isSimulationMode}
@@ -1600,9 +1828,10 @@ export default function App() {
                     onToggle={() => toggleTool('bulk')}
                 />
                 <CommandBar 
-                    onExecute={(md) => handleApplyMarkdown(md, true)} 
+                    onExecute={handleCommandExecution} 
                     isCollapsed={activeTool !== 'command'}
                     onToggle={() => toggleTool('command')}
+                    onOpenHistory={handleOpenCommandHistory}
                 />
             </div>
         </div>
@@ -1636,12 +1865,12 @@ export default function App() {
         <div 
             ref={panelRef}
             className={`z-[70] flex flex-col pointer-events-none ${detailsPanelPosition ? 'fixed shadow-2xl rounded-lg' : 'absolute top-24'}`}
-            style={detailsPanelPosition ? { left: detailsPanelPosition.x, top: detailsPanelPosition.y } : { right: isRightPanelOpen ? '620px' : '16px', maxHeight: 'calc(100vh - 8rem)' }}
+            style={detailsPanelPosition ? { left: detailsPanelPosition.x, top: detailsPanelPosition.y, maxHeight: 'calc(100vh - 2rem)' } : { right: isRightPanelOpen ? '620px' : '16px', maxHeight: 'calc(100vh - 8rem)' }}
         >
-            <div className="pointer-events-auto flex flex-col h-auto shadow-2xl rounded-lg">
+            <div className="pointer-events-auto flex flex-col h-auto max-h-full shadow-2xl rounded-lg bg-gray-800 border border-gray-700 min-h-0">
                 {/* Drag Header */}
                 <div 
-                    className="h-6 bg-gray-700 rounded-t-lg flex items-center justify-center cursor-move border-b border-gray-600 group relative"
+                    className="h-6 bg-gray-700 rounded-t-lg flex items-center justify-center cursor-move border-b border-gray-600 group relative flex-shrink-0"
                     onMouseDown={handlePanelDragStart}
                 >
                     <div className="w-10 h-1 bg-gray-500 rounded-full group-hover:bg-gray-400 transition-colors"></div>
@@ -1665,7 +1894,7 @@ export default function App() {
                 </div>
 
                 {/* Panel Content */}
-                <div className="rounded-b-lg overflow-hidden">
+                <div className="rounded-b-lg overflow-hidden flex flex-col min-h-0 flex-grow">
                     {panelState.view === 'addRelationship' && addRelationshipSourceElement ? (
                         <AddRelationshipPanel
                         sourceElement={addRelationshipSourceElement}
@@ -1827,7 +2056,7 @@ export default function App() {
         relationships={relationships}
         onClose={() => setIsMiningModalOpen(false)}
         onNodeSelect={(id) => {
-            handleNodeClick(id);
+            handleNodeClick(id, new MouseEvent('click'));
             setIsMiningModalOpen(false);
         }}
         onLogHistory={handleLogHistory}
@@ -1841,7 +2070,7 @@ export default function App() {
         relationships={relationships}
         onClose={() => setIsTagCloudModalOpen(false)}
         onNodeSelect={(id) => {
-            handleNodeClick(id);
+            handleNodeClick(id, new MouseEvent('click'));
             setIsTagCloudModalOpen(false);
         }}
       />
@@ -1879,6 +2108,7 @@ export default function App() {
           onNodeConnectToNew={handleNodeConnectToNew}
           activeColorScheme={activeColorScheme}
           selectedElementId={selectedElementId}
+          multiSelection={multiSelection}
           selectedRelationshipId={selectedRelationshipId}
           focusMode={focusMode}
           setElements={setElements}
@@ -1887,6 +2117,7 @@ export default function App() {
           onJiggleTrigger={jiggleTrigger}
           isBulkEditActive={isBulkEditActive}
           simulationState={simulationState}
+          analysisHighlights={analysisHighlights}
         />
       ) : (
         <div className="w-full h-full flex-col items-center justify-center bg-gray-900 text-white space-y-10 p-8 flex">
@@ -1943,6 +2174,7 @@ export default function App() {
           onAddRelationship={() => {
             setPanelState({ view: 'addRelationship', sourceElementId: contextMenu.elementId, targetElementId: null, isNewTarget: false });
             setSelectedElementId(null);
+            setMultiSelection(new Set());
             setSelectedRelationshipId(null);
             handleCloseContextMenu();
           }}

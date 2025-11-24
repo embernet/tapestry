@@ -4,6 +4,7 @@ import { Element, Relationship, TocToolType, ModelActions, TapestryDocument, Tap
 import { generateMarkdownFromGraph } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
+import { DEFAULT_TOOL_PROMPTS } from '../constants';
 
 interface TocModalProps {
   isOpen: boolean;
@@ -19,9 +20,11 @@ interface TocModalProps {
   documents: TapestryDocument[];
   folders: TapestryFolder[];
   onUpdateDocument: (docId: string, updates: Partial<TapestryDocument>) => void;
+  customPrompt?: string;
 }
 
-// --- Sub Components ---
+// ... (Keep Sub Components CrtPanel, EcPanel, FrtPanel, TtPanel identical) ...
+// [Re-declaring for context]
 
 const CrtPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> = ({ onGenerate, isLoading }) => {
     return (
@@ -137,7 +140,7 @@ const TtPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> = ({ onG
 
 // --- Main Modal ---
 
-const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument }) => {
+const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -176,15 +179,10 @@ const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relat
           const graphMarkdown = generateMarkdownFromGraph(elements, relationships);
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           
-          let systemInstruction = `You are an expert in the Theory of Constraints (TOC). Analyze the provided graph model.
+          const systemPromptBase = customPrompt || DEFAULT_TOOL_PROMPTS['toc'];
+          let systemInstruction = `${systemPromptBase}
           GRAPH CONTEXT:
-          ${graphMarkdown}
-          
-          OUTPUT FORMAT:
-          Return a JSON object with two fields:
-          1. "analysis": A detailed MARKDOWN string explaining your findings using TOC terminology (UDEs, Constraints, Injections, etc.).
-          2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.
-          `;
+          ${graphMarkdown}`;
 
           let userPrompt = "";
           let subjectName = "";
@@ -388,6 +386,7 @@ const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relat
             {/* Right: Results */}
             <div className="w-2/3 p-6 overflow-y-auto flex flex-col gap-6 bg-gray-900 relative">
                 
+                {/* Results UI ... */}
                 {analysisText && (
                     <div className="absolute top-4 right-6 flex gap-2 z-10">
                         <button onClick={handleCopy} className="p-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition" title="Copy">
@@ -437,8 +436,9 @@ const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relat
                                                 <div className="text-gray-200 font-medium">
                                                     {action.name === 'addElement' && `Add: ${action.args.name}`}
                                                     {action.name === 'addRelationship' && `Link: ${action.args.sourceName} → ${action.args.targetName}`}
+                                                    {action.name === 'deleteElement' && `Delete: ${action.args.name}`}
                                                     {action.name === 'setElementAttribute' && `Set: ${action.args.key} = ${action.args.value} on ${action.args.elementName}`}
-                                                    {!['addElement', 'addRelationship', 'setElementAttribute'].includes(action.name) && JSON.stringify(action.args)}
+                                                    {!['addElement', 'addRelationship', 'deleteElement', 'setElementAttribute'].includes(action.name) && JSON.stringify(action.args)}
                                                 </div>
                                             </div>
                                             {action.status === 'pending' ? (

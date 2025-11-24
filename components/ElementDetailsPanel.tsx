@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme } from '../types';
 import ElementEditor from './ElementEditor';
@@ -37,7 +38,7 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({
   }, [element]);
 
   const handleDataChange = (updatedData: Partial<Element>, immediate: boolean = false) => {
-    setFormData(updatedData);
+    setFormData(prev => ({ ...prev, ...updatedData }));
     if (immediate && element) {
         // Immediate update requested (e.g. tag toggle)
         onUpdate({ ...element, ...updatedData } as Element);
@@ -69,9 +70,7 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({
     if (event.key === 'Enter' || event.key === 'Escape') {
       const target = event.target as HTMLElement;
       // Avoid blurring if inside an input that handles its own Enter (like tag input)
-      // ElementEditor tag input stops propagation, so this likely only catches other inputs.
-      // However, generic blurring on Enter is useful for Name/Notes.
-      if (target.tagName.toLowerCase() !== 'textarea') {
+      if (target.tagName.toLowerCase() !== 'textarea' && target.getAttribute('type') !== 'color') {
           target.blur();
       }
     }
@@ -86,9 +85,10 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({
   }
 
   return (
-    <div className="bg-gray-800 border border-gray-700 h-auto max-h-full w-96 rounded-lg shadow-2xl flex flex-col" onKeyDown={handleKeyDown}>
-      <div className="p-6 flex flex-col min-h-0">
-        <div className="flex-shrink-0 mb-6 flex justify-between items-start">
+    <div className="bg-gray-800 border border-gray-700 w-96 flex flex-col h-full min-h-0" onKeyDown={handleKeyDown}>
+      {/* Fixed Header Section */}
+      <div className="p-6 pb-0 flex-shrink-0 bg-gray-800 z-10">
+        <div className="flex justify-between items-start mb-4">
           <h2 className="text-2xl font-bold text-white">Element Details</h2>
           <div className="flex space-x-2">
             <button 
@@ -118,22 +118,39 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({
           </div>
         </div>
 
-        <div className="flex-grow overflow-y-auto pr-2">
+        {/* Name Field moved here to be fixed above scroll area */}
+        <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-400 mb-1">Name</label>
+            <input
+                ref={nameInputRef}
+                type="text"
+                name="name"
+                value={formData.name || ''}
+                onChange={(e) => handleDataChange({ name: e.target.value })}
+                onBlur={handleBlur}
+                className="block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+            />
+        </div>
+      </div>
+
+      {/* Scrollable Content Section */}
+      <div className="flex-grow overflow-y-auto px-6 pb-2 custom-scrollbar">
           <ElementEditor
             elementData={formData}
             onDataChange={handleDataChange}
             onBlur={handleBlur}
-            nameInputRef={nameInputRef}
             colorSchemes={colorSchemes}
             activeSchemeId={activeSchemeId}
+            hideName={true} // Name is handled in the fixed header
           />
-          <div className="text-xs text-gray-500 pt-4 space-y-1 mt-4">
+          <div className="text-xs text-gray-500 pt-4 space-y-1 mt-4 border-t border-gray-700">
               <p>Created: {formatDate(element.createdAt)}</p>
               <p>Last Edited: {formatDate(element.updatedAt)}</p>
           </div>
-        </div>
-        
-        <div className="flex-shrink-0 mt-4 pt-4 border-t border-gray-700 flex justify-between items-center">
+      </div>
+      
+      {/* Footer Section */}
+      <div className="flex-shrink-0 p-6 pt-4 border-t border-gray-700 flex justify-between items-center bg-gray-800">
           <p className="text-xs text-gray-500">Changes saved automatically.</p>
           <button
             onClick={handleDelete}
@@ -141,7 +158,6 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({
           >
             Delete Element
           </button>
-        </div>
       </div>
     </div>
   );

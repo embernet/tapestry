@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Element, ColorScheme } from '../types';
 import AttributesEditor from './AttributesEditor';
@@ -9,6 +10,7 @@ interface ElementEditorProps {
   nameInputRef?: React.RefObject<HTMLInputElement>;
   colorSchemes: ColorScheme[];
   activeSchemeId: string | null;
+  hideName?: boolean;
 }
 
 const ElementEditor: React.FC<ElementEditorProps> = ({ 
@@ -17,7 +19,8 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
   onBlur, 
   nameInputRef, 
   colorSchemes, 
-  activeSchemeId 
+  activeSchemeId,
+  hideName = false
 }) => {
   const [manualTagInput, setManualTagInput] = useState('');
   const [otherSchemaView, setOtherSchemaView] = useState<string>('none');
@@ -95,18 +98,20 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
 
   return (
     <div className="space-y-4 text-gray-300">
-      <div>
-        <label className="block text-sm font-medium">Name</label>
-        <input
-          ref={nameInputRef}
-          type="text"
-          name="name"
-          value={elementData.name || ''}
-          onChange={handleInputChange}
-          onBlur={onBlur}
-          className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
+      {!hideName && (
+        <div>
+            <label className="block text-sm font-medium">Name</label>
+            <input
+            ref={nameInputRef}
+            type="text"
+            name="name"
+            value={elementData.name || ''}
+            onChange={handleInputChange}
+            onBlur={onBlur}
+            className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+        </div>
+      )}
       
       <div>
         <label className="block text-sm font-medium mb-2">Tags</label>

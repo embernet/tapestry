@@ -76,18 +76,19 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
   }
 
   return (
-    <div className="bg-gray-800 border border-gray-700 h-auto max-h-full w-96 rounded-lg shadow-2xl flex flex-col" onKeyDown={handleKeyDown}>
-      <div className="p-6 flex flex-col min-h-0">
-        <div className="flex-shrink-0 mb-6">
+    <div className="bg-gray-800 border border-gray-700 w-96 flex flex-col h-full min-h-0" onKeyDown={handleKeyDown}>
+        {/* Header */}
+        <div className="flex-shrink-0 p-6 pb-0 bg-gray-800 z-10">
           <h2 className="text-2xl font-bold text-white">Relationship Details</h2>
-          <div className="flex items-center text-sm text-gray-400 mt-2 space-x-2">
+          <div className="flex items-center text-sm text-gray-400 mt-2 space-x-2 mb-6">
              <span className="bg-gray-700 px-2 py-0.5 rounded">{sourceElement.name}</span>
              <span>→</span>
              <span className="bg-gray-700 px-2 py-0.5 rounded">{targetElement.name}</span>
           </div>
         </div>
 
-        <div className="flex-grow space-y-4 text-gray-300 overflow-y-auto pr-2">
+        {/* Scrollable Content */}
+        <div className="flex-grow space-y-4 text-gray-300 overflow-y-auto px-6 pb-2 custom-scrollbar">
           <div>
             <label className="block text-sm font-medium">Label</label>
             <input
@@ -147,7 +148,8 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
           />
         </div>
         
-        <div className="flex-shrink-0 mt-4 pt-4 border-t border-gray-700 flex justify-between items-center">
+        {/* Footer */}
+        <div className="flex-shrink-0 p-6 pt-4 border-t border-gray-700 flex justify-between items-center bg-gray-800 rounded-b-lg">
            <p className="text-xs text-gray-500">Changes saved automatically.</p>
            <button
             onClick={handleDelete}
@@ -156,7 +158,6 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
             Delete Link
           </button>
         </div>
-      </div>
     </div>
   );
 };

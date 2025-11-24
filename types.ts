@@ -94,6 +94,7 @@ export interface SystemPromptConfig {
   userContext?: string;
   responseStyle?: string;
   enabledTools?: string[];
+  toolPrompts?: Record<string, string>;
 }
 
 export interface GlobalSettings {

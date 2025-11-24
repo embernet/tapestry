@@ -6,6 +6,8 @@ interface AnalysisToolbarProps {
   elements: Element[];
   relationships: Relationship[];
   onBulkTag: (elementIds: string[], tag: string, mode: 'add' | 'remove') => void;
+  onHighlight: (highlightMap: Map<string, string>) => void;
+  onFilter: (mode: 'hide' | 'hide_others' | 'none', ids: Set<string>) => void;
   isCollapsed: boolean;
   onToggle: () => void;
   isSimulationMode: boolean;
@@ -13,23 +15,18 @@ interface AnalysisToolbarProps {
   onResetSimulation: () => void;
 }
 
-const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationships, onBulkTag, isCollapsed, onToggle, isSimulationMode, onToggleSimulation, onResetSimulation }) => {
-  const [isShiftPressed, setIsShiftPressed] = useState(false);
+const ANALYSIS_CATEGORIES = [
+    { id: 'isolated', label: 'Isolated', tag: 'Isolated', color: 'bg-red-300', borderColor: 'border-red-300', textColor: 'text-red-900', hex: '#fca5a5' },
+    { id: 'source', label: 'Sources', tag: 'Source', color: 'bg-orange-300', borderColor: 'border-orange-300', textColor: 'text-orange-900', hex: '#fdba74' },
+    { id: 'sink', label: 'Sinks', tag: 'Sink', color: 'bg-blue-300', borderColor: 'border-blue-300', textColor: 'text-blue-900', hex: '#93c5fd' },
+    { id: 'leaf', label: 'Leaves', tag: 'Leaf', color: 'bg-green-300', borderColor: 'border-green-300', textColor: 'text-green-900', hex: '#86efac' },
+    { id: 'hub', label: 'Hubs', tag: 'Hub', color: 'bg-purple-300', borderColor: 'border-purple-300', textColor: 'text-purple-900', hex: '#d8b4fe' },
+    { id: 'articulation', label: 'Articulations', tag: 'Articulation', color: 'bg-yellow-300', borderColor: 'border-yellow-300', textColor: 'text-yellow-900', hex: '#fcd34d' }
+];
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Shift') setIsShiftPressed(true);
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Shift') setIsShiftPressed(false);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, []);
+const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationships, onBulkTag, onHighlight, onFilter, isCollapsed, onToggle, isSimulationMode, onToggleSimulation, onResetSimulation }) => {
+  const [actionType, setActionType] = useState<'tag' | 'highlight' | 'hide' | 'hide_others'>('highlight');
+  const [activeCategoryIds, setActiveCategoryIds] = useState<Set<string>>(new Set());
 
   const stats = useMemo(() => {
     const nodeCount = elements.length;
@@ -142,14 +139,79 @@ const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationshi
     };
   }, [elements, relationships]);
 
-  const handleTagAction = (ids: string[], tag: string) => {
-      if (ids.length === 0) {
-          // Optional: Feedback for empty selection
-          // alert("No matching elements found.");
-          return;
+  // Effect to update highlights/filters whenever active categories or mode changes
+  useEffect(() => {
+      const selectedIds = new Set<string>();
+      const highlightMap = new Map<string, string>();
+
+      ANALYSIS_CATEGORIES.forEach(cat => {
+          if (activeCategoryIds.has(cat.id)) {
+              const key = `${cat.id}Ids` as keyof typeof stats;
+              const ids = stats[key] as string[];
+              if (Array.isArray(ids)) {
+                  ids.forEach(id => {
+                      selectedIds.add(id);
+                      // Apply colors in order of definition (later overrides earlier if node is in multiple sets)
+                      highlightMap.set(id, cat.hex);
+                  });
+              }
+          }
+      });
+
+      if (actionType === 'highlight') {
+          onHighlight(highlightMap);
+          onFilter('none', new Set());
+      } else if (actionType === 'hide') {
+          onHighlight(new Map()); // Clear highlights when filtering
+          onFilter('hide', selectedIds);
+      } else if (actionType === 'hide_others') {
+          onHighlight(new Map()); // Clear highlights when filtering
+          // If nothing is selected in 'Hide Others', strict interpretation means everything is hidden.
+          if (activeCategoryIds.size === 0) {
+              onFilter('none', new Set()); // To avoid "blank screen shock", behave like 'none' if nothing selected
+          } else {
+              onFilter('hide_others', selectedIds);
+          }
+      } else {
+          // Tag mode
+          onHighlight(new Map());
+          onFilter('none', new Set());
       }
-      const mode = isShiftPressed ? 'remove' : 'add';
-      onBulkTag(ids, tag, mode);
+  }, [activeCategoryIds, actionType, stats, onHighlight, onFilter]);
+
+  const handleToggleCategory = (catId: string, tagLabel: string) => {
+      const newSet = new Set(activeCategoryIds);
+      const isActive = newSet.has(catId);
+      
+      if (isActive) {
+          newSet.delete(catId);
+          if (actionType === 'tag') {
+              const key = `${catId}Ids` as keyof typeof stats;
+              onBulkTag(stats[key] as string[], tagLabel, 'remove');
+          }
+      } else {
+          newSet.add(catId);
+          if (actionType === 'tag') {
+              const key = `${catId}Ids` as keyof typeof stats;
+              onBulkTag(stats[key] as string[], tagLabel, 'add');
+          }
+      }
+      setActiveCategoryIds(newSet);
+  };
+
+  const handleReset = () => {
+      if (actionType === 'tag') {
+          // Remove all tags related to analysis from all nodes
+          ANALYSIS_CATEGORIES.forEach(cat => {
+              if (activeCategoryIds.has(cat.id)) {
+                  const key = `${cat.id}Ids` as keyof typeof stats;
+                  onBulkTag(stats[key] as string[], cat.tag, 'remove');
+              }
+          });
+      }
+      
+      setActiveCategoryIds(new Set());
+      // The useEffect will clear filters/highlights automatically when activeCategoryIds becomes empty
   };
 
   return (
@@ -164,7 +226,7 @@ const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationshi
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <span className="text-xs font-bold tracking-wider">STATS</span>
+                <span className="text-[10px] font-bold tracking-wider uppercase">ANALYSIS</span>
             </button>
 
              {/* Expanded Content */}
@@ -186,7 +248,7 @@ const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationshi
                         </div>
                     </div>
 
-                    {/* Simulation Section (NEW) */}
+                    {/* Simulation Section */}
                     <div className="flex flex-col justify-center h-full px-2 border-r border-gray-600 pr-4">
                         <span className="text-[10px] font-bold uppercase tracking-wider mb-2 text-blue-400">
                             SIMULATION
@@ -221,63 +283,54 @@ const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationshi
 
                     {/* Actions Section */}
                     <div className="flex flex-col justify-center h-full pl-2">
-                        <span className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${isShiftPressed ? 'text-red-400' : 'text-gray-400'}`}>
-                            ANALYSIS ACTIONS - {isShiftPressed ? 'UNTAG' : 'TAG'}
-                        </span>
+                        <div className="flex items-center justify-between mb-2 gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                                ACTIONS
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <select 
+                                    value={actionType}
+                                    onChange={(e) => setActionType(e.target.value as 'tag' | 'highlight' | 'hide' | 'hide_others')}
+                                    className="bg-gray-900 border border-gray-600 text-[10px] text-white rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 uppercase font-bold max-w-[100px]"
+                                >
+                                    <option value="highlight">Highlight</option>
+                                    <option value="tag">Tag</option>
+                                    <option value="hide">Hide</option>
+                                    <option value="hide_others">Hide Others</option>
+                                </select>
+                                <button 
+                                    onClick={handleReset}
+                                    className="text-[10px] bg-gray-700 hover:bg-gray-600 border border-gray-600 text-gray-300 px-2 py-0.5 rounded hover:text-white transition-colors"
+                                    title={`Reset ${actionType}`}
+                                >
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                        
                         <div className="flex gap-2">
-                            <button 
-                                onClick={() => handleTagAction(stats.isolatedIds, 'Isolated')}
-                                className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-1.5 rounded border border-gray-600 transition-colors flex items-center gap-2"
-                                title="Nodes with 0 connections"
-                            >
-                                <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                                <span className="font-semibold text-gray-200">Isolated ({stats.isolatedIds.length})</span>
-                            </button>
-                            
-                             <button 
-                                onClick={() => handleTagAction(stats.sourceIds, 'Source')}
-                                className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-1.5 rounded border border-gray-600 transition-colors flex items-center gap-2"
-                                title="Nodes with Outgoing links only"
-                            >
-                                <span className="w-2 h-2 rounded-full bg-orange-500"></span>
-                                <span className="font-semibold text-gray-200">Sources ({stats.sourceIds.length})</span>
-                            </button>
-                            
-                            <button 
-                                onClick={() => handleTagAction(stats.sinkIds, 'Sink')}
-                                className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-1.5 rounded border border-gray-600 transition-colors flex items-center gap-2"
-                                title="Nodes with Incoming links only"
-                            >
-                                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                <span className="font-semibold text-gray-200">Sinks ({stats.sinkIds.length})</span>
-                            </button>
-
-                            <button 
-                                onClick={() => handleTagAction(stats.leafIds, 'Leaf')}
-                                className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-1.5 rounded border border-gray-600 transition-colors flex items-center gap-2"
-                                title="Nodes with exactly 1 connection"
-                            >
-                                <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                                <span className="font-semibold text-gray-200">Leaves ({stats.leafIds.length})</span>
-                            </button>
-                            
-                            <button 
-                                onClick={() => handleTagAction(stats.hubIds, 'Hub')}
-                                className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-1.5 rounded border border-gray-600 transition-colors flex items-center gap-2"
-                                title="Nodes with 5+ connections"
-                            >
-                                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                                <span className="font-semibold text-gray-200">Hubs ({stats.hubIds.length})</span>
-                            </button>
-
-                            <button 
-                                onClick={() => handleTagAction(stats.articulationIds, 'Articulation')}
-                                className="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-1.5 rounded border border-gray-600 transition-colors flex items-center gap-2"
-                                title="Nodes whose removal would disconnect the graph"
-                            >
-                                <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
-                                <span className="font-semibold text-gray-200">Articulations ({stats.articulationIds.length})</span>
-                            </button>
+                            {ANALYSIS_CATEGORIES.map(cat => {
+                                const isActive = activeCategoryIds.has(cat.id);
+                                const count = (stats[`${cat.id}Ids` as keyof typeof stats] as string[]).length;
+                                
+                                return (
+                                    <button 
+                                        key={cat.id}
+                                        onClick={() => handleToggleCategory(cat.id, cat.tag)}
+                                        className={`text-xs px-3 py-1.5 rounded border transition-all flex items-center gap-2 ${
+                                            isActive 
+                                            ? `bg-gray-800 ${cat.borderColor} border-2 shadow-[0_0_10px_rgba(0,0,0,0.3)]` 
+                                            : 'bg-gray-700 border-gray-600 hover:bg-gray-600 hover:border-gray-500'
+                                        }`}
+                                        title={`Toggle ${cat.label} (${count})`}
+                                    >
+                                        <span className={`w-2 h-2 rounded-full ${cat.color}`}></span>
+                                        <span className={`font-semibold ${isActive ? 'text-white' : 'text-gray-300'}`}>
+                                            {cat.label} ({count})
+                                        </span>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>

@@ -183,3 +183,30 @@ export const generateElementMarkdown = (
   
   return lines.join('\n\n---\n\n');
 };
+
+export const generateSelectionReport = (elements: Element[], relationships: Relationship[]): string => {
+    return elements.map(el => {
+        // Find relationships connected to this element that are ALSO within the selection set
+        // We assume 'relationships' passed here is already filtered to only include internal links
+        const connectedRels = relationships.filter(r => r.source === el.id || r.target === el.id);
+        
+        let relStrings = 'None';
+        
+        if (connectedRels.length > 0) {
+            relStrings = connectedRels.map(r => {
+                const source = elements.find(e => e.id === r.source);
+                const target = elements.find(e => e.id === r.target);
+                
+                // Even if filtered, safety check
+                if (!source || !target) return null;
+
+                // Format: Source label Target
+                // We essentially describe the relationship fact regardless of direction,
+                // matching the user's example "Car produces Pollution"
+                return `${source.name} ${r.label} ${target.name}`;
+            }).filter(Boolean).join('\n');
+        }
+
+        return `${el.name}\nTags: ${el.tags.join(', ')}\nRelationships:\n${relStrings}`;
+    }).join('\n\n');
+};
