@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, MiningToolType, TagCloudToolType, SwotToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings } from './types';
-import { DEFAULT_COLOR_SCHEMES, LINK_DISTANCE, DEFAULT_SYSTEM_PROMPT_CONFIG, TAGLINES, AVAILABLE_AI_TOOLS } from './constants';
+import { DEFAULT_COLOR_SCHEMES, LINK_DISTANCE, DEFAULT_SYSTEM_PROMPT_CONFIG, TAGLINES, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
 import ElementDetailsPanel from './components/ElementDetailsPanel';
 import RelationshipDetailsPanel from './components/RelationshipDetailsPanel';
@@ -88,7 +88,7 @@ export default function App() {
   });
   const [systemPromptConfig, setSystemPromptConfig] = useState<SystemPromptConfig>(DEFAULT_SYSTEM_PROMPT_CONFIG);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'ai'>('general');
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'ai' | 'tools'>('general');
 
   // --- Documents State ---
   const [documents, setDocuments] = useState<TapestryDocument[]>([]);
@@ -185,6 +185,24 @@ export default function App() {
       setGlobalSettings(settings);
       localStorage.setItem(GLOBAL_SETTINGS_KEY, JSON.stringify(settings));
   };
+
+  // --- Helper to resolve tool prompts (with subtool fallback) ---
+  const getToolPrompt = useCallback((tool: string, subTool?: string | null) => {
+      const prompts = systemPromptConfig.toolPrompts || DEFAULT_TOOL_PROMPTS;
+      
+      // 1. Check for specific subtool override (e.g. "triz:contradiction")
+      if (subTool && prompts[`${tool}:${subTool}`]) {
+          return prompts[`${tool}:${subTool}`];
+      }
+      
+      // 2. Check for category base prompt (e.g. "triz")
+      if (prompts[tool]) {
+          return prompts[tool];
+      }
+      
+      // 3. Fallback to default constant
+      return DEFAULT_TOOL_PROMPTS[tool];
+  }, [systemPromptConfig]);
 
   const toggleTool = (toolName: string) => {
       setActiveTool(prev => {
@@ -768,7 +786,20 @@ export default function App() {
 
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const prompt = `Apply the SCAMPER technique '${letter} - ${operator}' to the concept: "${sourceElement.name}" (Notes: ${sourceElement.notes}). Generate 4-8 distinct, creative ideas that emerge from applying this operator. For each idea, provide a name, a short description/rationale, and a short relationship label that connects the original concept to the new idea (e.g. "can be replaced by", "combined with", "adapted to").`;
+        
+        // Get custom prompt if available for this specific operator
+        const customPrompt = getToolPrompt('scamper', letter) || DEFAULT_TOOL_PROMPTS['scamper'];
+        
+        // If base prompt is generic, we construct the task. 
+        // If user overwrites it completely, we might lose the task context unless they include it.
+        // But assuming advanced users want control, we use the prompt as the base instruction.
+        
+        const prompt = `${customPrompt}
+        
+        TASK: Apply the SCAMPER technique '${letter} - ${operator}' to the concept: "${sourceElement.name}" (Notes: ${sourceElement.notes}). 
+        Generate 4-8 distinct, creative ideas that emerge from applying this operator. 
+        For each idea, provide a name, a short description/rationale, and a short relationship label that connects the original concept to the new idea (e.g. "can be replaced by", "combined with", "adapted to").`;
+        
         const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING, description: "The name of the new idea node." }, description: { type: Type.STRING, description: "Rationale or explanation." }, relationshipLabel: { type: Type.STRING, description: "Label for the link from original node to this new node." } } } } } });
         const results = JSON.parse(response.text || "[]");
         const suggestions: ScamperSuggestion[] = results.map((r: any) => ({ id: generateUUID(), name: r.name, description: r.description, relationshipLabel: r.relationshipLabel, status: 'pending' }));
@@ -1773,36 +1804,42 @@ export default function App() {
                     onScamper={handleScamperGenerate}
                     isCollapsed={activeTool !== 'scamper'}
                     onToggle={() => toggleTool('scamper')}
+                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
                 />
                 <TrizToolbar
                     activeTool={activeTrizTool}
                     onSelectTool={handleTrizToolSelect}
                     isCollapsed={activeTool !== 'triz'}
                     onToggle={() => toggleTool('triz')}
+                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
                 />
                 <LssToolbar
                     activeTool={activeLssTool}
                     onSelectTool={handleLssToolSelect}
                     isCollapsed={activeTool !== 'lss'}
                     onToggle={() => toggleTool('lss')}
+                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
                 />
                 <TocToolbar
                     activeTool={activeTocTool}
                     onSelectTool={handleTocToolSelect}
                     isCollapsed={activeTool !== 'toc'}
                     onToggle={() => toggleTool('toc')}
+                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
                 />
                 <SsmToolbar
                     activeTool={activeSsmTool}
                     onSelectTool={handleSsmToolSelect}
                     isCollapsed={activeTool !== 'ssm'}
                     onToggle={() => toggleTool('ssm')}
+                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
                 />
                 <SwotToolbar 
                     activeTool={activeSwotTool}
                     onSelectTool={handleSwotToolSelect}
                     isCollapsed={activeTool !== 'swot'}
                     onToggle={() => toggleTool('swot')}
+                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
                 />
                 <MiningToolbar
                     onSelectTool={handleMiningToolSelect}
@@ -1985,6 +2022,7 @@ export default function App() {
         onLogHistory={handleLogHistory}
         onOpenHistory={() => setIsHistoryPanelOpen(true)}
         onAnalyze={handleAnalyzeWithChat}
+        customPrompt={getToolPrompt('triz', activeTrizTool)}
       />
 
       <LssModal 
@@ -2001,6 +2039,7 @@ export default function App() {
         onLogHistory={handleLogHistory}
         onOpenHistory={() => setIsHistoryPanelOpen(true)}
         onAnalyze={handleAnalyzeWithChat}
+        customPrompt={getToolPrompt('lss', activeLssTool)}
       />
 
       <TocModal 
@@ -2017,6 +2056,7 @@ export default function App() {
         onLogHistory={handleLogHistory}
         onOpenHistory={() => setIsHistoryPanelOpen(true)}
         onAnalyze={handleAnalyzeWithChat}
+        customPrompt={getToolPrompt('toc', activeTocTool)}
       />
 
       <SsmModal 
@@ -2033,6 +2073,7 @@ export default function App() {
         onLogHistory={handleLogHistory}
         onOpenHistory={() => setIsHistoryPanelOpen(true)}
         onAnalyze={handleAnalyzeWithChat}
+        customPrompt={getToolPrompt('ssm', activeSsmTool)}
       />
 
       <SwotModal 
@@ -2047,6 +2088,7 @@ export default function App() {
         onClose={() => setIsSwotModalOpen(false)}
         onLogHistory={handleLogHistory}
         onOpenHistory={() => setIsHistoryPanelOpen(true)}
+        customPrompt={getToolPrompt('swot', activeSwotTool)}
       />
 
       <MiningModal 
