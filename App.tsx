@@ -264,7 +264,7 @@ export default function App() {
       } else if (tool === 'tagcloud') {
           setIsTagCloudModalOpen(true);
       } else if (tool === 'swot') {
-          setActiveSwotTool('matrix');
+          setActiveSwotTool((subTool as SwotToolType) || 'matrix');
           setIsSwotModalOpen(true);
       }
   }, []);
@@ -303,9 +303,9 @@ export default function App() {
       } else if (toolId.includes('mining')) {
           setActiveTool('mining');
           setIsMiningModalOpen(true);
-      } else if (toolId.includes('swot')) {
+      } else if (toolId.includes('swot') || toolId.includes('strategic')) {
           setActiveTool('swot');
-          setActiveSwotTool('matrix');
+          setActiveSwotTool((subTool as SwotToolType) || 'matrix');
           setIsSwotModalOpen(true);
       }
       setIsToolsPanelOpen(true);
@@ -344,10 +344,8 @@ export default function App() {
   };
 
   const handleSwotToolSelect = (tool: SwotToolType) => {
-      if (tool === 'matrix') {
-          setActiveSwotTool(tool);
-          setIsSwotModalOpen(true);
-      }
+      setActiveSwotTool(tool);
+      setIsSwotModalOpen(true);
   };
 
   // Reset bulk mode if tool is closed
@@ -1531,7 +1529,7 @@ export default function App() {
                                 { id: 'lss', label: 'Lean Six Sigma', color: 'text-blue-400' },
                                 { id: 'toc', label: 'Theory of Constraints', color: 'text-amber-400' },
                                 { id: 'ssm', label: 'Soft Systems', color: 'text-cyan-400' },
-                                { id: 'swot', label: 'SWOT Analysis', color: 'text-lime-400' },
+                                { id: 'swot', label: 'Strategic Analysis', color: 'text-lime-400' },
                                 { id: 'mining', label: 'Data Mining', color: 'text-yellow-400' },
                                 { id: 'tagcloud', label: 'Tag Cloud', color: 'text-pink-400' },
                                 { id: 'bulk', label: 'Bulk Edit', color: 'text-pink-400' },
@@ -2039,6 +2037,7 @@ export default function App() {
 
       <SwotModal 
         isOpen={isSwotModalOpen}
+        activeTool={activeSwotTool}
         elements={elements}
         relationships={relationships}
         modelActions={aiActions}

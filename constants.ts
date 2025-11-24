@@ -34,8 +34,8 @@ export const AVAILABLE_AI_TOOLS = [
     },
     {
         id: 'swot',
-        name: 'SWOT Analysis (Strategy)',
-        description: 'Strategic planning technique used to identify Strengths, Weaknesses, Opportunities, and Threats related to business competition or project planning.'
+        name: 'Strategic Analysis (SWOT++)',
+        description: 'Strategic planning frameworks including SWOT, PESTEL, Porter’s Five Forces, and CAGE to analyze internal/external factors and competitive landscapes.'
     },
     { 
         id: 'mining', 
@@ -76,11 +76,11 @@ OUTPUT FORMAT:
 Return a JSON object with two fields:
 1. "analysis": A detailed MARKDOWN string explaining your findings using SSM terminology.
 2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`,
-    swot: `You are a Strategic Analyst specializing in SWOT Analysis. Analyze the provided graph model to identify Strengths, Weaknesses, Opportunities, and Threats.
+    swot: `You are a Strategic Analyst. Analyze the provided graph model using the requested framework (SWOT, PESTEL, Porter's Five Forces, etc.).
 
 OUTPUT FORMAT:
 Return a JSON object with two fields:
-1. "analysis": A detailed MARKDOWN string explaining your findings, organized by Strength, Weakness, Opportunity, Threat.
+1. "analysis": A detailed MARKDOWN string explaining your findings, organized by the categories of the selected framework.
 2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`
 };
 
