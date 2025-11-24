@@ -177,7 +177,7 @@ export interface StorySlide {
 // ---
 
 export type TrizToolType = 'contradiction' | 'principles' | 'ariz' | 'sufield' | 'trends' | null;
-export type LssToolType = 'dmaic' | '5whys' | 'fishbone' | 'fmea' | 'vsm' | null;
+export type LssToolType = 'charter' | 'sipoc' | 'voc' | 'ctq' | 'stakeholder' | 'dmaic' | '5whys' | 'fishbone' | 'fmea' | 'vsm' | null;
 export type TocToolType = 'crt' | 'ec' | 'frt' | 'tt' | null;
 export type SsmToolType = 'rich_picture' | 'catwoe' | 'activity_models' | 'comparison' | null;
 export type SwotToolType = 'matrix' | null;

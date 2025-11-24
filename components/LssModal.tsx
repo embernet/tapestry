@@ -23,8 +23,137 @@ interface LssModalProps {
   customPrompt?: string;
 }
 
-// ... (Keep Sub Components DmaicPanel, FiveWhysPanel, FishbonePanel, FmeaPanel, VsmPanel identical) ...
-// [Re-declaring for context]
+// --- Define Phase Tool Panels ---
+
+const CharterPanel: React.FC<{ onGenerate: (context: string) => void, isLoading: boolean }> = ({ onGenerate, isLoading }) => {
+    const [context, setContext] = useState('');
+    return (
+        <div className="space-y-4">
+            <p className="text-gray-300 text-sm">
+                A Project Charter defines the problem scope, goals, and stakeholders. 
+                Describe the project or problem you are tackling.
+            </p>
+            <textarea
+                value={context}
+                onChange={e => setContext(e.target.value)}
+                placeholder="e.g., Reducing customer wait times in the support center..."
+                className="w-full bg-gray-800 text-white text-sm rounded p-2 border border-gray-600 focus:border-indigo-500 outline-none h-24"
+            />
+            <button 
+                disabled={!context.trim() || isLoading}
+                onClick={() => onGenerate(context)}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded transition disabled:opacity-50"
+            >
+                {isLoading ? 'Drafting Charter...' : 'Generate Project Charter'}
+            </button>
+        </div>
+    );
+};
+
+const SipocPanel: React.FC<{ onGenerate: (process: string) => void, isLoading: boolean }> = ({ onGenerate, isLoading }) => {
+    const [processName, setProcessName] = useState('');
+    return (
+        <div className="space-y-4">
+            <p className="text-gray-300 text-sm">
+                SIPOC (Suppliers, Inputs, Process, Outputs, Customers) maps a process at a high level.
+                Enter the name of the process you want to map.
+            </p>
+            <input
+                type="text"
+                value={processName}
+                onChange={e => setProcessName(e.target.value)}
+                placeholder="e.g., Order Fulfillment Process"
+                className="w-full bg-gray-800 text-white text-sm rounded p-2 border border-gray-600 focus:border-teal-500 outline-none"
+            />
+            <button 
+                disabled={!processName.trim() || isLoading}
+                onClick={() => onGenerate(processName)}
+                className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 rounded transition disabled:opacity-50"
+            >
+                {isLoading ? 'Mapping Process...' : 'Generate SIPOC Diagram'}
+            </button>
+        </div>
+    );
+};
+
+const VocPanel: React.FC<{ onGenerate: (product: string) => void, isLoading: boolean }> = ({ onGenerate, isLoading }) => {
+    const [product, setProduct] = useState('');
+    return (
+        <div className="space-y-4">
+            <p className="text-gray-300 text-sm">
+                Voice of the Customer (VoC) captures customer needs and translates them into requirements.
+                Enter the product, service, or feature you are analyzing.
+            </p>
+            <input
+                type="text"
+                value={product}
+                onChange={e => setProduct(e.target.value)}
+                placeholder="e.g., Mobile Banking App"
+                className="w-full bg-gray-800 text-white text-sm rounded p-2 border border-gray-600 focus:border-pink-500 outline-none"
+            />
+            <button 
+                disabled={!product.trim() || isLoading}
+                onClick={() => onGenerate(product)}
+                className="w-full bg-pink-600 hover:bg-pink-500 text-white font-bold py-3 rounded transition disabled:opacity-50"
+            >
+                {isLoading ? 'Listening to Customers...' : 'Analyze Customer Needs'}
+            </button>
+        </div>
+    );
+};
+
+const CtqPanel: React.FC<{ onGenerate: (need: string) => void, isLoading: boolean }> = ({ onGenerate, isLoading }) => {
+    const [need, setNeed] = useState('');
+    return (
+        <div className="space-y-4">
+            <p className="text-gray-300 text-sm">
+                CTQ (Critical-to-Quality) Tree breaks down broad customer needs into specific, measurable drivers and metrics.
+                Enter a high-level customer need.
+            </p>
+            <input
+                type="text"
+                value={need}
+                onChange={e => setNeed(e.target.value)}
+                placeholder="e.g., 'Fast Service' or 'Reliable Connection'"
+                className="w-full bg-gray-800 text-white text-sm rounded p-2 border border-gray-600 focus:border-emerald-500 outline-none"
+            />
+            <button 
+                disabled={!need.trim() || isLoading}
+                onClick={() => onGenerate(need)}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded transition disabled:opacity-50"
+            >
+                {isLoading ? 'Building Tree...' : 'Generate CTQ Tree'}
+            </button>
+        </div>
+    );
+};
+
+const StakeholderPanel: React.FC<{ onGenerate: (context: string) => void, isLoading: boolean }> = ({ onGenerate, isLoading }) => {
+    const [context, setContext] = useState('');
+    return (
+        <div className="space-y-4">
+            <p className="text-gray-300 text-sm">
+                Stakeholder Analysis identifies people affected by the project and assesses their interest and influence.
+                Describe the project context.
+            </p>
+            <textarea
+                value={context}
+                onChange={e => setContext(e.target.value)}
+                placeholder="e.g., Implementing a new CRM system across sales and marketing..."
+                className="w-full bg-gray-800 text-white text-sm rounded p-2 border border-gray-600 focus:border-amber-500 outline-none h-24"
+            />
+            <button 
+                disabled={!context.trim() || isLoading}
+                onClick={() => onGenerate(context)}
+                className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 rounded transition disabled:opacity-50"
+            >
+                {isLoading ? 'Identifying Stakeholders...' : 'Run Stakeholder Analysis'}
+            </button>
+        </div>
+    );
+};
+
+// --- Existing Process Improvement Tool Panels ---
 
 const DmaicPanel: React.FC<{ onGenerate: (phase: string) => void, isLoading: boolean }> = ({ onGenerate, isLoading }) => {
     const PHASES = [
@@ -188,6 +317,13 @@ const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relat
 
   const toolInfo = useMemo(() => {
       switch(activeTool) {
+          // Define Phase
+          case 'charter': return { title: 'Project Charter', color: 'text-indigo-400', border: 'border-indigo-500' };
+          case 'sipoc': return { title: 'SIPOC Diagram', color: 'text-teal-400', border: 'border-teal-500' };
+          case 'voc': return { title: 'Voice of Customer', color: 'text-pink-400', border: 'border-pink-500' };
+          case 'ctq': return { title: 'CTQ Tree', color: 'text-emerald-400', border: 'border-emerald-500' };
+          case 'stakeholder': return { title: 'Stakeholder Analysis', color: 'text-amber-400', border: 'border-amber-500' };
+          // Process Tools
           case 'dmaic': return { title: 'DMAIC Cycle', color: 'text-blue-400', border: 'border-blue-500' };
           case '5whys': return { title: '5 Whys', color: 'text-orange-400', border: 'border-orange-500' };
           case 'fishbone': return { title: 'Ishikawa Diagram', color: 'text-emerald-400', border: 'border-emerald-500' };
@@ -217,7 +353,42 @@ const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relat
           let userPrompt = "";
           let subjectName = "";
 
-          if (activeTool === 'dmaic') {
+          // Define Phase Tools Logic
+          if (activeTool === 'charter') {
+              subjectName = contextData;
+              userPrompt = `Create a Project Charter for: "${contextData}".
+              1. Define the Problem Statement.
+              2. Define the Goal Statement.
+              3. Define the Project Scope (In/Out).
+              4. Identify Key Stakeholders.
+              5. Suggest nodes for 'Goal', 'Problem', 'Scope', and 'Stakeholder' if they don't exist.`;
+          } else if (activeTool === 'sipoc') {
+              subjectName = contextData;
+              userPrompt = `Create a SIPOC Diagram for the process: "${contextData}".
+              1. Identify Suppliers, Inputs, Process (high-level steps), Outputs, and Customers.
+              2. Suggest adding nodes for each component and linking them sequentially (Supplier -> Input -> Process -> Output -> Customer).`;
+          } else if (activeTool === 'voc') {
+              subjectName = contextData;
+              userPrompt = `Analyze Voice of the Customer (VoC) for: "${contextData}".
+              1. Identify Customer Needs and Wants (Verbatims).
+              2. Translate these into measurable Requirements.
+              3. Suggest adding 'Need' and 'Requirement' nodes.`;
+          } else if (activeTool === 'ctq') {
+              subjectName = contextData;
+              userPrompt = `Build a CTQ (Critical-to-Quality) Tree for the need: "${contextData}".
+              1. Start with the Need.
+              2. Identify Quality Drivers.
+              3. Identify specific, measurable CTQ metrics.
+              4. Suggest building this tree structure with nodes.`;
+          } else if (activeTool === 'stakeholder') {
+              subjectName = contextData;
+              userPrompt = `Perform a Stakeholder Analysis for the project: "${contextData}".
+              1. Identify potential Stakeholders.
+              2. Assess their Interest and Influence (High/Low).
+              3. Suggest adding 'Stakeholder' nodes with attributes {Interest="High", Influence="Low", etc.}.`;
+          } 
+          // Process Tools Logic
+          else if (activeTool === 'dmaic') {
               subjectName = contextData;
               userPrompt = `Perform a ${contextData} phase analysis on the graph.
               1. If Define: Identify Customers and CTQs (Critical to Quality).
@@ -414,6 +585,14 @@ const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relat
         <div className="flex flex-grow overflow-hidden">
             {/* Left: Controls */}
             <div className="w-1/3 p-6 border-r border-gray-800 overflow-y-auto bg-gray-800/50">
+                {/* Define Phase Tools */}
+                {activeTool === 'charter' && <CharterPanel isLoading={isLoading} onGenerate={handleGenerate} />}
+                {activeTool === 'sipoc' && <SipocPanel isLoading={isLoading} onGenerate={handleGenerate} />}
+                {activeTool === 'voc' && <VocPanel isLoading={isLoading} onGenerate={handleGenerate} />}
+                {activeTool === 'ctq' && <CtqPanel isLoading={isLoading} onGenerate={handleGenerate} />}
+                {activeTool === 'stakeholder' && <StakeholderPanel isLoading={isLoading} onGenerate={handleGenerate} />}
+                
+                {/* Process Tools */}
                 {activeTool === 'dmaic' && <DmaicPanel isLoading={isLoading} onGenerate={handleGenerate} />}
                 {activeTool === '5whys' && <FiveWhysPanel elements={elements} isLoading={isLoading} onGenerate={handleGenerate} />}
                 {activeTool === 'fishbone' && <FishbonePanel isLoading={isLoading} onGenerate={handleGenerate} />}
@@ -474,8 +653,9 @@ const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relat
                                                 <div className="text-gray-200 font-medium">
                                                     {action.name === 'addElement' && `Add: ${action.args.name}`}
                                                     {action.name === 'addRelationship' && `Link: ${action.args.sourceName} → ${action.args.targetName}`}
+                                                    {action.name === 'deleteElement' && `Delete: ${action.args.name}`}
                                                     {action.name === 'setElementAttribute' && `Set: ${action.args.key} = ${action.args.value} on ${action.args.elementName}`}
-                                                    {!['addElement', 'addRelationship', 'setElementAttribute'].includes(action.name) && JSON.stringify(action.args)}
+                                                    {!['addElement', 'addRelationship', 'deleteElement', 'setElementAttribute'].includes(action.name) && JSON.stringify(action.args)}
                                                 </div>
                                             </div>
                                             {action.status === 'pending' ? (

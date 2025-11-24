@@ -10,7 +10,65 @@ interface LssToolbarProps {
   onOpenSettings: () => void;
 }
 
-const LSS_TOOLS = [
+const DEFINE_TOOLS = [
+  { 
+    id: 'charter' as LssToolType, 
+    name: 'Project Charter', 
+    desc: 'Problem, Scope, Goals',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+    color: '#6366f1' // Indigo
+  },
+  { 
+    id: 'sipoc' as LssToolType, 
+    name: 'SIPOC Diagram', 
+    desc: 'Suppliers, Inputs, Process...',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+      </svg>
+    ),
+    color: '#14b8a6' // Teal
+  },
+  { 
+    id: 'voc' as LssToolType, 
+    name: 'Voice of Customer', 
+    desc: 'Customer Needs',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3" />
+      </svg>
+    ),
+    color: '#ec4899' // Pink
+  },
+  { 
+    id: 'ctq' as LssToolType, 
+    name: 'CTQ Tree', 
+    desc: 'Critical-to-Quality',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+      </svg>
+    ),
+    color: '#10b981' // Emerald
+  },
+  { 
+    id: 'stakeholder' as LssToolType, 
+    name: 'Stakeholder Analysis', 
+    desc: 'Influence & Interest',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+    ),
+    color: '#f59e0b' // Amber
+  }
+];
+
+const IMPROVEMENT_TOOLS = [
   { 
     id: 'dmaic' as LssToolType, 
     name: 'DMAIC', 
@@ -107,11 +165,36 @@ const LssToolbar: React.FC<LssToolbarProps> = ({
 
         {!isCollapsed && (
             <div className="absolute top-full left-0 mt-2 w-72 bg-gray-900 border border-gray-600 rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600">
+                 
+                 {/* Define Tools Section */}
                  <div className="p-2 bg-gray-800 border-b border-gray-700 text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center">
-                     Process Improvement Tools
+                     Define Tools
                  </div>
                  
-                 {LSS_TOOLS.map(tool => (
+                 {DEFINE_TOOLS.map(tool => (
+                     <button
+                        key={tool.id}
+                        onClick={() => onSelectTool(tool.id)}
+                        className={`flex items-start text-left p-3 border-b border-gray-700 last:border-0 hover:bg-gray-800 transition-colors group`}
+                     >
+                         <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110" style={{ color: tool.color }}>
+                             {tool.icon}
+                         </div>
+                         <div>
+                             <div className="font-bold text-gray-200 text-sm mb-0.5 group-hover:text-white">{tool.name}</div>
+                             <p className="text-xs text-gray-400 leading-tight group-hover:text-gray-300">
+                                 {tool.desc}
+                             </p>
+                         </div>
+                     </button>
+                 ))}
+
+                 {/* Improvement Tools Section */}
+                 <div className="p-2 bg-gray-800 border-b border-gray-700 border-t text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center">
+                     Improvement Tools
+                 </div>
+
+                 {IMPROVEMENT_TOOLS.map(tool => (
                      <button
                         key={tool.id}
                         onClick={() => onSelectTool(tool.id)}
