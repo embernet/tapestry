@@ -132,8 +132,14 @@ const DocumentItem: React.FC<{
         }
         if (doc.type === 'scamper-analysis') {
             return (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-cyan-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none">
+                    <rect x="2" y="4" width="2" height="16" rx="0.5" fill="#06b6d4" />
+                    <rect x="5" y="4" width="2" height="16" rx="0.5" fill="#3b82f6" />
+                    <rect x="8" y="4" width="2" height="16" rx="0.5" fill="#8b5cf6" />
+                    <rect x="11" y="4" width="2" height="16" rx="0.5" fill="#d946ef" />
+                    <rect x="14" y="4" width="2" height="16" rx="0.5" fill="#ef4444" />
+                    <rect x="17" y="4" width="2" height="16" rx="0.5" fill="#f97316" />
+                    <rect x="20" y="4" width="2" height="16" rx="0.5" fill="#22c55e" />
                 </svg>
             );
         }
