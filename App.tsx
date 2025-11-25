@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram } from './types';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, AIConfig } from './types';
 import { DEFAULT_COLOR_SCHEMES, LINK_DISTANCE, DEFAULT_SYSTEM_PROMPT_CONFIG, TAGLINES, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
 import ElementDetailsPanel from './components/ElementDetailsPanel';
@@ -57,6 +57,7 @@ const MODELS_INDEX_KEY = 'tapestry_models_index';
 const LAST_OPENED_MODEL_ID_KEY = 'tapestry_last_opened_model_id';
 const MODEL_DATA_PREFIX = 'tapestry_model_data_';
 const GLOBAL_SETTINGS_KEY = 'tapestry_global_settings';
+const AI_CONFIG_KEY = 'tapestry_ai_config';
 
 // Helper Hook for detecting clicks outside an element
 const useClickOutside = <T extends HTMLElement,>(ref: React.RefObject<T>, handler: (event: MouseEvent | TouchEvent) => void) => {
@@ -89,9 +90,15 @@ export default function App() {
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
       toolsBarOpenByDefault: true
   });
+  const [aiConfig, setAiConfig] = useState<AIConfig>({
+      provider: 'google',
+      apiKey: '', // Intentionally empty, user must provide or rely on env if built-in
+      modelId: 'gemini-2.5-flash',
+      baseUrl: ''
+  });
   const [systemPromptConfig, setSystemPromptConfig] = useState<SystemPromptConfig>(DEFAULT_SYSTEM_PROMPT_CONFIG);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'ai' | 'tools'>('general');
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'ai_settings' | 'ai_prompts' | 'ai_tools' | 'tool_prompts'>('general');
 
   // --- Documents State ---
   const [documents, setDocuments] = useState<TapestryDocument[]>([]);
@@ -187,7 +194,7 @@ export default function App() {
   // --- Internal Clipboard for Copy/Paste ---
   const [internalClipboard, setInternalClipboard] = useState<{ elements: Element[], relationships: Relationship[] } | null>(null);
 
-  // Load Global Settings on Mount
+  // Load Global Settings & AI Config on Mount
   useEffect(() => {
       try {
           const savedSettings = localStorage.getItem(GLOBAL_SETTINGS_KEY);
@@ -196,8 +203,12 @@ export default function App() {
               setGlobalSettings(parsed);
               setIsToolsPanelOpen(parsed.toolsBarOpenByDefault ?? true);
           }
+          const savedAiConfig = localStorage.getItem(AI_CONFIG_KEY);
+          if (savedAiConfig) {
+              setAiConfig(JSON.parse(savedAiConfig));
+          }
       } catch (e) {
-          console.error("Failed to load global settings", e);
+          console.error("Failed to load global settings or AI config", e);
       }
   }, []);
 
@@ -205,6 +216,12 @@ export default function App() {
   const handleGlobalSettingsChange = (settings: GlobalSettings) => {
       setGlobalSettings(settings);
       localStorage.setItem(GLOBAL_SETTINGS_KEY, JSON.stringify(settings));
+  };
+
+  // Save AI Config when changed
+  const handleAiConfigChange = (config: AIConfig) => {
+      setAiConfig(config);
+      localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(config));
   };
 
   // --- Helper to resolve tool prompts (with subtool fallback) ---
@@ -1899,7 +1916,7 @@ export default function App() {
                                 { label: 'History', state: isHistoryPanelOpen, toggle: () => setIsHistoryPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
                                 { label: 'Table', state: isTablePanelOpen, toggle: () => setIsTablePanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" /></svg> },
                                 { label: 'Matrix', state: isMatrixPanelOpen, toggle: () => setIsMatrixPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> },
-                                { label: 'Grid', state: isGridPanelOpen, toggle: () => setIsGridPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /></svg> },
+                                { label: 'Grid', state: isGridPanelOpen, toggle: () => setIsGridPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7H4V4z M4 13h7v7H4v-7z M13 13h7v7H13v-7z" /></svg> },
                                 { label: 'Markdown', state: isMarkdownPanelOpen, toggle: () => setIsMarkdownPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg> },
                                 { label: 'JSON', state: isJSONPanelOpen, toggle: () => setIsJSONPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg> }
                             ].map((panel, idx) => (
@@ -2123,42 +2140,42 @@ export default function App() {
                     }}
                     isCollapsed={activeTool !== 'scamper'}
                     onToggle={() => toggleTool('scamper')}
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
+                    onOpenSettings={() => { setSettingsInitialTab('tool_prompts'); setIsSettingsModalOpen(true); }}
                 />
                 <TrizToolbar
                     activeTool={activeTrizTool}
                     onSelectTool={handleTrizToolSelect}
                     isCollapsed={activeTool !== 'triz'}
                     onToggle={() => toggleTool('triz')}
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
+                    onOpenSettings={() => { setSettingsInitialTab('tool_prompts'); setIsSettingsModalOpen(true); }}
                 />
                 <LssToolbar
                     activeTool={activeLssTool}
                     onSelectTool={handleLssToolSelect}
                     isCollapsed={activeTool !== 'lss'}
                     onToggle={() => toggleTool('lss')}
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
+                    onOpenSettings={() => { setSettingsInitialTab('tool_prompts'); setIsSettingsModalOpen(true); }}
                 />
                 <TocToolbar
                     activeTool={activeTocTool}
                     onSelectTool={handleTocToolSelect}
                     isCollapsed={activeTool !== 'toc'}
                     onToggle={() => toggleTool('toc')}
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
+                    onOpenSettings={() => { setSettingsInitialTab('tool_prompts'); setIsSettingsModalOpen(true); }}
                 />
                 <SsmToolbar
                     activeTool={activeSsmTool}
                     onSelectTool={handleSsmToolSelect}
                     isCollapsed={activeTool !== 'ssm'}
                     onToggle={() => toggleTool('ssm')}
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
+                    onOpenSettings={() => { setSettingsInitialTab('tool_prompts'); setIsSettingsModalOpen(true); }}
                 />
                 <SwotToolbar 
                     activeTool={activeSwotTool}
                     onSelectTool={handleSwotToolSelect}
                     isCollapsed={activeTool !== 'swot'}
                     onToggle={() => toggleTool('swot')}
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
+                    onOpenSettings={() => { setSettingsInitialTab('tool_prompts'); setIsSettingsModalOpen(true); }}
                 />
                 <ExplorerToolbar
                     onSelectTool={handleExplorerToolSelect}
@@ -2304,7 +2321,7 @@ export default function App() {
           currentModelId={currentModelId}
           modelActions={aiActions}
           onOpenPromptSettings={() => {
-              setSettingsInitialTab('ai');
+              setSettingsInitialTab('ai_prompts');
               setIsSettingsModalOpen(true);
           }}
           systemPromptConfig={systemPromptConfig}
@@ -2431,6 +2448,8 @@ export default function App() {
         onGlobalSettingsChange={handleGlobalSettingsChange}
         modelSettings={systemPromptConfig}
         onModelSettingsChange={setSystemPromptConfig}
+        aiConfig={aiConfig}
+        onAiConfigChange={handleAiConfigChange}
       />
 
       {/* Schema Update Notification Modal */}

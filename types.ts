@@ -111,6 +111,15 @@ export interface GlobalSettings {
   toolsBarOpenByDefault: boolean;
 }
 
+export type AIProvider = 'google' | 'openai' | 'anthropic' | 'grok' | 'ollama' | 'custom';
+
+export interface AIConfig {
+  provider: AIProvider;
+  apiKey: string;
+  baseUrl?: string;
+  modelId: string;
+}
+
 export interface ModelMetadata {
   id: string;
   name: string;
