@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, MiningToolType, TagCloudToolType, SwotToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings } from './types';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, MiningToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram } from './types';
 import { DEFAULT_COLOR_SCHEMES, LINK_DISTANCE, DEFAULT_SYSTEM_PROMPT_CONFIG, TAGLINES, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
 import ElementDetailsPanel from './components/ElementDetailsPanel';
@@ -31,6 +31,8 @@ import TagCloudToolbar from './components/TagCloudToolbar';
 import TagCloudModal from './components/TagCloudModal';
 import SwotToolbar from './components/SwotToolbar';
 import SwotModal from './components/SwotModal';
+import MermaidToolbar from './components/MermaidToolbar';
+import MermaidPanel from './components/MermaidPanel';
 import CommandBar from './components/CommandBar';
 import MatrixPanel from './components/MatrixPanel';
 import TablePanel from './components/TablePanel';
@@ -154,10 +156,16 @@ export default function App() {
 
   // --- Tag Cloud State ---
   const [isTagCloudModalOpen, setIsTagCloudModalOpen] = useState(false);
+  const [activeTagCloudMode, setActiveTagCloudMode] = useState<'tags' | 'nodes' | 'words'>('tags');
 
   // --- SWOT State ---
   const [activeSwotTool, setActiveSwotTool] = useState<SwotToolType>(null);
   const [isSwotModalOpen, setIsSwotModalOpen] = useState(false);
+
+  // --- Mermaid State ---
+  const [isMermaidPanelOpen, setIsMermaidPanelOpen] = useState(false);
+  const [mermaidDiagrams, setMermaidDiagrams] = useState<MermaidDiagram[]>([]);
+  const [isMermaidGenerating, setIsMermaidGenerating] = useState(false);
 
   // --- Schema Update Notification State ---
   const [schemaUpdateChanges, setSchemaUpdateChanges] = useState<string[]>([]);
@@ -280,10 +288,13 @@ export default function App() {
       } else if (tool === 'mining') {
           setIsMiningModalOpen(true);
       } else if (tool === 'tagcloud') {
+          setActiveTagCloudMode((subTool as any) || 'tags');
           setIsTagCloudModalOpen(true);
       } else if (tool === 'swot') {
           setActiveSwotTool((subTool as SwotToolType) || 'matrix');
           setIsSwotModalOpen(true);
+      } else if (tool === 'mermaid') {
+          setIsMermaidPanelOpen(true);
       }
   }, []);
 
@@ -325,6 +336,9 @@ export default function App() {
           setActiveTool('swot');
           setActiveSwotTool((subTool as SwotToolType) || 'matrix');
           setIsSwotModalOpen(true);
+      } else if (toolId.includes('diagram') || toolId.includes('mermaid')) {
+          setActiveTool('mermaid');
+          setIsMermaidPanelOpen(true);
       }
       setIsToolsPanelOpen(true);
   }, []);
@@ -358,12 +372,19 @@ export default function App() {
   };
 
   const handleTagCloudToolSelect = (tool: TagCloudToolType) => {
-      if (tool === 'cloud') setIsTagCloudModalOpen(true);
+      if (tool) {
+          setActiveTagCloudMode(tool);
+          setIsTagCloudModalOpen(true);
+      }
   };
 
   const handleSwotToolSelect = (tool: SwotToolType) => {
       setActiveSwotTool(tool);
       setIsSwotModalOpen(true);
+  };
+
+  const handleMermaidToolSelect = (tool: MermaidToolType) => {
+      if (tool === 'editor') setIsMermaidPanelOpen(true);
   };
 
   // Reset bulk mode if tool is closed
@@ -559,6 +580,7 @@ export default function App() {
     setFolders(data.folders || []);
     setHistory(data.history || []);
     setSlides(data.slides || []);
+    setMermaidDiagrams(data.mermaidDiagrams || []);
     setOpenDocIds([]); 
     setDetachedHistoryIds([]);
     setPanelLayouts({});
@@ -621,9 +643,9 @@ export default function App() {
   const handleLoadModel = useCallback((modelId: string) => { const modelDataString = localStorage.getItem(`${MODEL_DATA_PREFIX}${modelId}`); if (modelDataString) { const data = JSON.parse(modelDataString); currentFileHandleRef.current = null; loadModelData(data, modelId); } }, [loadModelData]);
   useEffect(() => { if (!isInitialLoad) return; try { const indexStr = localStorage.getItem(MODELS_INDEX_KEY); const index = indexStr ? JSON.parse(indexStr) : []; setModelsIndex(index); } catch (error) { console.error("Failed to load models index:", error); setModelsIndex([]); } setIsInitialLoad(false); }, [isInitialLoad]);
   useEffect(() => { if (!isInitialLoad) { localStorage.setItem(MODELS_INDEX_KEY, JSON.stringify(modelsIndex)); } }, [modelsIndex, isInitialLoad]);
-  useEffect(() => { if (currentModelId && !isInitialLoad) { const modelData = { elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides }; const currentContentHash = computeContentHash(modelData); const currentMeta = modelsIndex.find(m => m.id === currentModelId); if (!currentMeta || currentMeta.contentHash !== currentContentHash) { localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData)); setModelsIndex(prevIndex => { const now = new Date().toISOString(); return prevIndex.map(m => m.id === currentModelId ? { ...m, updatedAt: now, contentHash: currentContentHash } : m); }); } } }, [elements, relationships, documents, folders, colorSchemes, activeSchemeId, currentModelId, isInitialLoad, modelsIndex, systemPromptConfig, history, slides]);
+  useEffect(() => { if (currentModelId && !isInitialLoad) { const modelData = { elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams }; const currentContentHash = computeContentHash(modelData); const currentMeta = modelsIndex.find(m => m.id === currentModelId); if (!currentMeta || currentMeta.contentHash !== currentContentHash) { localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData)); setModelsIndex(prevIndex => { const now = new Date().toISOString(); return prevIndex.map(m => m.id === currentModelId ? { ...m, updatedAt: now, contentHash: currentContentHash } : m); }); } } }, [elements, relationships, documents, folders, colorSchemes, activeSchemeId, currentModelId, isInitialLoad, modelsIndex, systemPromptConfig, history, slides, mermaidDiagrams]);
   
-  const handleCreateModel = useCallback((name: string, description: string) => { const now = new Date().toISOString(); const newModelData = { elements: [], relationships: [], documents: [], folders: [], colorSchemes: DEFAULT_COLOR_SCHEMES, activeSchemeId: DEFAULT_COLOR_SCHEMES[0]?.id || null, systemPromptConfig: DEFAULT_SYSTEM_PROMPT_CONFIG, history: [], slides: [] }; const initialHash = computeContentHash(newModelData); const newModel: ModelMetadata = { id: generateUUID(), name, description, createdAt: now, updatedAt: now, filename: `${name.replace(/ /g, '_')}.json`, contentHash: initialHash, }; setModelsIndex(prevIndex => [...prevIndex, newModel]); localStorage.setItem(`${MODEL_DATA_PREFIX}${newModel.id}`, JSON.stringify(newModelData)); currentFileHandleRef.current = null; handleLoadModel(newModel.id); setIsCreateModelModalOpen(false); }, [handleLoadModel]);
+  const handleCreateModel = useCallback((name: string, description: string) => { const now = new Date().toISOString(); const newModelData = { elements: [], relationships: [], documents: [], folders: [], colorSchemes: DEFAULT_COLOR_SCHEMES, activeSchemeId: DEFAULT_COLOR_SCHEMES[0]?.id || null, systemPromptConfig: DEFAULT_SYSTEM_PROMPT_CONFIG, history: [], slides: [], mermaidDiagrams: [] }; const initialHash = computeContentHash(newModelData); const newModel: ModelMetadata = { id: generateUUID(), name, description, createdAt: now, updatedAt: now, filename: `${name.replace(/ /g, '_')}.json`, contentHash: initialHash, }; setModelsIndex(prevIndex => [...prevIndex, newModel]); localStorage.setItem(`${MODEL_DATA_PREFIX}${newModel.id}`, JSON.stringify(newModelData)); currentFileHandleRef.current = null; handleLoadModel(newModel.id); setIsCreateModelModalOpen(false); }, [handleLoadModel]);
   const handleAddElement = useCallback((coords: { x: number; y: number }) => { const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.y, }; setElements(prev => [...prev, newElement]); setSelectedElementId(newElement.id); setMultiSelection(new Set([newElement.id])); setSelectedRelationshipId(null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); }, [defaultTags]);
   const handleAddElementFromName = useCallback((name: string) => { const centerX = window.innerWidth / 2; const centerY = window.innerHeight / 2; const randomOffset = () => (Math.random() - 0.5) * 100; const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: name, notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: centerX + randomOffset(), y: centerY + randomOffset(), fx: null, fy: null, }; setElements(prev => [...prev, newElement]); }, [defaultTags]);
   const handleUpdateElement = useCallback((updatedElement: Element) => { setElements(prev => prev.map(f => f.id === updatedElement.id ? { ...updatedElement, updatedAt: new Date().toISOString() } : f)); }, []);
@@ -641,6 +663,62 @@ export default function App() {
   const handleDeleteFolder = useCallback((folderId: string) => { if (confirm("Delete this folder and all its contents?")) { setFolders(prev => prev.filter(f => f.id !== folderId)); setDocuments(prev => prev.filter(d => d.folderId !== folderId)); } }, []);
   const handleUpdateDocument = useCallback((docId: string, updates: Partial<TapestryDocument>) => { setDocuments(prev => prev.map(d => d.id === docId ? { ...d, ...updates, updatedAt: new Date().toISOString() } : d)); }, []);
   const handleOpenDocument = useCallback((docId: string, origin?: 'report') => { if (!openDocIds.includes(docId)) { setOpenDocIds(prev => [...prev, docId]); } if (origin === 'report') { const reportLayout = panelLayouts['report']; let x = 100, y = 100; if (reportLayout && reportLayout.isFloating) { x = reportLayout.x + reportLayout.w + 20; y = reportLayout.y; } else if (isReportPanelOpen) { x = window.innerWidth - 600 - 520; y = 100; } if (x < 20) x = 20; if (x > window.innerWidth - 100) x = window.innerWidth - 600; const nextZ = panelZIndex + 1; setPanelZIndex(nextZ); setPanelLayouts(prev => ({ ...prev, [`doc-${docId}`]: { x, y, w: 500, h: 600, zIndex: nextZ, isFloating: true } })); } }, [openDocIds, panelLayouts, isReportPanelOpen, panelZIndex]);
+
+  // --- Mermaid Actions ---
+  const handleSaveMermaidDiagram = useCallback((diagram: MermaidDiagram) => {
+      setMermaidDiagrams(prev => {
+          const existingIndex = prev.findIndex(d => d.id === diagram.id);
+          if (existingIndex >= 0) {
+              const newDiagrams = [...prev];
+              newDiagrams[existingIndex] = diagram;
+              return newDiagrams;
+          } else {
+              return [...prev, diagram];
+          }
+      });
+  }, []);
+
+  const handleDeleteMermaidDiagram = useCallback((id: string) => {
+      if (confirm("Delete this diagram?")) {
+          setMermaidDiagrams(prev => prev.filter(d => d.id !== id));
+      }
+  }, []);
+
+  const handleGenerateMermaid = useCallback(async (prompt: string, contextMarkdown?: string) => {
+      setIsMermaidGenerating(true);
+      try {
+          // Use provided context, or generate default full graph context
+          const graphMarkdown = contextMarkdown || generateMarkdownFromGraph(elements, relationships);
+          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+          const fullPrompt = `
+          You are an expert in Mermaid.js diagram syntax.
+          The user wants you to generate or update a Mermaid diagram based on the following knowledge graph data.
+          
+          TASK: ${prompt}
+          
+          GRAPH CONTEXT (Markdown Format):
+          ${graphMarkdown}
+          
+          Instructions:
+          1. Analyze the graph context.
+          2. Generate valid Mermaid markdown code that visualizes this structure according to the user's specific request (e.g. Flowchart, Mindmap, Sequence, etc.).
+          3. ONLY return the mermaid code block (enclosed in \`\`\`mermaid ... \`\`\`). Do not include extra conversational text.
+          `;
+          
+          const response = await ai.models.generateContent({
+              model: 'gemini-2.5-flash',
+              contents: fullPrompt
+          });
+          
+          return response.text || "";
+      } catch (e) {
+          console.error("Mermaid Gen Error", e);
+          alert("Failed to generate diagram.");
+          return "";
+      } finally {
+          setIsMermaidGenerating(false);
+      }
+  }, [elements, relationships]);
 
   // --- AI Actions Adapter ---
   const aiActions: ModelActions = useMemo(() => {
@@ -833,7 +911,7 @@ export default function App() {
     const modelMetadata = modelsIndex.find(m => m.id === currentModelId);
     if (!modelMetadata) { alert("Could not find model metadata to save."); return; }
     const now = new Date().toISOString();
-    const modelData = { elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides };
+    const modelData = { elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams };
     const currentHash = computeContentHash(modelData);
     const updatedMetadata = { ...modelMetadata, updatedAt: now, filename: modelMetadata.filename || `${modelMetadata.name.replace(/ /g, '_')}.json`, contentHash: currentHash, lastDiskHash: currentHash };
     const exportData = { metadata: updatedMetadata, data: modelData, };
@@ -865,7 +943,7 @@ export default function App() {
         localStorage.setItem(MODELS_INDEX_KEY, JSON.stringify(modelsIndex.map(m => m.id === currentModelId ? updatedMetadata : m)));
         localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
     } catch (err: any) { if (err.name !== 'AbortError') { console.error("Save failed:", err); alert("Failed to save file. You can try using the 'Export' feature in JSON view as a backup."); } }
-  }, [currentModelId, modelsIndex, elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides]);
+  }, [currentModelId, modelsIndex, elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams]);
 
   const handleSaveAs = useCallback((name: string, description: string) => {
     if (!currentModelId) return;
@@ -877,7 +955,7 @@ export default function App() {
     const modelData = { 
         elements, relationships, documents, folders, 
         colorSchemes, activeSchemeId, systemPromptConfig, 
-        history, slides 
+        history, slides, mermaidDiagrams 
     };
     const currentHash = computeContentHash(modelData);
     
@@ -913,7 +991,7 @@ export default function App() {
         console.error("Save As failed", e);
         alert("Failed to save copy. Local storage might be full.");
     }
-  }, [currentModelId, elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides]);
+  }, [currentModelId, elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams]);
 
   // (Import/Export logic identical to original, omitted for brevity)
   const processImportedData = useCallback((text: string, filename?: string) => {
@@ -933,7 +1011,7 @@ export default function App() {
             const newModelId = existingId || generateUUID();
             if (!existingId) { let finalModelName = nameToUse; let i = 1; while(modelsIndex.some(m => m.name === finalModelName)) { i++; finalModelName = `${nameToUse} ${i}`; } nameToUse = finalModelName; }
             const newMetadata: ModelMetadata = { id: newModelId, name: nameToUse, description: descToUse, createdAt: imported.metadata?.createdAt || now, updatedAt: imported.metadata?.updatedAt || now, filename: filename, contentHash: importedHash, lastDiskHash: importedHash };
-            const newModelData = { elements: dataToImport.elements || [], relationships: dataToImport.relationships || [], documents: dataToImport.documents || [], folders: dataToImport.folders || [], history: dataToImport.history || [], slides: dataToImport.slides || [], colorSchemes: dataToImport.colorSchemes || DEFAULT_COLOR_SCHEMES, activeSchemeId: dataToImport.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null, systemPromptConfig: dataToImport.systemPromptConfig || DEFAULT_SYSTEM_PROMPT_CONFIG, };
+            const newModelData = { elements: dataToImport.elements || [], relationships: dataToImport.relationships || [], documents: dataToImport.documents || [], folders: dataToImport.folders || [], history: dataToImport.history || [], slides: dataToImport.slides || [], mermaidDiagrams: dataToImport.mermaidDiagrams || [], colorSchemes: dataToImport.colorSchemes || DEFAULT_COLOR_SCHEMES, activeSchemeId: dataToImport.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null, systemPromptConfig: dataToImport.systemPromptConfig || DEFAULT_SYSTEM_PROMPT_CONFIG, };
             loadModelData(newModelData, newModelId, newMetadata);
         } catch (error) { const message = error instanceof Error ? error.message : 'An unknown error occurred.'; alert(`Failed to import file: ${message}`); console.error("Import failed:", error); }
   }, [modelsIndex, loadModelData]);
@@ -959,8 +1037,8 @@ export default function App() {
       if (importFileRef.current) { importFileRef.current.value = ''; importFileRef.current.click(); } 
   }, [processImportedData]);
   const handleImportInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; currentFileHandleRef.current = null; const reader = new FileReader(); reader.onload = (e) => { const text = e.target?.result as string; processImportedData(text, file.name); }; reader.readAsText(file); }, [processImportedData]);
-  const handleApplyJSON = useCallback((data: any) => { try { if (data.elements && Array.isArray(data.elements)) { setElements(data.elements); } if (data.relationships && Array.isArray(data.relationships)) { setRelationships(data.relationships); } if (data.documents && Array.isArray(data.documents)) { setDocuments(data.documents); } if (data.folders && Array.isArray(data.folders)) { setFolders(data.folders); } if (data.history && Array.isArray(data.history)) { setHistory(data.history); } if (data.slides && Array.isArray(data.slides)) { setSlides(data.slides); } if (data.colorSchemes && Array.isArray(data.colorSchemes)) { const { schemes } = migrateLegacySchemes(data.colorSchemes); setColorSchemes(schemes); } if (data.activeSchemeId) { setActiveSchemeId(data.activeSchemeId); } if (data.systemPromptConfig) { setSystemPromptConfig(data.systemPromptConfig); } setIsJSONPanelOpen(false); } catch (e) { alert("Failed to apply JSON data: " + (e instanceof Error ? e.message : String(e))); } }, [migrateLegacySchemes]);
-  const handleNewModelClick = useCallback(async () => { if (currentModelId) { const currentMeta = modelsIndex.find(m => m.id === currentModelId); const modelData = { elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides }; const currentHash = computeContentHash(modelData); const isDirty = currentMeta?.lastDiskHash !== currentHash; const isEmpty = elements.length === 0; if (isDirty && !isEmpty) { if (confirm("You have unsaved changes. Do you want to save your current model before creating a new one?")) { await handleDiskSave(); } } } setIsCreateModelModalOpen(true); }, [currentModelId, modelsIndex, elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, handleDiskSave]);
+  const handleApplyJSON = useCallback((data: any) => { try { if (data.elements && Array.isArray(data.elements)) { setElements(data.elements); } if (data.relationships && Array.isArray(data.relationships)) { setRelationships(data.relationships); } if (data.documents && Array.isArray(data.documents)) { setDocuments(data.documents); } if (data.folders && Array.isArray(data.folders)) { setFolders(data.folders); } if (data.history && Array.isArray(data.history)) { setHistory(data.history); } if (data.slides && Array.isArray(data.slides)) { setSlides(data.slides); } if (data.mermaidDiagrams && Array.isArray(data.mermaidDiagrams)) { setMermaidDiagrams(data.mermaidDiagrams); } if (data.colorSchemes && Array.isArray(data.colorSchemes)) { const { schemes } = migrateLegacySchemes(data.colorSchemes); setColorSchemes(schemes); } if (data.activeSchemeId) { setActiveSchemeId(data.activeSchemeId); } if (data.systemPromptConfig) { setSystemPromptConfig(data.systemPromptConfig); } setIsJSONPanelOpen(false); } catch (e) { alert("Failed to apply JSON data: " + (e instanceof Error ? e.message : String(e))); } }, [migrateLegacySchemes]);
+  const handleNewModelClick = useCallback(async () => { if (currentModelId) { const currentMeta = modelsIndex.find(m => m.id === currentModelId); const modelData = { elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams }; const currentHash = computeContentHash(modelData); const isDirty = currentMeta?.lastDiskHash !== currentHash; const isEmpty = elements.length === 0; if (isDirty && !isEmpty) { if (confirm("You have unsaved changes. Do you want to save your current model before creating a new one?")) { await handleDiskSave(); } } } setIsCreateModelModalOpen(true); }, [currentModelId, modelsIndex, elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, handleDiskSave]);
 
   const handleCloseContextMenu = useCallback(() => setContextMenu(null), []);
   const handleCloseCanvasContextMenu = useCallback(() => setCanvasContextMenu(null), []);
@@ -1360,7 +1438,7 @@ export default function App() {
   const addRelationshipSourceElement = useMemo(() => elements.find(f => f.id === panelState.sourceElementId), [elements, panelState.sourceElementId]);
   const activeColorScheme = useMemo(() => { const current = colorSchemes.find(s => s.id === activeSchemeId); if (!current) return undefined; const defaultScheme = DEFAULT_COLOR_SCHEMES.find(d => d.id === current.id); if (defaultScheme) { const mergedTags = { ...defaultScheme.tagColors, ...current.tagColors }; const currentDefs = current.relationshipDefinitions || []; const defaultDefs = defaultScheme.relationshipDefinitions || []; const combinedDefsMap = new Map<string, RelationshipDefinition>(); defaultDefs.forEach(d => combinedDefsMap.set(d.label, d)); currentDefs.forEach(d => combinedDefsMap.set(d.label, d)); const mergedDefinitions = Array.from(combinedDefsMap.values()); const mergedDefaultLabel = current.defaultRelationshipLabel || defaultScheme.defaultRelationshipLabel; return { ...current, tagColors: mergedTags, relationshipDefinitions: mergedDefinitions, defaultRelationshipLabel: mergedDefaultLabel }; } return current; }, [colorSchemes, activeSchemeId]);
   const activeRelationshipLabels = useMemo(() => { return activeColorScheme?.relationshipDefinitions?.map(d => d.label) || []; }, [activeColorScheme]);
-  const isRightPanelOpen = isReportPanelOpen || isMarkdownPanelOpen || isJSONPanelOpen || isMatrixPanelOpen || isTablePanelOpen || isGridPanelOpen || isDocumentPanelOpen || isHistoryPanelOpen || isKanbanPanelOpen || isPresentationPanelOpen || openDocIds.length > 0 || detachedHistoryIds.length > 0;
+  const isRightPanelOpen = isReportPanelOpen || isMarkdownPanelOpen || isJSONPanelOpen || isMatrixPanelOpen || isTablePanelOpen || isGridPanelOpen || isDocumentPanelOpen || isHistoryPanelOpen || isKanbanPanelOpen || isPresentationPanelOpen || isMermaidPanelOpen || openDocIds.length > 0 || detachedHistoryIds.length > 0;
 
   // --- New Command Handlers ---
   const handleOpenCommandHistory = useCallback(() => {
@@ -1444,8 +1522,26 @@ export default function App() {
         { id: 'grid', title: 'Grid', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /></svg>, content: <GridPanel elements={filteredElements} activeColorScheme={activeColorScheme} onClose={() => setIsGridPanelOpen(false)} onNodeClick={(id) => handleNodeClick(id, new MouseEvent('click'))} />, isOpen: isGridPanelOpen, onToggle: () => setIsGridPanelOpen(prev => !prev) },
         { id: 'kanban', title: 'Kanban', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>, content: <KanbanPanel elements={filteredElements} modelActions={aiActions} onClose={() => setIsKanbanPanelOpen(false)} />, isOpen: isKanbanPanelOpen, onToggle: () => setIsKanbanPanelOpen(prev => !prev) },
         { id: 'presentation', title: 'Story', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>, content: <PresentationPanel slides={slides} onSlidesChange={setSlides} onCaptureSlide={handleCaptureSlide} onPlay={handlePlayPresentation} onClose={() => setIsPresentationPanelOpen(false)} />, isOpen: isPresentationPanelOpen, onToggle: () => setIsPresentationPanelOpen(prev => !prev) },
+        { 
+            id: 'mermaid', 
+            title: 'Diagrams', 
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg>, 
+            content: <MermaidPanel 
+                        savedDiagrams={mermaidDiagrams} 
+                        onSaveDiagram={handleSaveMermaidDiagram} 
+                        onDeleteDiagram={handleDeleteMermaidDiagram} 
+                        onGenerate={handleGenerateMermaid} 
+                        onClose={() => setIsMermaidPanelOpen(false)} 
+                        isGenerating={isMermaidGenerating} 
+                        elements={elements}
+                        relationships={relationships}
+                        multiSelection={multiSelection}
+                     />, 
+            isOpen: isMermaidPanelOpen, 
+            onToggle: () => setIsMermaidPanelOpen(prev => !prev) 
+        },
         { id: 'markdown', title: 'Markdown', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>, content: <MarkdownPanel initialText={generateMarkdownFromGraph(elements, relationships)} onApply={(md) => handleApplyMarkdown(md, false)} onClose={() => setIsMarkdownPanelOpen(false)} modelName={currentModelName} />, isOpen: isMarkdownPanelOpen, onToggle: () => setIsMarkdownPanelOpen(prev => !prev) },
-        { id: 'json', title: 'JSON', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>, content: <JSONPanel initialData={{ elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides }} onApply={handleApplyJSON} onClose={() => setIsJSONPanelOpen(false)} modelName={currentModelName} />, isOpen: isJSONPanelOpen, onToggle: () => setIsJSONPanelOpen(prev => !prev) },
+        { id: 'json', title: 'JSON', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>, content: <JSONPanel initialData={{ elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams }} onApply={handleApplyJSON} onClose={() => setIsJSONPanelOpen(false)} modelName={currentModelName} />, isOpen: isJSONPanelOpen, onToggle: () => setIsJSONPanelOpen(prev => !prev) },
         { id: 'history', title: 'History', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, content: <HistoryPanel history={history} onClose={() => setIsHistoryPanelOpen(false)} onDetach={handleDetachHistory} onReopen={handleReopenHistory} onAnalyze={handleAnalyzeWithChat} onDelete={handleDeleteHistory} />, isOpen: isHistoryPanelOpen, onToggle: () => setIsHistoryPanelOpen(prev => !prev) }
     ];
 
@@ -1462,7 +1558,7 @@ export default function App() {
     }).filter((p): p is PanelDefinition => p !== null);
 
     return [...staticPanels, ...docPanels, ...historyItemPanels];
-  }, [ isReportPanelOpen, isDocumentPanelOpen, isTablePanelOpen, isMatrixPanelOpen, isGridPanelOpen, isMarkdownPanelOpen, isJSONPanelOpen, isHistoryPanelOpen, isKanbanPanelOpen, isPresentationPanelOpen, filteredElements, filteredRelationships, elements, relationships, documents, folders, openDocIds, currentModelName, activeColorScheme, history, slides, detachedHistoryIds, handleNodeClick, handleUpdateElement, handleDeleteElement, handleAddElementFromName, handleAddRelationshipDirect, handleDeleteRelationship, handleApplyMarkdown, handleApplyJSON, handleOpenDocument, handleCreateFolder, handleCreateDocument, handleDeleteDocument, handleDeleteFolder, handleUpdateDocument, handleDetachHistory, handleReopenHistory, handleAnalyzeWithChat, handleDeleteHistory, aiActions, handleCaptureSlide, handlePlayPresentation, selectedElementId ]); // Added selectedElementId to deps
+  }, [ isReportPanelOpen, isDocumentPanelOpen, isTablePanelOpen, isMatrixPanelOpen, isGridPanelOpen, isMarkdownPanelOpen, isJSONPanelOpen, isHistoryPanelOpen, isKanbanPanelOpen, isPresentationPanelOpen, isMermaidPanelOpen, isMermaidGenerating, filteredElements, filteredRelationships, elements, relationships, documents, folders, openDocIds, currentModelName, activeColorScheme, history, slides, mermaidDiagrams, detachedHistoryIds, handleNodeClick, handleUpdateElement, handleDeleteElement, handleAddElementFromName, handleAddRelationshipDirect, handleDeleteRelationship, handleApplyMarkdown, handleApplyJSON, handleOpenDocument, handleCreateFolder, handleCreateDocument, handleDeleteDocument, handleDeleteFolder, handleUpdateDocument, handleDetachHistory, handleReopenHistory, handleAnalyzeWithChat, handleDeleteHistory, aiActions, handleCaptureSlide, handlePlayPresentation, handleSaveMermaidDiagram, handleDeleteMermaidDiagram, handleGenerateMermaid, selectedElementId, multiSelection ]);
 
   if (isInitialLoad && !isCreateModelModalOpen) { return ( <div className="w-screen h-screen flex items-center justify-center bg-gray-900 text-white"> Loading... </div> ); }
   const focusButtonTitle = () => { if (focusMode === 'narrow') return 'Switch to Wide Focus'; if (focusMode === 'wide') return 'Switch to Zoom Focus'; return 'Switch to Narrow Focus'; };
@@ -1562,7 +1658,8 @@ export default function App() {
                                 { id: 'ssm', label: 'Soft Systems', color: 'text-cyan-400' },
                                 { id: 'swot', label: 'Strategic Analysis', color: 'text-lime-400' },
                                 { id: 'mining', label: 'Data Mining', color: 'text-yellow-400' },
-                                { id: 'tagcloud', label: 'Tag Cloud', color: 'text-pink-400' },
+                                { id: 'tagcloud', label: 'Word Cloud', color: 'text-pink-400' },
+                                { id: 'mermaid', label: 'Diagrams', color: 'text-cyan-400' },
                                 { id: 'bulk', label: 'Bulk Edit', color: 'text-pink-400' },
                                 { id: 'command', label: 'Command Bar', color: 'text-green-400' }
                             ].map(tool => (
@@ -1583,6 +1680,7 @@ export default function App() {
                             <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Panels</div>
                             {[
                                 { label: 'Report', state: isReportPanelOpen, toggle: () => setIsReportPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
+                                { label: 'Diagrams', state: isMermaidPanelOpen, toggle: () => setIsMermaidPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg> },
                                 { label: 'Story Mode', state: isPresentationPanelOpen, toggle: () => setIsPresentationPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> },
                                 { label: 'Kanban', state: isKanbanPanelOpen, toggle: () => setIsKanbanPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg> },
                                 { label: 'Documents', state: isDocumentPanelOpen, toggle: () => setIsDocumentPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg> },
@@ -1653,7 +1751,12 @@ export default function App() {
                     {focusMode === 'zoom' && (<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" /><path strokeLinecap="round" strokeLinejoin="round" d="M2 6V2h4 M22 6V2h-4 M2 18v4h4 M22 18v4h-4" /></svg>)}
                 </button>
                 
-                {/* New Documents Button */}
+                <button onClick={() => setIsMermaidPanelOpen(prev => !prev)} title="Diagrams" className="p-2 rounded-md hover:bg-gray-700 transition">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                    </svg>
+                </button>
+
                 <button onClick={() => setIsDocumentPanelOpen(prev => !prev)} title="Documents" className="p-2 rounded-md hover:bg-gray-700 transition">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -1850,6 +1953,11 @@ export default function App() {
                     onSelectTool={handleTagCloudToolSelect}
                     isCollapsed={activeTool !== 'tagcloud'}
                     onToggle={() => toggleTool('tagcloud')}
+                />
+                <MermaidToolbar
+                    onSelectTool={handleMermaidToolSelect}
+                    isCollapsed={activeTool !== 'mermaid'}
+                    onToggle={() => toggleTool('mermaid')}
                 />
                 <BulkEditToolbar
                     activeColorScheme={activeColorScheme}
@@ -2107,6 +2215,7 @@ export default function App() {
 
       <TagCloudModal
         isOpen={isTagCloudModalOpen}
+        initialMode={activeTagCloudMode}
         elements={elements}
         relationships={relationships}
         onClose={() => setIsTagCloudModalOpen(false)}

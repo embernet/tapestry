@@ -48,6 +48,14 @@ export interface TapestryFolder {
   createdAt: string;
 }
 
+export interface MermaidDiagram {
+  id: string;
+  title: string;
+  code: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface HistoryEntry {
   id: string;
   tool: string;
@@ -182,4 +190,5 @@ export type TocToolType = 'crt' | 'ec' | 'frt' | 'tt' | null;
 export type SsmToolType = 'rich_picture' | 'catwoe' | 'activity_models' | 'comparison' | null;
 export type SwotToolType = 'matrix' | 'pestel' | 'steer' | 'destep' | 'longpest' | 'five_forces' | 'cage' | null;
 export type MiningToolType = 'dashboard' | null;
-export type TagCloudToolType = 'cloud' | null;
+export type TagCloudToolType = 'tags' | 'nodes' | 'words' | null;
+export type MermaidToolType = 'editor' | null;

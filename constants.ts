@@ -50,38 +50,189 @@ export const AVAILABLE_AI_TOOLS = [
 ];
 
 export const DEFAULT_TOOL_PROMPTS: Record<string, string> = {
+    // --- BASE PROMPTS ---
     scamper: `You are an expert in the SCAMPER ideation technique. Help the user generate creative ideas by modifying existing concepts.
-Generate distinct, creative ideas that emerge from applying the specific operator.`,
-    triz: `You are an expert TRIZ Master. Analyze the provided graph model. Use the specific TRIZ tool requested (Contradiction Matrix, 40 Principles, ARIZ, etc.) to solve the problem.
-
+Generate distinct, creative ideas that emerge from applying the specific operator. Suggest creating these as new nodes linked to the original concept.`,
+    
+    triz: `You are an expert TRIZ Master. Analyze the provided graph model. Use the specific TRIZ tool requested to solve the problem.
 OUTPUT FORMAT:
 Return a JSON object with two fields:
 1. "analysis": A detailed MARKDOWN string explaining your findings. Structure it with headers.
 2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`,
+    
     lss: `You are an expert Master Black Belt in Lean Six Sigma. Analyze the provided graph model using data-driven quality strategies.
-
 OUTPUT FORMAT:
 Return a JSON object with two fields:
 1. "analysis": A detailed MARKDOWN string explaining your findings using LSS terminology (Sigma level, Variance, Waste/Muda, Root Cause, RPN).
 2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`,
+    
     toc: `You are an expert in the Theory of Constraints (TOC). Analyze the provided graph model to identify bottlenecks and constraints.
-
 OUTPUT FORMAT:
 Return a JSON object with two fields:
 1. "analysis": A detailed MARKDOWN string explaining your findings using TOC terminology (UDEs, Constraints, Injections, etc.).
 2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`,
+    
     ssm: `You are an expert in Soft Systems Methodology (SSM). Analyze the provided graph model to explore complex, unstructured problems.
-
 OUTPUT FORMAT:
 Return a JSON object with two fields:
 1. "analysis": A detailed MARKDOWN string explaining your findings using SSM terminology.
 2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`,
-    swot: `You are a Strategic Analyst. Analyze the provided graph model using the requested framework (SWOT, PESTEL, Porter's Five Forces, etc.).
-
+    
+    swot: `You are a Strategic Analyst. Analyze the provided graph model using the requested framework.
 OUTPUT FORMAT:
 Return a JSON object with two fields:
 1. "analysis": A detailed MARKDOWN string explaining your findings, organized by the categories of the selected framework.
-2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`
+2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.`,
+
+    // --- TRIZ SUB-TOOLS ---
+    'triz:contradiction': `Identify a Technical Contradiction in the graph where improving one node/parameter worsens another.
+1. Analyze the relationship between the selected nodes.
+2. Map these to the standard 39 TRIZ parameters.
+3. Use the Contradiction Matrix to find the relevant 40 Principles.
+4. **ACTION:** Suggest creating new 'Idea' or 'Solution' nodes based on these principles. Link them to the conflicting nodes with a label like 'resolves' or 'mitigates'.`,
+
+    'triz:principles': `Apply the 40 Inventive Principles to the target node.
+1. Review the node's function and constraints.
+2. Select principles that could evolve or improve this node (e.g., Segmentation, Taking Out, Local Quality).
+3. **ACTION:** Suggest specific graph changes: splitting the node (Segmentation), removing harmful parts (Taking Out), or adding attributes/sub-nodes (Local Quality).`,
+
+    'triz:ariz': `Simulate the ARIZ (Algorithm for Inventive Problem Solving) process on the graph.
+1. Identify the 'Mini-Problem' and the 'Conflict Zone'.
+2. Define the 'Ideal Final Result' (IFR): "The system performs the function itself without..."
+3. **ACTION:** Suggest adding a node for the IFR. Suggest adding 'Resource' nodes available in the system (Time, Space, Information) that can be used to resolve the physical contradiction.`,
+
+    'triz:sufield': `Perform a Su-Field (Substance-Field) Analysis.
+1. Identify if the model is a complete S1-S2-Field triangle.
+2. If the interaction is harmful or insufficient, apply the 76 Standard Solutions.
+3. **ACTION:** Suggest adding a third 'Substance' node or a 'Field' node to stabilize or improve the interaction. Link it to the existing nodes to complete the triangle.`,
+
+    'triz:trends': `Analyze the graph for Laws of Technical Systems Evolution.
+1. Determine where the system (node) is on the S-Curve (Infancy, Growth, Maturity, Decline).
+2. Identify trends like 'Transition to Super-system', 'Increasing Dynamization', or 'Miniaturization'.
+3. **ACTION:** Suggest creating 'Future State' nodes representing the next evolutionary step. Connect them with 'evolves into' relationships.`,
+
+    // --- LSS SUB-TOOLS ---
+    'lss:charter': `Draft a Project Charter based on the graph context.
+1. Clarify the Problem Statement and Goal Statement.
+2. Define the Scope (In-Scope / Out-of-Scope).
+3. **ACTION:** Suggest adding nodes for 'Goal', 'Problem', 'Scope Boundary', and 'Team Member' if they are missing. Connect them to the central project node.`,
+
+    'lss:sipoc': `Construct a SIPOC (Suppliers, Inputs, Process, Outputs, Customers) view.
+1. Analyze the graph to find these elements.
+2. Identify gaps: Are there Inputs without Suppliers? Outputs without Customers?
+3. **ACTION:** Suggest adding missing nodes to complete the chain: Supplier -> Input -> Process -> Output -> Customer. Use these exact tags if possible.`,
+
+    'lss:voc': `Analyze Voice of the Customer (VoC).
+1. Look for nodes representing customer feedback, complaints, or desires.
+2. Translate verbatims into specific Needs and Requirements.
+3. **ACTION:** Suggest adding 'Need' nodes (what they want) and 'Requirement' nodes (measurable targets). Link them to the 'Customer' node.`,
+
+    'lss:ctq': `Build a Critical-to-Quality (CTQ) Tree.
+1. Start with a high-level 'Customer Need' node.
+2. Break it down into 'Quality Drivers'.
+3. **ACTION:** Suggest adding 'CTQ' nodes (specific, measurable metrics) that quantify the drivers. Link Need -> Driver -> CTQ.`,
+
+    'lss:stakeholder': `Perform a Stakeholder Analysis.
+1. Identify all nodes representing people, groups, or organizations.
+2. Assess their Interest and Influence regarding the central topic.
+3. **ACTION:** Suggest adding 'Stakeholder' nodes. Use 'setElementAttribute' to add {Interest="High/Low", Influence="High/Low"} attributes to them.`,
+
+    'lss:dmaic': `Organize the graph analysis into DMAIC phases.
+1. Define: What is the problem?
+2. Measure: What is the baseline data?
+3. Analyze: What are the root causes?
+4. Improve: What are the solutions?
+5. Control: How to sustain gains?
+6. **ACTION:** Suggest adding nodes for 'Metric' (Measure), 'Root Cause' (Analyze), 'Solution' (Improve), and 'Control Plan' (Control).`,
+
+    'lss:5whys': `Perform a 5 Whys Root Cause Analysis.
+1. Start from the selected 'Problem' node.
+2. Iteratively ask "Why?" to find the underlying cause.
+3. **ACTION:** Suggest creating a chain of 3-5 'Cause' nodes linked sequentially (Cause -> causes -> Problem). The final node is the 'Root Cause'.`,
+
+    'lss:fishbone': `Generate an Ishikawa (Fishbone) Diagram structure.
+1. Focus on the main 'Effect' or 'Problem' node.
+2. Brainstorm causes in categories: Man, Machine, Material, Method, Measurement, Environment.
+3. **ACTION:** Suggest adding 'Cause' nodes tagged with their category (e.g., tag 'Method'). Link them to the problem node.`,
+
+    'lss:fmea': `Conduct a Failure Modes and Effects Analysis (FMEA).
+1. Analyze 'Process Step' or 'Component' nodes.
+2. Identify potential 'Failure Modes'.
+3. **ACTION:** Suggest adding 'Failure Mode' nodes. Suggest attributes {Severity, Occurrence, Detection, RPN}. Suggest 'Mitigation' nodes linked to high-RPN failures.`,
+
+    'lss:vsm': `Analyze the Value Stream.
+1. Review the flow of nodes representing the process.
+2. Distinguish between Value-Added (VA) and Non-Value-Added (NVA) steps.
+3. **ACTION:** Suggest tagging nodes as 'VA' or 'NVA'. Suggest adding 'Waste' nodes (e.g., Inventory, Waiting) linked to process steps. Suggest 'Kaizen' nodes for improvements.`,
+
+    // --- TOC SUB-TOOLS ---
+    'toc:crt': `Construct a Current Reality Tree (CRT).
+1. Identify 'Undesirable Effects' (UDEs) in the graph.
+2. Trace causal dependencies downwards to find the 'Core Problem'.
+3. **ACTION:** Suggest adding 'Cause' nodes to bridge gaps between UDEs. Tag the bottom-most cause as 'Root Cause' or 'Constraint'.`,
+
+    'toc:ec': `Build an Evaporating Cloud (Conflict Resolution Diagram).
+1. Identify a conflict between two nodes (Wants).
+2. Identify the common 'Objective' and the 'Needs' that drive the Wants.
+3. Expose the Assumptions behind the arrows.
+4. **ACTION:** Suggest adding an 'Injection' node that invalidates an assumption to resolve the conflict.`,
+
+    'toc:frt': `Construct a Future Reality Tree (FRT).
+1. Start with a proposed 'Injection' (Solution) node.
+2. Deduce the logical 'Desirable Effects' that will result.
+3. Check for 'Negative Branches' (unintended consequences).
+4. **ACTION:** Suggest adding 'Effect' nodes branching from the solution. If a risk is found, suggest a 'Preventative Action' node.`,
+
+    'toc:tt': `Create a Transition Tree (Implementation Plan).
+1. Start with the 'Goal' or 'Injection' node.
+2. Break down the path into Obstacles and Intermediate Objectives (IO).
+3. **ACTION:** Suggest adding 'Action' nodes and 'IO' nodes in a sequence. Link them to show the path to the goal.`,
+
+    // --- SSM SUB-TOOLS ---
+    'ssm:rich_picture': `Develop elements for a Rich Picture.
+1. Analyze the messy situation. Identify Structures, Processes, Climate, People, and Conflicts.
+2. **ACTION:** Suggest adding nodes for 'Stakeholder', 'Concern', 'Conflict', and 'Environment'. Use expressive relationship labels (e.g., 'fears', 'blocks', 'misunderstands').`,
+
+    'ssm:catwoe': `Perform a CATWOE Analysis.
+1. Identify Customers, Actors, Transformation, Worldview, Owner, Environment.
+2. **ACTION:** Suggest adding missing nodes to represent these six elements. Ensure the Transformation (Input -> Output) is clearly modeled with nodes.`,
+
+    'ssm:activity_models': `Design a Conceptual Activity Model.
+1. Based on the Root Definition, determine the minimum necessary activities.
+2. **ACTION:** Suggest adding 'Activity' nodes (verbs) that *must* exist for the system to function. Link them in logical dependencies (A requires B).`,
+
+    'ssm:comparison': `Compare the Ideal Activity Model with the Real World graph.
+1. Identify gaps (missing activities) and constraints (real-world blockers).
+2. **ACTION:** Suggest adding 'Gap' nodes where reality differs from the ideal. Suggest 'Accommodation' nodes to resolve these differences culturally or politically.`,
+
+    // --- STRATEGY SUB-TOOLS ---
+    'swot:matrix': `Perform a SWOT Analysis.
+1. Identify internal Strengths/Weaknesses and external Opportunities/Threats.
+2. **ACTION:** Suggest adding nodes tagged 'Strength', 'Weakness', 'Opportunity', 'Threat'. Suggest 'Strategy' nodes that link a Strength to an Opportunity (Leverage) or a Strength to a Threat (Defend).`,
+
+    'swot:pestel': `Perform a PESTEL Analysis.
+1. Scan for macro-environmental factors: Political, Economic, Social, Technological, Environmental, Legal.
+2. **ACTION:** Suggest adding nodes for these factors (e.g., "New Legislation", "Inflation"). Link them to the central organization node with 'affects' or 'constrains'.`,
+
+    'swot:steer': `Perform a STEER Analysis (Socio-cultural, Technological, Economic, Ecological, Regulatory).
+1. Analyze these specific external drivers.
+2. **ACTION:** Suggest adding nodes for key trends in these areas. Connect them to the subject to show impact.`,
+
+    'swot:destep': `Perform a DESTEP Analysis (Demographic, Economic, Social, Technological, Ecological, Political).
+1. Focus on Demographic shifts in addition to standard PEST factors.
+2. **ACTION:** Suggest adding nodes representing 'Demographic Trend' (e.g., "Aging Population"). Link to market/service nodes.`,
+
+    'swot:longpest': `Perform a LoNGPEST Analysis (Local, National, Global PEST).
+1. Analyze factors at different geographic scales.
+2. **ACTION:** Suggest adding PEST nodes with attributes {Scale="Local" | "National" | "Global"}. Ensure global trends and local realities are represented.`,
+
+    'swot:five_forces': `Analyze Porter’s Five Forces.
+1. Assess: Supplier Power, Buyer Power, Competitive Rivalry, Threat of Substitution, Threat of New Entry.
+2. **ACTION:** Suggest adding nodes for 'Competitor', 'Supplier', 'Buyer', 'Substitute', 'Entrant'. Link them to the central node (e.g., "Supplier -> exercises power over -> Company").`,
+
+    'swot:cage': `Apply the CAGE Distance Framework.
+1. Analyze Cultural, Administrative, Geographic, and Economic distances between two markets/countries.
+2. **ACTION:** Suggest adding 'Distance' nodes (e.g., "Language Difference", "Trade Tariff", "Physical Distance"). Link the two market nodes with these distance factors.`,
 };
 
 export const DEFAULT_SYSTEM_PROMPT_CONFIG: SystemPromptConfig = {

@@ -8,6 +8,42 @@ interface TagCloudToolbarProps {
   onToggle: () => void;
 }
 
+const WORD_CLOUD_TOOLS = [
+  { 
+    id: 'tags' as TagCloudToolType, 
+    name: 'Concept Cloud', 
+    desc: 'Visualize frequency of tags/categories.',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+      </svg>
+    ),
+    color: '#ec4899' // Pink
+  },
+  { 
+    id: 'nodes' as TagCloudToolType, 
+    name: 'Influence Cloud', 
+    desc: 'Visualize connectivity of nodes.',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+      </svg>
+    ),
+    color: '#f472b6' // Lighter Pink
+  },
+  { 
+    id: 'words' as TagCloudToolType, 
+    name: 'Text Analysis', 
+    desc: 'Visualize word frequency in node names.',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+      </svg>
+    ),
+    color: '#db2777' // Pink-600
+  }
+];
+
 const TagCloudToolbar: React.FC<TagCloudToolbarProps> = ({
   onSelectTool,
   isCollapsed,
@@ -15,46 +51,61 @@ const TagCloudToolbar: React.FC<TagCloudToolbarProps> = ({
 }) => {
 
   return (
-    <div className="flex flex-col gap-2 pointer-events-none transition-all duration-300">
-      <div className="flex items-stretch gap-0 bg-gray-800 bg-opacity-90 rounded-lg border border-gray-600 shadow-lg pointer-events-auto overflow-hidden">
-        {/* Collapse Toggle */}
+    <div className="relative pointer-events-auto">
+      {/* Collapse Toggle / Main Button */}
+      <div className="relative">
         <button 
             onClick={onToggle}
-            className="bg-gray-700 hover:bg-gray-600 border-r border-gray-600 w-20 flex flex-col items-center justify-center transition-colors h-20 flex-shrink-0 gap-1"
-            title={isCollapsed ? "Expand Tag Cloud" : "Collapse Tag Cloud"}
+            className={`h-20 w-20 bg-gray-800 hover:bg-gray-700 border border-gray-600 shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${!isCollapsed ? 'ring-2 ring-pink-500 bg-gray-700' : ''}`}
+            title={isCollapsed ? "Expand Word Cloud" : "Close Word Cloud"}
         >
-            <div className="relative w-8 h-8 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-pink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+            <div className="relative w-8 h-8 flex items-center justify-center text-pink-400">
+                {/* Zoomed out word cloud icon (various small colored lines) */}
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="2" y="6" width="6" height="2" rx="1" fill="currentColor" fillOpacity="0.8"/>
+                    <rect x="9" y="6" width="8" height="2" rx="1" fill="currentColor" fillOpacity="0.5"/>
+                    <rect x="18" y="6" width="4" height="2" rx="1" fill="currentColor" fillOpacity="0.9"/>
+                    
+                    <rect x="3" y="10" width="9" height="2" rx="1" fill="currentColor" fillOpacity="0.6"/>
+                    <rect x="13" y="10" width="5" height="2" rx="1" fill="currentColor" fillOpacity="0.9"/>
+                    <rect x="19" y="10" width="2" height="2" rx="1" fill="currentColor" fillOpacity="0.4"/>
+                    
+                    <rect x="2" y="14" width="4" height="2" rx="1" fill="currentColor" fillOpacity="0.9"/>
+                    <rect x="7" y="14" width="7" height="2" rx="1" fill="currentColor" fillOpacity="0.5"/>
+                    <rect x="15" y="14" width="7" height="2" rx="1" fill="currentColor" fillOpacity="0.7"/>
                 </svg>
             </div>
-            <span className="text-xs font-bold tracking-wider text-gray-300">CLOUD</span>
+            <div className="text-[9px] font-bold tracking-wider text-gray-300 leading-none text-center">
+                WORD<br/>CLOUD
+            </div>
         </button>
+      </div>
 
-        {!isCollapsed && (
-            <div className="flex items-center p-3 animate-fade-in bg-gray-800 h-20 gap-1">
+      {!isCollapsed && (
+        <div className="absolute top-full left-0 mt-2 w-72 bg-gray-900 border border-gray-600 rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600">
+             <div className="p-2 bg-gray-800 border-b border-gray-700 text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center">
+                 Word Cloud Tools
+             </div>
+             
+             {WORD_CLOUD_TOOLS.map(tool => (
                  <button
-                    onClick={() => onSelectTool('cloud')}
-                    className="flex flex-col h-full w-24 items-center justify-end group transition-all rounded hover:bg-gray-700 px-1 pb-1"
-                    title="Open Tag Cloud Explorer"
+                    key={tool.id}
+                    onClick={() => onSelectTool(tool.id)}
+                    className={`flex items-start text-left p-3 border-b border-gray-700 last:border-0 hover:bg-gray-800 transition-colors group`}
                  >
-                     <div className="mb-1 transition-transform group-hover:scale-110 text-pink-400">
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
-                        </svg>
+                     <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110" style={{ color: tool.color }}>
+                         {tool.icon}
                      </div>
-                     <div className="text-[10px] font-bold text-gray-400 text-center leading-tight group-hover:text-white">
-                         Open Explorer
+                     <div>
+                         <div className="font-bold text-gray-200 text-sm mb-0.5 group-hover:text-white">{tool.name}</div>
+                         <p className="text-xs text-gray-400 leading-tight group-hover:text-gray-300">
+                             {tool.desc}
+                         </p>
                      </div>
                  </button>
-                 <div className="ml-2 pl-2 border-l border-gray-600 h-12 flex flex-col justify-center">
-                     <span className="text-[9px] text-gray-500 uppercase font-bold w-16 leading-tight">
-                        Tag Explorer
-                     </span>
-                 </div>
-            </div>
-        )}
-      </div>
+             ))}
+        </div>
+      )}
     </div>
   );
 };
