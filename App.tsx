@@ -168,6 +168,12 @@ export default function App() {
   // --- SWOT State ---
   const [activeSwotTool, setActiveSwotTool] = useState<SwotToolType>(null);
   const [isSwotModalOpen, setIsSwotModalOpen] = useState(false);
+  const [swotInitialDoc, setSwotInitialDoc] = useState<TapestryDocument | null>(null);
+
+  // --- SCAMPER State ---
+  const [isScamperModalOpen, setIsScamperModalOpen] = useState(false);
+  const [scamperTrigger, setScamperTrigger] = useState<{ operator: string, letter: string } | null>(null);
+  const [scamperInitialDoc, setScamperInitialDoc] = useState<TapestryDocument | null>(null);
 
   // --- Mermaid State ---
   const [isMermaidPanelOpen, setIsMermaidPanelOpen] = useState(false);
@@ -291,6 +297,7 @@ export default function App() {
           setActiveSsmTool((subTool as SsmToolType) || 'rich_picture');
           setIsSsmModalOpen(true);
       } else if (tool === 'scamper') {
+          setScamperInitialDoc(null);
           setIsScamperModalOpen(true);
       } else if (tool === 'explorer') {
           if (subTool === 'treemap') setIsTreemapPanelOpen(true);
@@ -306,6 +313,7 @@ export default function App() {
           else setIsConceptCloudOpen(true);
       } else if (tool === 'swot') {
           setActiveSwotTool((subTool as SwotToolType) || 'matrix');
+          setSwotInitialDoc(null); // Clear any doc context if opening fresh
           setIsSwotModalOpen(true);
       } else if (tool === 'mermaid') {
           setIsMermaidPanelOpen(true);
@@ -340,7 +348,7 @@ export default function App() {
       } else if (toolId.includes('scamper')) {
           setActiveTool('scamper');
           if (params) {
-              setCurrentScamperOperator({ name: params.operator, letter: params.letter });
+              setScamperTrigger({ operator: params.operator, letter: params.letter });
           }
           setIsScamperModalOpen(true);
       } else if (toolId.includes('explorer')) {
@@ -352,6 +360,7 @@ export default function App() {
       } else if (toolId.includes('swot') || toolId.includes('strategic')) {
           setActiveTool('swot');
           setActiveSwotTool((subTool as SwotToolType) || 'matrix');
+          setSwotInitialDoc(null);
           setIsSwotModalOpen(true);
       } else if (toolId.includes('diagram') || toolId.includes('mermaid')) {
           setActiveTool('mermaid');
@@ -405,6 +414,7 @@ export default function App() {
 
   const handleSwotToolSelect = (tool: SwotToolType) => {
       setActiveSwotTool(tool);
+      setSwotInitialDoc(null);
       setIsSwotModalOpen(true);
       setActiveTool(null); // Close the toolbar
   };
@@ -472,10 +482,6 @@ export default function App() {
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isPatternGalleryModalOpen, setIsPatternGalleryModalOpen] = useState(false);
   const [pendingImport, setPendingImport] = useState<{ localMetadata: ModelMetadata, diskMetadata: ModelMetadata, localData: any, diskData: any } | null>(null);
-  const [isScamperModalOpen, setIsScamperModalOpen] = useState(false);
-  const [isScamperLoading, setIsScamperLoading] = useState(false);
-  const [currentScamperOperator, setCurrentScamperOperator] = useState<{ name: string, letter: string } | null>(null);
-  const [scamperSuggestions, setScamperSuggestions] = useState<ScamperSuggestion[]>([]);
   const helpMenuRef = useRef<HTMLDivElement>(null);
   useClickOutside(helpMenuRef, () => setIsHelpMenuOpen(false));
   
@@ -714,11 +720,41 @@ export default function App() {
   const handleDeleteRelationship = useCallback((relationshipId: string) => { setRelationships(prev => prev.filter(r => r.id !== relationshipId)); setSelectedRelationshipId(null); }, []);
 
   const handleCreateFolder = useCallback((name: string) => { const newFolder: TapestryFolder = { id: generateUUID(), name, parentId: null, createdAt: new Date().toISOString() }; setFolders(prev => [...prev, newFolder]); }, []);
-  const handleCreateDocument = useCallback((folderId: string | null) => { const now = new Date().toISOString(); const newDoc: TapestryDocument = { id: generateUUID(), title: 'Untitled Document', content: '', folderId, createdAt: now, updatedAt: now }; setDocuments(prev => [...prev, newDoc]); setOpenDocIds(prev => [...prev, newDoc.id]); }, []);
+  const handleCreateDocument = useCallback((folderId: string | null, type: string = 'text', data?: any) => { const now = new Date().toISOString(); const newDoc: TapestryDocument = { id: generateUUID(), title: 'Untitled Document', content: '', folderId, createdAt: now, updatedAt: now, type, data }; setDocuments(prev => [...prev, newDoc]); setOpenDocIds(prev => [...prev, newDoc.id]); }, []);
   const handleDeleteDocument = useCallback((docId: string) => { if (confirm("Delete this document?")) { setDocuments(prev => prev.filter(d => d.id !== docId)); setOpenDocIds(prev => prev.filter(id => id !== docId)); } }, []);
   const handleDeleteFolder = useCallback((folderId: string) => { if (confirm("Delete this folder and all its contents?")) { setFolders(prev => prev.filter(f => f.id !== folderId)); setDocuments(prev => prev.filter(d => d.folderId !== folderId)); } }, []);
   const handleUpdateDocument = useCallback((docId: string, updates: Partial<TapestryDocument>) => { setDocuments(prev => prev.map(d => d.id === docId ? { ...d, ...updates, updatedAt: new Date().toISOString() } : d)); }, []);
-  const handleOpenDocument = useCallback((docId: string, origin?: 'report') => { if (!openDocIds.includes(docId)) { setOpenDocIds(prev => [...prev, docId]); } if (origin === 'report') { const reportLayout = panelLayouts['report']; let x = 100, y = 100; if (reportLayout && reportLayout.isFloating) { x = reportLayout.x + reportLayout.w + 20; y = reportLayout.y; } else if (isReportPanelOpen) { x = window.innerWidth - 600 - 520; y = 100; } if (x < 20) x = 20; if (x > window.innerWidth - 100) x = window.innerWidth - 600; const nextZ = panelZIndex + 1; setPanelZIndex(nextZ); setPanelLayouts(prev => ({ ...prev, [`doc-${docId}`]: { x, y, w: 500, h: 600, zIndex: nextZ, isFloating: true } })); } }, [openDocIds, panelLayouts, isReportPanelOpen, panelZIndex]);
+  
+  const handleOpenDocument = useCallback((docId: string, origin?: 'report') => {
+        const doc = documents.find(d => d.id === docId);
+        if (!doc) return;
+
+        // Handle Special Document Types
+        if (doc.type === 'swot-analysis') {
+            setActiveTool('swot');
+            setActiveSwotTool('matrix');
+            setSwotInitialDoc(doc);
+            setIsSwotModalOpen(true);
+            return;
+        } else if (doc.type === 'scamper-analysis') {
+            setActiveTool('scamper');
+            setScamperInitialDoc(doc);
+            setIsScamperModalOpen(true);
+            return;
+        }
+
+        if (!openDocIds.includes(docId)) { setOpenDocIds(prev => [...prev, docId]); }
+        
+        if (origin === 'report') { 
+            const reportLayout = panelLayouts['report']; 
+            let x = 100, y = 100; 
+            if (reportLayout && reportLayout.isFloating) { x = reportLayout.x + reportLayout.w + 20; y = reportLayout.y; } else if (isReportPanelOpen) { x = window.innerWidth - 600 - 520; y = 100; } 
+            if (x < 20) x = 20; if (x > window.innerWidth - 100) x = window.innerWidth - 600; 
+            const nextZ = panelZIndex + 1; 
+            setPanelZIndex(nextZ); 
+            setPanelLayouts(prev => ({ ...prev, [`doc-${docId}`]: { x, y, w: 500, h: 600, zIndex: nextZ, isFloating: true } })); 
+        }
+  }, [documents, openDocIds, panelLayouts, isReportPanelOpen, panelZIndex]);
 
   // --- Mermaid Actions ---
   const handleSaveMermaidDiagram = useCallback((diagram: MermaidDiagram) => {
@@ -887,7 +923,14 @@ export default function App() {
           return true;
       },
       readDocument: (title) => { const doc = findDocumentByTitle(title); return doc ? doc.content : null; },
-      createDocument: (title, content = '') => { const now = new Date().toISOString(); const newDoc: TapestryDocument = { id: generateUUID(), title, content, folderId: null, createdAt: now, updatedAt: now }; documentsRef.current = [...documentsRef.current, newDoc]; setDocuments(prev => [...prev, newDoc]); if (!openDocIds.includes(newDoc.id)) { setOpenDocIds(prev => [...prev, newDoc.id]); } return newDoc.id; },
+      createDocument: (title, content = '', type = 'text', data = null) => { 
+          const now = new Date().toISOString(); 
+          const newDoc: TapestryDocument = { id: generateUUID(), title, content, folderId: null, createdAt: now, updatedAt: now, type, data }; 
+          documentsRef.current = [...documentsRef.current, newDoc]; 
+          setDocuments(prev => [...prev, newDoc]); 
+          if (!openDocIds.includes(newDoc.id)) { setOpenDocIds(prev => [...prev, newDoc.id]); } 
+          return newDoc.id; 
+      },
       updateDocument: (title, content, mode) => { const doc = findDocumentByTitle(title); if (!doc) return false; let newContent = content; if (mode === 'append') { newContent = doc.content ? `${doc.content}\n\n${content}` : content; } const updatedDoc = { ...doc, content: newContent, updatedAt: new Date().toISOString() }; documentsRef.current = documentsRef.current.map(d => d.id === doc.id ? updatedDoc : d); setDocuments(prev => prev.map(d => d.id === doc.id ? updatedDoc : d)); return true; },
       createFolder: (name, parentId) => {
           const id = generateUUID();
@@ -908,59 +951,15 @@ export default function App() {
   }, [handleDeleteElement, openDocIds]);
 
   // --- SCAMPER Actions ---
-  const handleScamperGenerate = async (operator: string, letter: string) => {
-      if (!selectedElementId) return;
-      const sourceElement = elements.find(e => e.id === selectedElementId);
-      if (!sourceElement) return;
-
-      setIsScamperModalOpen(true);
-      setIsScamperLoading(true);
-      setCurrentScamperOperator({ name: operator, letter });
-      setScamperSuggestions([]);
-
-      try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        
-        // Get custom prompt if available for this specific operator
-        const customPrompt = getToolPrompt('scamper', letter) || DEFAULT_TOOL_PROMPTS['scamper'];
-        
-        // If base prompt is generic, we construct the task. 
-        // If user overwrites it completely, we might lose the task context unless they include it.
-        // But assuming advanced users want control, we use the prompt as the base instruction.
-        
-        const prompt = `${customPrompt}
-        
-        TASK: Apply the SCAMPER technique '${letter} - ${operator}' to the concept: "${sourceElement.name}" (Notes: ${sourceElement.notes}). 
-        Generate 4-8 distinct, creative ideas that emerge from applying this operator. 
-        For each idea, provide a name, a short description/rationale, and a short relationship label that connects the original concept to the new idea (e.g. "can be replaced by", "combined with", "adapted to").`;
-        
-        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: "application/json", responseSchema: { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { name: { type: Type.STRING, description: "The name of the new idea node." }, description: { type: Type.STRING, description: "Rationale or explanation." }, relationshipLabel: { type: Type.STRING, description: "Label for the link from original node to this new node." } } } } } });
-        const results = JSON.parse(response.text || "[]");
-        const suggestions: ScamperSuggestion[] = results.map((r: any) => ({ id: generateUUID(), name: r.name, description: r.description, relationshipLabel: r.relationshipLabel, status: 'pending' }));
-        setScamperSuggestions(suggestions);
-        handleLogHistory('SCAMPER', `Generated ${suggestions.length} ideas for '${sourceElement.name}' using operator ${operator}.\n\n` + suggestions.map(s => `- **${s.name}** (${s.relationshipLabel}): ${s.description}`).join('\n'), `SCAMPER: ${operator}`, operator, { letter, operator, sourceNodeName: sourceElement.name });
-      } catch (e) { console.error("SCAMPER generation failed", e); alert("Failed to generate ideas. Please try again."); setIsScamperModalOpen(false); } finally { setIsScamperLoading(false); }
-  };
-  const handleScamperAccept = (id: string) => {
-      const suggestion = scamperSuggestions.find(s => s.id === id);
-      const sourceElement = elements.find(e => e.id === selectedElementId);
-      if (suggestion && sourceElement) {
-          const newId = generateUUID();
-          const now = new Date().toISOString();
-          const angle = Math.random() * Math.PI * 2;
-          const distance = 150 + Math.random() * 50;
-          const x = (sourceElement.x || 0) + Math.cos(angle) * distance;
-          const y = (sourceElement.y || 0) + Math.sin(angle) * distance;
-          const newElement: Element = { id: newId, name: suggestion.name, notes: suggestion.description, tags: ['Idea', ...defaultTags], createdAt: now, updatedAt: now, x, y, fx: x, fy: y };
-          const newRel: Relationship = { id: generateUUID(), source: sourceElement.id, target: newId, label: suggestion.relationshipLabel, direction: RelationshipDirection.To, tags: [] };
-          setElements(prev => [...prev, newElement]);
-          setRelationships(prev => [...prev, newRel]);
-          setScamperSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: 'accepted' } : s));
+  const handleScamperTrigger = (operator: string, letter: string) => {
+      if (!selectedElementId) {
+          alert("Please select a node first to apply SCAMPER.");
+          return;
       }
+      setScamperInitialDoc(null);
+      setScamperTrigger({ operator, letter });
+      setIsScamperModalOpen(true);
   };
-  const handleScamperReject = (id: string) => { setScamperSuggestions(prev => prev.map(s => s.id === id ? { ...s, status: 'rejected' } : s)); };
-  const handleScamperAcceptAll = () => { scamperSuggestions.forEach(s => { if (s.status === 'pending') handleScamperAccept(s.id); }); };
-  const handleScamperRejectAll = () => { setScamperSuggestions(prev => prev.map(s => s.status === 'pending' ? { ...s, status: 'rejected' } : s)); };
 
   const handleDiskSave = useCallback(async () => {
     if (!currentModelId) { alert("No active model to save."); return; }
@@ -2117,7 +2116,11 @@ export default function App() {
                 />
                 <ScamperToolbar
                     selectedElementId={selectedElementId}
-                    onScamper={handleScamperGenerate}
+                    onScamper={(operator, letter) => {
+                        setScamperInitialDoc(null);
+                        setScamperTrigger({ operator, letter });
+                        setIsScamperModalOpen(true);
+                    }}
                     isCollapsed={activeTool !== 'scamper'}
                     onToggle={() => toggleTool('scamper')}
                     onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
@@ -2316,17 +2319,24 @@ export default function App() {
       
       <ScamperModal
         isOpen={isScamperModalOpen}
-        isLoading={isScamperLoading}
-        operator={currentScamperOperator ? `${currentScamperOperator.letter} - ${currentScamperOperator.name}` : ''}
-        sourceNodeName={selectedElement ? selectedElement.name : ''}
-        suggestions={scamperSuggestions}
-        onAccept={handleScamperAccept}
-        onReject={handleScamperReject}
-        onAcceptAll={handleScamperAcceptAll}
-        onRejectAll={handleScamperRejectAll}
-        onRegenerate={() => handleScamperGenerate(currentScamperOperator?.name || '', currentScamperOperator?.letter || '')}
         onClose={() => setIsScamperModalOpen(false)}
+        
+        elements={elements}
+        relationships={relationships}
+        selectedElementId={selectedElementId}
+        modelActions={aiActions}
+        
+        triggerOp={scamperTrigger}
+        onClearTrigger={() => setScamperTrigger(null)}
+        
+        documents={documents}
+        folders={folders}
+        onUpdateDocument={handleUpdateDocument}
+        modelName={currentModelName}
+        initialDoc={scamperInitialDoc}
+        
         onLogHistory={handleLogHistory}
+        defaultTags={defaultTags}
       />
 
       <TrizModal 
@@ -2409,7 +2419,8 @@ export default function App() {
         onClose={() => setIsSwotModalOpen(false)}
         onLogHistory={handleLogHistory}
         onOpenHistory={() => setIsHistoryPanelOpen(true)}
-        customPrompt={getToolPrompt('swot', activeSwotTool)}
+        modelName={currentModelName}
+        initialDoc={swotInitialDoc}
       />
 
       <SettingsModal 

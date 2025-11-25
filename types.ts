@@ -39,6 +39,8 @@ export interface TapestryDocument {
   folderId: string | null;
   createdAt: string;
   updatedAt: string;
+  type?: 'text' | 'swot-analysis' | 'triz-analysis' | 'scamper-analysis' | string;
+  data?: any; // Structured data for tools (e.g. SWOT arrays)
 }
 
 export interface TapestryFolder {
@@ -147,7 +149,7 @@ export interface ModelActions {
   
   // Document Actions
   readDocument: (title: string) => string | null;
-  createDocument: (title: string, content?: string) => string;
+  createDocument: (title: string, content?: string, type?: string, data?: any) => string;
   updateDocument: (title: string, content: string, mode: 'replace' | 'append') => boolean;
   createFolder: (name: string, parentId?: string | null) => string;
   moveDocument: (docId: string, folderId: string | null) => boolean;
@@ -159,6 +161,7 @@ export interface ScamperSuggestion {
   description: string;
   relationshipLabel: string;
   status: 'pending' | 'accepted' | 'rejected';
+  actionLog?: string;
 }
 
 export interface PanelLayout {

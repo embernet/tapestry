@@ -4,6 +4,7 @@ import { Element, Relationship, SwotToolType, ModelActions, TapestryDocument, Ta
 import { generateMarkdownFromGraph, generateUUID } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
+import { DEFAULT_TOOL_PROMPTS } from '../constants';
 
 interface SwotModalProps {
   isOpen: boolean;
@@ -12,11 +13,14 @@ interface SwotModalProps {
   relationships: Relationship[];
   modelActions: ModelActions;
   onClose: () => void;
-  onLogHistory?: (tool: string, content: string, summary?: string) => void;
+  onLogHistory?: (tool: string, content: string, summary?: string, subTool?: string, toolParams?: any) => void;
   onOpenHistory?: () => void;
   documents: TapestryDocument[];
   folders: TapestryFolder[];
   onUpdateDocument: (docId: string, updates: Partial<TapestryDocument>) => void;
+  modelName?: string;
+  initialDoc?: TapestryDocument | null;
+  customPrompt?: string;
 }
 
 interface SwotEntry {
@@ -27,7 +31,7 @@ interface SwotEntry {
 
 type SwotCategory = 'strengths' | 'weaknesses' | 'opportunities' | 'threats';
 
-const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, documents, folders, onUpdateDocument }) => {
+const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, documents, folders, onUpdateDocument, modelName, initialDoc, customPrompt }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -42,6 +46,7 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
       opportunities: [],
       threats: []
   });
+  const [docTitle, setDocTitle] = useState('SWOT Analysis');
   const [promptGuidance, setPromptGuidance] = useState('');
   const [analysisScope, setAnalysisScope] = useState<'model' | 'selection'>('model');
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -63,22 +68,26 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
   const dragOverItem = useRef<{ category: SwotCategory, index: number } | null>(null);
 
   useEffect(() => {
-      if (!isOpen) {
+      if (isOpen) {
+          if (initialDoc) {
+              // Load from document
+              setSwotData(initialDoc.data || { strengths: [], weaknesses: [], opportunities: [], threats: [] });
+              setDocTitle(initialDoc.title);
+              setGeneratedDocId(initialDoc.id);
+          } else {
+              // Reset for new analysis
+              setSwotData({ strengths: [], weaknesses: [], opportunities: [], threats: [] });
+              const dateStr = new Date().toLocaleDateString();
+              setDocTitle(`${modelName || 'Model'} - SWOT - ${dateStr}`);
+              setGeneratedDocId(null);
+          }
           setSuggestions([]);
           setAnalysisText('');
-          setGeneratedDocId(null);
-          // Reset SWOT data on close/open
-          setSwotData({ strengths: [], weaknesses: [], opportunities: [], threats: [] });
       } else {
-          // Center on open if not set (simple heuristic)
-          if (position.x === 100 && position.y === 100) {
-              setPosition({ 
-                  x: Math.max(20, (window.innerWidth - 1200) / 2), 
-                  y: Math.max(20, (window.innerHeight - 800) / 2) 
-              });
-          }
+          // Reset on close to clean up if reopened
+          setGeneratedDocId(null);
       }
-  }, [isOpen]);
+  }, [isOpen, initialDoc, modelName]);
 
   // Reset scroll position when entry height changes
   useEffect(() => {
@@ -242,6 +251,79 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
       setDraggingId(null);
   };
 
+  const generateSwotMarkdown = (data: Record<SwotCategory, SwotEntry[]>, onlySelected: boolean = false) => {
+      let md = `# ${docTitle}\n\n`;
+      const categories: SwotCategory[] = ['strengths', 'weaknesses', 'opportunities', 'threats'];
+      
+      categories.forEach(cat => {
+          const items = data[cat].filter(e => !onlySelected || e.selected);
+          
+          if (items.length > 0 || !onlySelected) {
+             md += `## ${cat.charAt(0).toUpperCase() + cat.slice(1)}\n`;
+             if (items.length > 0) {
+                 md += `${items.map(e => `- ${e.text}`).join('\n')}\n\n`;
+             } else {
+                 md += `(None)\n\n`;
+             }
+          }
+      });
+      return md;
+  };
+
+  const handleSaveToDocuments = () => {
+      // Find/Create SWOT folder
+      let swotFolder = folders.find(f => f.name === 'SWOT');
+      let folderId = swotFolder?.id;
+      
+      if (!swotFolder) {
+          folderId = modelActions.createFolder('SWOT');
+      }
+
+      const content = generateSwotMarkdown(swotData);
+
+      if (generatedDocId) {
+          onUpdateDocument(generatedDocId, { 
+              title: docTitle, 
+              content: content,
+              data: swotData,
+              folderId: folderId 
+          });
+      } else {
+          const newId = modelActions.createDocument(docTitle, content, 'swot-analysis', swotData);
+          modelActions.moveDocument(newId, folderId!);
+          setGeneratedDocId(newId);
+      }
+      alert('Saved to Documents!');
+  };
+
+  const handleSaveReport = (onlySelected: boolean) => {
+      // Check if anything selected if onlySelected is true
+      if (onlySelected) {
+          const categories: SwotCategory[] = ['strengths', 'weaknesses', 'opportunities', 'threats'];
+          const hasSelection = categories.some(cat => swotData[cat].some(i => i.selected));
+          if (!hasSelection) {
+              alert("No items selected.");
+              return;
+          }
+      }
+
+      let swotFolder = folders.find(f => f.name === 'SWOT');
+      let folderId = swotFolder?.id;
+      
+      if (!swotFolder) {
+          folderId = modelActions.createFolder('SWOT');
+      }
+
+      const content = generateSwotMarkdown(swotData, onlySelected);
+      const titleSuffix = onlySelected ? ' (Selected Report)' : ' (Report)';
+      const title = `${docTitle}${titleSuffix}`;
+
+      const newId = modelActions.createDocument(title, content, 'text');
+      modelActions.moveDocument(newId, folderId!);
+      
+      alert(`Report saved to Documents: ${title}`);
+  };
+
   const handleSwotAI = async (targetCategory?: SwotCategory) => {
       setIsLoading(true);
       try {
@@ -250,19 +332,16 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
           let contextRels = relationships;
           
           if (analysisScope === 'selection') {
-              // Simplistic selection check - ideally we'd pass selected IDs from parent, 
-              // but relying on what's passed to modal via props if selection is active elsewhere.
-              // Assuming 'selectedNode' prop usage or similar.
-              // For this implementation, we'll assume 'elements' passed are ALL elements.
-              // If we want selection specific, we rely on the prompt instruction mainly, 
-              // or the parent needs to pass selection state.
-              // Let's use the existing 'selectedNode' state if set for focus, else warn.
+              // TODO: Use selection from app context if available
           }
 
           const graphMarkdown = generateMarkdownFromGraph(contextElements, contextRels);
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+          const systemPromptBase = customPrompt || DEFAULT_TOOL_PROMPTS['swot'];
           const prompt = `
+          ${systemPromptBase}
+          
           Perform a SWOT Analysis on the provided knowledge graph.
           ${promptGuidance ? `USER GUIDANCE: ${promptGuidance}` : ''}
           
@@ -317,7 +396,7 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
                       const newEntries = result[key].map((text: string) => ({
                           id: generateUUID(),
                           text: text,
-                          selected: false // Default to not selected? Or select new ones? Let's keep unselected.
+                          selected: false
                       }));
                       next[cat] = [...next[cat], ...newEntries];
                   }
@@ -350,7 +429,7 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
                       threats: 'Threat'
                   };
                   
-                  const nodeId = modelActions.addElement({
+                  modelActions.addElement({
                       name: name,
                       tags: [tagMap[cat]],
                       notes: entry.text
@@ -380,15 +459,10 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
           const graphMarkdown = generateMarkdownFromGraph(elements, relationships);
           const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           
-          const systemInstruction = `You are a Strategic Analyst. Analyze the provided graph model using the ${toolInfo.title} framework.
+          const systemPromptBase = customPrompt || DEFAULT_TOOL_PROMPTS[activeTool] || DEFAULT_TOOL_PROMPTS['swot'];
+          const systemInstruction = `${systemPromptBase}
           GRAPH CONTEXT:
-          ${graphMarkdown}
-          
-          OUTPUT FORMAT:
-          Return a JSON object with two fields:
-          1. "analysis": A detailed MARKDOWN string explaining your findings, organized by the categories of the framework.
-          2. "actions": An array of suggested graph modifications. Each action must be a function call object: { name: "addElement" | "addRelationship" | "deleteElement" | "setElementAttribute", args: { ... } }.
-          `;
+          ${graphMarkdown}`;
 
           let userPrompt = `Perform a ${toolInfo.title} analysis for: "${selectedNode}".`; 
           
@@ -470,6 +544,14 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
       }
   };
 
+  const handleCopy = () => {
+      if (analysisText) {
+          navigator.clipboard.writeText(analysisText);
+          setIsCopied(true);
+          setTimeout(() => setIsCopied(false), 2000);
+      }
+  };
+
   if (!isOpen) return null;
 
   // --- Render ---
@@ -486,13 +568,38 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
                     className="h-10 bg-gray-800 border-b border-gray-700 flex justify-between items-center px-4 cursor-move select-none"
                     onMouseDown={handleWindowDragStart}
                 >
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full bg-lime-500"></div>
-                        <h2 className="text-sm font-bold text-gray-200 uppercase tracking-wider">SWOT Matrix</h2>
+                    <div className="flex items-center gap-2 flex-grow">
+                        <div className="w-4 h-4">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                <rect x="4" y="4" width="7" height="7" rx="1" className="fill-green-500" />
+                                <rect x="13" y="4" width="7" height="7" rx="1" className="fill-red-300" />
+                                <rect x="4" y="13" width="7" height="7" rx="1" className="fill-yellow-400" />
+                                <rect x="13" y="13" width="7" height="7" rx="1" className="fill-red-700" />
+                            </svg>
+                        </div>
+                        <span className="text-sm font-bold text-gray-200 uppercase tracking-wider mr-2">SWOT Matrix:</span>
+                        {/* Title Input */}
+                        <input 
+                            type="text" 
+                            value={docTitle}
+                            onChange={(e) => setDocTitle(e.target.value)}
+                            onMouseDown={(e) => e.stopPropagation()} // Allow interacting with input without dragging
+                            className="bg-gray-900 border border-gray-600 hover:border-lime-500 focus:border-lime-500 rounded px-2 py-0.5 text-sm font-bold text-white outline-none transition-all w-64"
+                        />
                     </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={handleSaveToDocuments} 
+                            className="bg-lime-700 hover:bg-lime-600 text-white text-xs font-bold px-3 py-1 rounded transition shadow-sm flex items-center gap-1"
+                            title="Save to Documents folder 'SWOT'"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" /></svg>
+                            Save
+                        </button>
+                        <button onClick={onClose} className="text-gray-400 hover:text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-grow flex overflow-hidden">
@@ -561,131 +668,120 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
                             <button 
                                 onClick={() => handleSwotAI()}
                                 disabled={isLoading}
-                                className="w-full bg-lime-700 hover:bg-lime-600 text-white font-bold py-2 rounded flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full bg-lime-600 hover:bg-lime-500 text-white font-bold py-2 rounded shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {isLoading ? (
-                                    <span className="animate-spin">⟳</span>
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                        Analyzing...
+                                    </>
                                 ) : (
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 5a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1V8a1 1 0 011-1zm5-5a1 1 0 011 1v15a1 1 0 11-2 0V3a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                                    'Generate Full SWOT'
                                 )}
-                                Auto-Populate All
                             </button>
+                        </div>
 
-                            <div className="border-t border-gray-700 pt-4 mt-2">
-                                <p className="text-xs text-gray-500 mb-2">
-                                    Select entries in the grid, then apply to create them as nodes in your graph.
-                                </p>
-                                <button 
-                                    onClick={applySwotToGraph}
-                                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded transition"
-                                >
-                                    Apply Selected to Graph
-                                </button>
-                            </div>
+                        <div className="w-full h-px bg-gray-700 my-1"></div>
+
+                        <button 
+                            onClick={applySwotToGraph}
+                            className="w-full bg-gray-700 hover:bg-blue-600 border border-gray-600 text-white font-bold py-2 rounded transition shadow-sm text-xs uppercase tracking-wide mb-2"
+                        >
+                            Add Selected to Graph
+                        </button>
+
+                        <div className="flex gap-2">
+                            <button 
+                                onClick={() => handleSaveReport(false)}
+                                className="flex-1 bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white font-bold py-2 rounded transition shadow-sm text-xs uppercase tracking-wide"
+                                title="Save full report as a text document"
+                            >
+                                Save Report (All)
+                            </button>
+                            <button 
+                                onClick={() => handleSaveReport(true)}
+                                className="flex-1 bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white font-bold py-2 rounded transition shadow-sm text-xs uppercase tracking-wide"
+                                title="Save selected items as a text document"
+                            >
+                                Save Report (Sel)
+                            </button>
                         </div>
                     </div>
 
-                    {/* Main 2x2 Grid */}
-                    <div className="flex-grow grid grid-cols-2 grid-rows-2 gap-4 p-4 bg-gray-900 overflow-hidden">
-                        
-                        {/* Reusable Quadrant Component */}
-                        {[
-                            { id: 'strengths' as SwotCategory, title: 'Strengths', color: 'text-green-400', border: 'border-green-900/50' },
-                            { id: 'weaknesses' as SwotCategory, title: 'Weaknesses', color: 'text-red-400', border: 'border-red-900/50' },
-                            { id: 'opportunities' as SwotCategory, title: 'Opportunities', color: 'text-blue-400', border: 'border-blue-900/50' },
-                            { id: 'threats' as SwotCategory, title: 'Threats', color: 'text-orange-400', border: 'border-orange-900/50' }
-                        ].map((quad) => (
+                    {/* Main Matrix Grid */}
+                    <div className="flex-grow bg-gray-900 p-1 grid grid-cols-2 grid-rows-2 gap-1 overflow-hidden">
+                        {(['strengths', 'weaknesses', 'opportunities', 'threats'] as SwotCategory[]).map(category => (
                             <div 
-                                key={quad.id} 
-                                className={`bg-gray-800 rounded-lg border ${quad.border} flex flex-col overflow-hidden relative`}
+                                key={category} 
+                                className="bg-gray-800 border border-gray-700 rounded flex flex-col overflow-hidden"
+                                onDragOver={(e) => e.preventDefault()} // Allow drop
                             >
-                                {/* Quadrant Header */}
-                                <div className="p-3 bg-gray-800/80 border-b border-gray-700 flex justify-between items-center">
-                                    <h3 className={`font-bold uppercase tracking-wider ${quad.color}`}>{quad.title}</h3>
+                                {/* Category Header */}
+                                <div className="p-2 border-b border-gray-700 bg-gray-900/50 flex justify-between items-center">
+                                    <h3 className={`font-bold uppercase tracking-wider text-sm ${
+                                        category === 'strengths' ? 'text-green-400' :
+                                        category === 'weaknesses' ? 'text-red-400' :
+                                        category === 'opportunities' ? 'text-blue-400' : 'text-orange-400'
+                                    }`}>
+                                        {category}
+                                    </h3>
                                     <div className="flex gap-1">
                                         <button 
-                                            onClick={() => addEntry(quad.id)}
-                                            className="p-1 text-gray-400 hover:text-white hover:bg-gray-700 rounded"
-                                            title="Add Entry"
+                                            onClick={() => handleSwotAI(category)}
+                                            disabled={isLoading}
+                                            className="p-1 hover:bg-gray-700 rounded text-gray-500 hover:text-white" 
+                                            title={`Generate only ${category}`}
                                         >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                                         </button>
                                         <button 
-                                            onClick={() => handleSwotAI(quad.id)}
-                                            disabled={isLoading}
-                                            className="p-1 text-gray-400 hover:text-lime-400 hover:bg-gray-700 rounded disabled:opacity-30"
-                                            title="Auto-Populate Category"
+                                            onClick={() => addEntry(category)}
+                                            className="p-1 hover:bg-gray-700 rounded text-gray-500 hover:text-white" 
+                                            title="Add Item"
                                         >
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 5a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1V8a1 1 0 011-1zm5-5a1 1 0 011 1v15a1 1 0 11-2 0V3a1 1 0 011-1z" clipRule="evenodd" /></svg>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                                         </button>
                                     </div>
                                 </div>
 
-                                {/* List */}
-                                <div 
-                                    className="flex-grow overflow-y-auto p-2 space-y-2"
-                                    onDragOver={(e) => {
-                                        e.preventDefault();
-                                        // If dragging over the container background (not an item),
-                                        // set the drop target to the end of the current category's list.
-                                        // This allows moving items between categories easily by dropping in empty space.
-                                        if (e.currentTarget === e.target) {
-                                            dragOverItem.current = { category: quad.id, index: swotData[quad.id].length };
-                                        }
-                                    }}
-                                    onDrop={onDragEnd}
-                                >
-                                    {swotData[quad.id].map((entry, idx) => (
+                                {/* Entries List */}
+                                <div className="flex-grow overflow-y-auto p-2 space-y-1 bg-gray-800">
+                                    {swotData[category].map((entry, index) => (
                                         <div 
                                             key={entry.id}
                                             draggable
-                                            onDragStart={(e) => onDragStart(e, quad.id, idx, entry.id)}
-                                            onDragEnter={(e) => onDragEnter(e, quad.id, idx)}
+                                            onDragStart={(e) => onDragStart(e, category, index, entry.id)}
+                                            onDragEnter={(e) => onDragEnter(e, category, index)}
                                             onDragEnd={onDragEnd}
-                                            onDragOver={(e) => e.preventDefault()}
                                             className={`flex items-start gap-2 p-2 rounded border group transition-colors ${
-                                                entry.selected 
-                                                ? 'bg-yellow-900/30 border-yellow-600/50' 
-                                                : 'bg-gray-700/50 border-gray-600 hover:border-gray-500'
-                                            } ${draggingId === entry.id ? 'opacity-50' : 'opacity-100'}`}
+                                                entry.selected ? 'bg-blue-900/20 border-blue-500/50' : 
+                                                draggingId === entry.id ? 'bg-gray-700 opacity-50 border-gray-600' : 'bg-gray-750 border-gray-700 hover:border-gray-500'
+                                            }`}
                                         >
-                                            {/* Drag Handle */}
-                                            <div className="cursor-grab text-gray-500 hover:text-gray-300 mt-1.5">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M7 2a2 2 0 10.001 4.001A2 2 0 007 2zm0 6a2 2 0 10.001 4.001A2 2 0 007 8zm0 6a2 2 0 10.001 4.001A2 2 0 007 14zm6-8a2 2 0 10-.001-4.001A2 2 0 0013 6zm0 2a2 2 0 10.001 4.001A2 2 0 0013 8zm0 6a2 2 0 10.001 4.001A2 2 0 0013 14z" /></svg>
-                                            </div>
-
-                                            {/* Checkbox */}
                                             <input 
                                                 type="checkbox" 
                                                 checked={entry.selected} 
-                                                onChange={() => toggleSelectEntry(quad.id, entry.id)}
-                                                className="w-4 h-4 mt-1.5 rounded bg-gray-900 border-gray-600 text-yellow-600 focus:ring-yellow-600 focus:ring-offset-gray-800 cursor-pointer"
+                                                onChange={() => toggleSelectEntry(category, entry.id)}
+                                                className="mt-1.5 cursor-pointer rounded bg-gray-900 border-gray-600 text-blue-500 focus:ring-0"
                                             />
-
-                                            {/* Text Area */}
                                             <textarea 
                                                 value={entry.text}
-                                                onChange={(e) => updateEntry(quad.id, entry.id, e.target.value)}
+                                                onChange={(e) => updateEntry(category, entry.id, e.target.value)}
+                                                className="swot-textarea flex-grow bg-transparent border-none text-sm text-gray-300 focus:text-white focus:ring-0 resize-none overflow-hidden outline-none placeholder-gray-600"
                                                 rows={entryHeight}
-                                                className="swot-textarea bg-transparent border-none text-sm text-white focus:ring-0 flex-grow w-full min-w-0 placeholder-gray-500 resize-none leading-relaxed"
-                                                placeholder="Enter text..."
+                                                placeholder="Enter point..."
                                             />
-
-                                            {/* Delete Button */}
                                             <button 
-                                                onClick={() => deleteEntry(quad.id, entry.id)}
-                                                className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity mt-1"
+                                                onClick={() => deleteEntry(category, entry.id)}
+                                                className="text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                                             >
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                                                ×
                                             </button>
                                         </div>
                                     ))}
-                                    {swotData[quad.id].length === 0 && (
-                                        <div 
-                                            onClick={() => addEntry(quad.id)}
-                                            className="text-center text-gray-500 text-xs py-4 italic border-2 border-dashed border-gray-700 rounded cursor-pointer hover:bg-gray-800 hover:text-gray-400 hover:border-gray-500 transition-all"
-                                        >
-                                            Empty (Click to add)
+                                    {swotData[category].length === 0 && (
+                                        <div className="text-center py-4 text-gray-600 text-xs italic select-none">
+                                            Empty
                                         </div>
                                     )}
                                 </div>
@@ -694,12 +790,12 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
                     </div>
                 </div>
 
-                {/* Resize Handle */}
+                {/* Resizer Handle */}
                 <div 
-                    className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50 flex items-end justify-end p-0.5"
+                    className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize z-50 flex items-end justify-end p-1"
                     onMouseDown={handleResizeStart}
                 >
-                    <svg viewBox="0 0 10 10" className="w-2 h-2 text-gray-500">
+                    <svg viewBox="0 0 10 10" className="w-3 h-3 text-gray-500 opacity-50">
                         <path d="M10 10 L10 0 L0 10 Z" fill="currentColor" />
                     </svg>
                 </div>
@@ -708,10 +804,11 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
       );
   }
 
-  // --- Fallback for Legacy Tools (PESTEL, etc) ---
+  // --- Legacy Render (Standard Modal) for PESTEL, etc. ---
+  
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
-      <div className={`bg-gray-900 rounded-lg w-full max-w-4xl shadow-2xl border ${toolInfo.border} text-white flex flex-col max-h-[90vh]`}>
+      <div className={`bg-gray-900 rounded-lg w-full max-w-6xl shadow-2xl border ${toolInfo.border} text-white flex flex-col max-h-[90vh]`}>
         
         {/* Header */}
         <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-800 rounded-t-lg">
@@ -719,11 +816,6 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
                 Strategy / <span className="text-white">{toolInfo.title}</span>
             </h2>
             <div className="flex items-center gap-2">
-                {onOpenHistory && (
-                    <button onClick={onOpenHistory} className="text-gray-400 hover:text-white mr-2" title="View History">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    </button>
-                )}
                 <button onClick={onClose} className="text-gray-400 hover:text-white transition">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
@@ -734,13 +826,11 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
             {/* Left: Controls */}
             <div className="w-1/3 p-6 border-r border-gray-800 overflow-y-auto bg-gray-800/50">
                 <div className="space-y-4">
-                    <p className="text-gray-300 text-sm">
-                        {toolInfo.desc}
-                    </p>
+                    <p className="text-gray-300 text-sm">{toolInfo.desc}</p>
                     <div>
                         <label className="block text-xs font-bold text-gray-400 uppercase mb-2">Subject Node</label>
                         <select 
-                            className={`w-full bg-gray-800 text-white text-sm rounded p-2 border border-gray-600 focus:${toolInfo.border.replace('border-', 'border-')} outline-none`}
+                            className="w-full bg-gray-800 text-white text-sm rounded p-2 border border-gray-600 focus:border-lime-500 outline-none"
                             value={selectedNode}
                             onChange={e => setSelectedNode(e.target.value)}
                         >
@@ -751,7 +841,7 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
                     <button 
                         disabled={!selectedNode || isLoading}
                         onClick={handleLegacyGenerate}
-                        className={`w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded transition disabled:opacity-50 flex justify-center items-center gap-2 border border-gray-500 hover:border-gray-400`}
+                        className="w-full bg-lime-600 hover:bg-lime-500 text-white font-bold py-3 rounded transition disabled:opacity-50"
                     >
                         {isLoading ? 'Analyzing...' : `Run ${toolInfo.title}`}
                     </button>
@@ -760,35 +850,44 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
 
             {/* Right: Results */}
             <div className="w-2/3 p-6 overflow-y-auto flex flex-col gap-6 bg-gray-900 relative">
-                {/* Reuse existing result rendering logic... */}
                 {analysisText && (
-                    <div className="bg-gray-800 p-4 rounded border border-gray-700">
+                    <div className="absolute top-4 right-6 flex gap-2 z-10">
+                        <button onClick={handleCopy} className="p-1.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white transition" title="Copy">
+                            {isCopied ? <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> : <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>}
+                        </button>
+                    </div>
+                )}
+
+                {analysisText ? (
+                    <div className="bg-gray-800 p-4 rounded border border-gray-700 pt-10">
                         <div className="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed markdown-content">
                             {analysisText}
                         </div>
                     </div>
+                ) : !isLoading ? (
+                    <div className="flex flex-col items-center justify-center h-full text-gray-600 opacity-50">
+                        <p>Select a node and run analysis.</p>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center justify-center h-full">
+                        <div className="w-10 h-10 border-4 border-lime-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                        <p className="text-lime-400 animate-pulse text-sm">Processing...</p>
+                    </div>
                 )}
-                
+
                 {suggestions.length > 0 && (
                     <div>
-                        <h3 className="text-lg font-bold text-gray-200 mb-3">Proposed Actions</h3>
+                        <h3 className="text-lg font-bold text-gray-200 mb-3">Recommended Actions</h3>
                         <div className="space-y-3">
                             {suggestions.map((action, idx) => (
                                 <div key={idx} className={`p-3 rounded border flex items-center justify-between ${action.status === 'applied' ? 'bg-green-900/20 border-green-600' : 'bg-gray-800 border-gray-700'}`}>
-                                    <div className="text-sm">
-                                        <div className="font-mono text-xs text-gray-500 uppercase mb-1">{action.name}</div>
-                                        <div className="text-gray-200 font-medium">
-                                            {action.name === 'addElement' && `Add: ${action.args.name}`}
-                                            {/* ... other action types ... */}
-                                        </div>
+                                    <div className="text-sm text-gray-300">
+                                        {action.name}: {JSON.stringify(action.args)}
                                     </div>
-                                    {action.status === 'pending' && (
-                                        <button 
-                                            onClick={() => handleApplyAction(idx)}
-                                            className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold transition"
-                                        >
-                                            Apply
-                                        </button>
+                                    {action.status === 'pending' ? (
+                                        <button onClick={() => handleApplyAction(idx)} className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold transition">Apply</button>
+                                    ) : (
+                                        <span className="text-green-500 text-xs font-bold">Applied</span>
                                     )}
                                 </div>
                             ))}
