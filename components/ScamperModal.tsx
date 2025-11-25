@@ -99,8 +99,7 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
               if (sourceEl) {
                   setSourceNodeId(sourceEl.id);
                   setSourceNodeName(sourceEl.name);
-                  setOperator({ name: triggerOp.operator, letter: triggerOp.letter });
-                  // Ensure full operator name is used in title (e.g. "Substitute" not "S")
+                  setOperator(triggerOp);
                   setDocTitle(`${sourceEl.name} - SCAMPER ${triggerOp.operator} - ${new Date().toLocaleDateString()}`);
                   setGeneratedDocId(null);
                   handleScamperGenerate(triggerOp.operator, triggerOp.letter, sourceEl);
