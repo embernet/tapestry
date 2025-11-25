@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, Content, Part, Type, Tool, FunctionCall, FunctionResponse } from '@google/genai';
-import { Element, Relationship, ModelActions, ColorScheme, SystemPromptConfig, TapestryDocument, TapestryFolder } from '../types';
+import { Type, FunctionCall, FunctionResponse } from '@google/genai';
+import { Element, Relationship, ModelActions, ColorScheme, SystemPromptConfig, TapestryDocument, TapestryFolder, AIConfig } from '../types';
 import { generateMarkdownFromGraph } from '../utils';
 import { AVAILABLE_AI_TOOLS } from '../constants';
+import { generateContent } from '../aiService';
 
 interface ChatPanelProps {
   elements: Element[];
@@ -24,6 +25,7 @@ interface ChatPanelProps {
   onOpenHistory?: () => void;
   onOpenTool?: (tool: string, subTool?: string) => void;
   initialInput?: string;
+  aiConfig: AIConfig;
 }
 
 interface Message {
@@ -34,7 +36,7 @@ interface Message {
   isPending?: boolean; // If true, the tool calls are waiting for user confirmation
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSchemes, activeSchemeId, onClose, currentModelId, modelActions, className, isOpen, onOpenPromptSettings, systemPromptConfig, documents, folders, openDocIds, onLogHistory, onOpenHistory, onOpenTool, initialInput }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSchemes, activeSchemeId, onClose, currentModelId, modelActions, className, isOpen, onOpenPromptSettings, systemPromptConfig, documents, folders, openDocIds, onLogHistory, onOpenHistory, onOpenTool, initialInput, aiConfig }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -106,7 +108,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSch
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const tools: Tool[] = [
+  const tools: any[] = [
       {
           functionDeclarations: [
               {
@@ -380,15 +382,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSch
   }
 
   // Helper to merge consecutive messages for API history
-  const buildApiHistory = (msgs: Message[]): Content[] => {
-    const history: Content[] = [];
-    let currentContent: Content | null = null;
+  const buildApiHistory = (msgs: Message[]): any[] => {
+    const history: any[] = [];
+    let currentContent: any = null;
 
     for (const msg of msgs) {
         // Don't include pending messages in history sent to API until they are confirmed
         if (msg.isPending) continue;
 
-        const parts: Part[] = [];
+        const parts: any[] = [];
         if (msg.text) parts.push({ text: msg.text });
         if (msg.functionCalls) msg.functionCalls.forEach(fc => parts.push({ functionCall: fc }));
         if (msg.functionResponses) msg.functionResponses.forEach(fr => parts.push({ functionResponse: fr }));
@@ -551,13 +553,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSch
         Current Model Data:
         ---\n${modelMarkdown}\n---`;
 
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
         const chatHistory = buildApiHistory(newMessages);
 
-        // Step 1: Send User Message
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+        // Step 1: Send User Message via Service
+        const response = await generateContent(aiConfig, {
             contents: chatHistory,
             config: {
                 systemInstruction: systemInstruction,
@@ -662,11 +661,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSch
           Summarize what you did based on the tool outputs. If some actions were skipped/rejected by the user, mention that.
           Current Model Data: ---\n${modelMarkdown}\n---`;
           
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           const apiHistory = buildApiHistory(historyWithResponses);
 
-          const finalResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+          const finalResponse = await generateContent(aiConfig, {
             contents: apiHistory,
             config: { systemInstruction }
           });
