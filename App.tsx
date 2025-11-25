@@ -406,6 +406,7 @@ export default function App() {
   const handleSwotToolSelect = (tool: SwotToolType) => {
       setActiveSwotTool(tool);
       setIsSwotModalOpen(true);
+      setActiveTool(null); // Close the toolbar
   };
 
   const handleMermaidToolSelect = (tool: MermaidToolType) => {

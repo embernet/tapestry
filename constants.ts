@@ -206,9 +206,18 @@ Return a JSON object with two fields:
 2. **ACTION:** Suggest adding 'Gap' nodes where reality differs from the ideal. Suggest 'Accommodation' nodes to resolve these differences culturally or politically.`,
 
     // --- STRATEGY SUB-TOOLS ---
-    'swot:matrix': `Perform a SWOT Analysis.
-1. Identify internal Strengths/Weaknesses and external Opportunities/Threats.
-2. **ACTION:** Suggest adding nodes tagged 'Strength', 'Weakness', 'Opportunity', 'Threat'. Suggest 'Strategy' nodes that link a Strength to an Opportunity (Leverage) or a Strength to a Threat (Defend).`,
+    'swot:matrix': `Perform a comprehensive SWOT Analysis.
+1. Identify internal Strengths and Weaknesses.
+2. Identify external Opportunities and Threats.
+3. Return a structured JSON object with four arrays: "strengths", "weaknesses", "opportunities", "threats".
+4. CRITICAL: Each array item must be a single, complete string describing one factor. Do not split sentences into separate items.
+5. Example JSON structure:
+{
+  "strengths": ["Strong brand recognition in US market", "Proprietary technology patent"],
+  "weaknesses": ["High supply chain costs", "Limited presence in Asia"],
+  ...
+}
+6. **ACTION:** Suggest adding nodes tagged 'Strength', 'Weakness', 'Opportunity', 'Threat'.`,
 
     'swot:pestel': `Perform a PESTEL Analysis.
 1. Scan for macro-environmental factors: Political, Economic, Social, Technological, Environmental, Legal.
