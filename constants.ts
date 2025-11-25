@@ -38,9 +38,9 @@ export const AVAILABLE_AI_TOOLS = [
         description: 'Strategic planning frameworks including SWOT, PESTEL, Porter’s Five Forces, and CAGE to analyze internal/external factors and competitive landscapes.'
     },
     { 
-        id: 'mining', 
-        name: 'Data Mining', 
-        description: 'Analyzes the graph structure to extract statistics, clusters, and patterns, visualizing data distributions (e.g., Treemaps) to find insights.'
+        id: 'explorer', 
+        name: 'Graph Explorer', 
+        description: 'Visualizes graph structure and data distributions using Treemaps, Tag charts, and Relationship analysis.'
     },
     { 
         id: 'tagcloud', 

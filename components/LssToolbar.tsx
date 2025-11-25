@@ -148,13 +148,13 @@ const LssToolbar: React.FC<LssToolbarProps> = ({
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                 </div>
-                <span className="text-xs font-bold tracking-wider text-gray-300">LEAN 6σ</span>
+                <span className="text-xs font-bold tracking-wider text-gray-300">LSS</span>
             </button>
             
             <button 
                 onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
                 className="absolute top-0 right-0 p-1 text-gray-500 hover:text-white bg-gray-800/50 rounded-bl hover:bg-gray-600 transition-colors"
-                title="Lean Six Sigma Settings"
+                title="LSS Settings"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -166,11 +166,10 @@ const LssToolbar: React.FC<LssToolbarProps> = ({
         {!isCollapsed && (
             <div className="absolute top-full left-0 mt-2 w-72 bg-gray-900 border border-gray-600 rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600">
                  
-                 {/* Define Tools Section */}
+                 {/* Define Phase Header */}
                  <div className="p-2 bg-gray-800 border-b border-gray-700 text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center">
-                     Define Tools
+                     Define & Measure
                  </div>
-                 
                  {DEFINE_TOOLS.map(tool => (
                      <button
                         key={tool.id}
@@ -189,11 +188,10 @@ const LssToolbar: React.FC<LssToolbarProps> = ({
                      </button>
                  ))}
 
-                 {/* Improvement Tools Section */}
+                 {/* Improve Phase Header */}
                  <div className="p-2 bg-gray-800 border-b border-gray-700 border-t text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center">
-                     Improvement Tools
+                     Analyze, Improve, Control
                  </div>
-
                  {IMPROVEMENT_TOOLS.map(tool => (
                      <button
                         key={tool.id}

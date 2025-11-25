@@ -11,7 +11,7 @@ interface TagCloudToolbarProps {
 const WORD_CLOUD_TOOLS = [
   { 
     id: 'tags' as TagCloudToolType, 
-    name: 'Concept Cloud', 
+    name: 'Tag Cloud', 
     desc: 'Visualize frequency of tags/categories.',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -22,7 +22,7 @@ const WORD_CLOUD_TOOLS = [
   },
   { 
     id: 'nodes' as TagCloudToolType, 
-    name: 'Influence Cloud', 
+    name: 'Relationship Cloud', 
     desc: 'Visualize connectivity of nodes.',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -33,7 +33,7 @@ const WORD_CLOUD_TOOLS = [
   },
   { 
     id: 'words' as TagCloudToolType, 
-    name: 'Text Analysis', 
+    name: 'Node Name Analysis', 
     desc: 'Visualize word frequency in node names.',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -41,6 +41,17 @@ const WORD_CLOUD_TOOLS = [
       </svg>
     ),
     color: '#db2777' // Pink-600
+  },
+  { 
+    id: 'full_text' as TagCloudToolType, 
+    name: 'Full Text Analysis', 
+    desc: 'Visualize word frequency across name and notes (ignoring tags/attributes).',
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+      </svg>
+    ),
+    color: '#9d174d' // Pink-800
   }
 ];
 

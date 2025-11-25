@@ -2,12 +2,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship } from '../types';
 
-interface TagCloudModalProps {
-  isOpen: boolean;
-  initialMode?: 'tags' | 'nodes' | 'words';
+interface TagCloudPanelProps {
+  mode: 'tags' | 'nodes' | 'words' | 'full_text';
   elements: Element[];
   relationships: Relationship[];
-  onClose: () => void;
   onNodeSelect: (elementId: string) => void;
 }
 
@@ -15,6 +13,7 @@ type ViewState =
     | { type: 'all_tags' } 
     | { type: 'all_nodes' }
     | { type: 'all_words' }
+    | { type: 'all_full_text' }
     | { type: 'elements_by_tag', tag: string }
     | { type: 'elements_by_word', word: string };
 
@@ -31,7 +30,9 @@ const STOP_WORDS = new Set([
     'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'up', 
     'down', 'it', 'that', 'this', 'my', 'your', 'his', 'her', 'its', 
     'our', 'their', 'be', 'as', 'not', 'if', 'when', 'than', 'can',
-    'will', 'just', 'don', 'should', 'now'
+    'will', 'just', 'don', 'should', 'now', 'have', 'has', 'had', 'do',
+    'does', 'did', 'how', 'why', 'what', 'where', 'who', 'which', 'so',
+    'some', 'any', 'no', 'yes'
 ]);
 
 const COLORS = ['text-blue-400', 'text-green-400', 'text-yellow-400', 'text-pink-400', 'text-purple-400', 'text-cyan-400', 'text-orange-400', 'text-red-400', 'text-teal-400'];
@@ -51,20 +52,20 @@ const shuffleAndEnrich = (items: Omit<CloudItem, 'color' | 'rotation'>[]): Cloud
     }));
 };
 
-const TagCloudModal: React.FC<TagCloudModalProps> = ({ isOpen, initialMode = 'tags', elements, relationships, onClose, onNodeSelect }) => {
+export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, relationships, onNodeSelect }) => {
     const [viewStack, setViewStack] = useState<ViewState[]>([]);
     
     useEffect(() => {
-        if (isOpen) {
-            if (initialMode === 'nodes') {
-                setViewStack([{ type: 'all_nodes' }]);
-            } else if (initialMode === 'words') {
-                setViewStack([{ type: 'all_words' }]);
-            } else {
-                setViewStack([{ type: 'all_tags' }]);
-            }
+        if (mode === 'nodes') {
+            setViewStack([{ type: 'all_nodes' }]);
+        } else if (mode === 'words') {
+            setViewStack([{ type: 'all_words' }]);
+        } else if (mode === 'full_text') {
+            setViewStack([{ type: 'all_full_text' }]);
+        } else {
+            setViewStack([{ type: 'all_tags' }]);
         }
-    }, [isOpen, initialMode]);
+    }, [mode]);
 
     const currentView = viewStack[viewStack.length - 1] || { type: 'all_tags' };
 
@@ -85,7 +86,7 @@ const TagCloudModal: React.FC<TagCloudModalProps> = ({ isOpen, initialMode = 'ta
         const counts = new Map<string, number>();
         elements.forEach(e => {
             // Split by non-alphanumeric chars
-            const words = e.name.toLowerCase().split(/[\s\-_,.:;()'"\[\]]+/);
+            const words = e.name.toLowerCase().split(/[\s\-_,.:;()'"\[\]\/]+/);
             words.forEach(w => {
                 if (w.length > 2 && !STOP_WORDS.has(w) && isNaN(Number(w))) {
                     counts.set(w, (counts.get(w) || 0) + 1);
@@ -95,6 +96,37 @@ const TagCloudModal: React.FC<TagCloudModalProps> = ({ isOpen, initialMode = 'ta
         const max = Math.max(...Array.from(counts.values()), 1);
         
         // Filter top 150 to avoid clutter, then shuffle
+        const rawItems = Array.from(counts.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 150)
+            .map(([text, value]) => ({ text, value }));
+
+        const items = shuffleAndEnrich(rawItems);
+
+        return { items, max };
+    }, [elements]);
+
+    // Stats for Full Text
+    const fullTextStats = useMemo(() => {
+        const counts = new Map<string, number>();
+        elements.forEach(e => {
+            // Only include name and notes, explicitly excluding tags and attributes
+            const fields = [e.name, e.notes];
+            
+            fields.forEach(field => {
+                if (typeof field === 'string' && isNaN(Number(field))) {
+                    // Split by non-alphanumeric
+                    const words = field.toLowerCase().split(/[\s\-_,.:;()'"\[\]\/]+/);
+                    words.forEach(w => {
+                        if (w.length > 2 && !STOP_WORDS.has(w) && isNaN(Number(w))) {
+                            counts.set(w, (counts.get(w) || 0) + 1);
+                        }
+                    });
+                }
+            });
+        });
+        const max = Math.max(...Array.from(counts.values()), 1);
+        
         const rawItems = Array.from(counts.entries())
             .sort((a, b) => b[1] - a[1])
             .slice(0, 150)
@@ -157,7 +189,17 @@ const TagCloudModal: React.FC<TagCloudModalProps> = ({ isOpen, initialMode = 'ta
     const elementsByWord = useMemo(() => {
         if (currentView.type !== 'elements_by_word') return { items: [], max: 1 };
         
-        const filtered = elements.filter(e => e.name.toLowerCase().includes(currentView.word));
+        const word = currentView.word;
+        const filtered = elements.filter(e => {
+            if (mode === 'full_text') {
+                 // Keep search inclusive for full text mode even if we generated stats from name/notes only
+                 const fields = [e.name, e.notes]; 
+                 return fields.some(f => typeof f === 'string' && f.toLowerCase().includes(word));
+            } else {
+                 return e.name.toLowerCase().includes(word);
+            }
+        });
+
         const degreeMap = new Map<string, number>();
         filtered.forEach(e => {
              const deg = relationships.filter(r => r.source === e.id || r.target === e.id).length;
@@ -172,7 +214,7 @@ const TagCloudModal: React.FC<TagCloudModalProps> = ({ isOpen, initialMode = 'ta
         }));
 
         return { items: shuffleAndEnrich(rawItems), max };
-    }, [elements, relationships, currentView]);
+    }, [elements, relationships, currentView, mode]);
 
 
     const handleTagClick = (tag: string) => {
@@ -191,7 +233,6 @@ const TagCloudModal: React.FC<TagCloudModalProps> = ({ isOpen, initialMode = 'ta
 
     const handleNodeClick = (id: string) => {
         onNodeSelect(id);
-        onClose();
     };
 
     const getFontSize = (count: number, max: number, minSize: number = 16, maxSize: number = 64) => {
@@ -201,152 +242,149 @@ const TagCloudModal: React.FC<TagCloudModalProps> = ({ isOpen, initialMode = 'ta
         return `${Math.round(size)}px`;
     };
 
-    if (!isOpen) return null;
-
     const getHeaderTitle = () => {
-        if (currentView.type === 'all_tags') return 'Concept Cloud';
-        if (currentView.type === 'all_nodes') return 'Influence Cloud';
-        if (currentView.type === 'all_words') return 'Text Analysis';
+        if (currentView.type === 'all_tags') return 'Tag Cloud';
+        if (currentView.type === 'all_nodes') return 'Relationship Cloud';
+        if (currentView.type === 'all_words') return 'Node Name Analysis';
+        if (currentView.type === 'all_full_text') return 'Full Text Analysis';
         if (currentView.type === 'elements_by_tag') return `Elements: ${currentView.tag}`;
         if (currentView.type === 'elements_by_word') return `Elements with "${currentView.word}"`;
         return 'Word Cloud';
     };
 
     const getHeaderDesc = () => {
-        if (currentView.type === 'all_tags') return 'Explore your knowledge graph by concept frequency.';
-        if (currentView.type === 'all_nodes') return 'Nodes sized by their connectivity (degree).';
-        if (currentView.type === 'all_words') return 'Frequent words appearing in element names.';
-        if (currentView.type === 'elements_by_tag') return 'Drill down into specific elements.';
-        if (currentView.type === 'elements_by_word') return 'Elements containing this word.';
+        if (currentView.type === 'all_tags') return 'Explore by concept frequency';
+        if (currentView.type === 'all_nodes') return 'Sized by connectivity';
+        if (currentView.type === 'all_words') return 'Frequent words in names';
+        if (currentView.type === 'all_full_text') return 'Frequent words in name & notes';
+        if (currentView.type === 'elements_by_tag') return 'Drill down';
+        if (currentView.type === 'elements_by_word') return 'Elements containing word';
         return '';
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-90 flex justify-center items-center z-50 p-8">
-            <div className="bg-gray-900 rounded-lg w-full h-full max-w-5xl shadow-2xl border border-gray-600 flex flex-col relative overflow-hidden">
-                
-                {/* Decorative Background */}
-                <div className="absolute inset-0 opacity-5 pointer-events-none">
-                    <svg width="100%" height="100%">
-                        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                            <circle cx="2" cy="2" r="1" fill="#fff" />
-                        </pattern>
-                        <rect width="100%" height="100%" fill="url(#grid)" />
-                    </svg>
-                </div>
+        <div className="w-full h-full bg-gray-900 flex flex-col relative overflow-hidden">
+            
+            {/* Decorative Background */}
+            <div className="absolute inset-0 opacity-5 pointer-events-none">
+                <svg width="100%" height="100%">
+                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <circle cx="2" cy="2" r="1" fill="#fff" />
+                    </pattern>
+                    <rect width="100%" height="100%" fill="url(#grid)" />
+                </svg>
+            </div>
 
-                {/* Header */}
-                <div className="p-6 border-b border-gray-700 flex justify-between items-center bg-gray-900/90 backdrop-blur z-10">
-                    <div className="flex items-center gap-4">
-                        {viewStack.length > 1 && (
-                            <button 
-                                onClick={handleBack}
-                                className="p-2 rounded-full hover:bg-gray-700 text-gray-300 transition"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                            </button>
-                        )}
-                        <div>
-                            <h2 className="text-3xl font-bold text-white tracking-tight">
-                                {getHeaderTitle()}
-                            </h2>
-                            <p className="text-gray-400 text-sm mt-1">
-                                {getHeaderDesc()}
-                            </p>
-                        </div>
+            {/* Header */}
+            <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900/90 backdrop-blur z-10">
+                <div className="flex items-center gap-3">
+                    {viewStack.length > 1 && (
+                        <button 
+                            onClick={handleBack}
+                            className="p-1.5 rounded-full hover:bg-gray-700 text-gray-300 transition"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                        </button>
+                    )}
+                    <div>
+                        <h2 className="text-xl font-bold text-white tracking-tight">
+                            {getHeaderTitle()}
+                        </h2>
+                        <p className="text-gray-400 text-xs">
+                            {getHeaderDesc()}
+                        </p>
                     </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white p-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
                 </div>
+            </div>
 
-                {/* Content */}
-                <div className="flex-grow p-8 overflow-y-auto flex flex-wrap content-center justify-center items-center gap-x-6 gap-y-2 z-10">
-                    
-                    {currentView.type === 'all_tags' && (
-                        tagStats.items.map((item, idx) => (
-                            <button
-                                key={`${item.text}-${idx}`}
-                                onClick={() => handleTagClick(item.text)}
-                                className={`hover:scale-110 transition-transform cursor-pointer ${item.color} font-bold leading-none opacity-90 hover:opacity-100`}
-                                style={{ 
-                                    fontSize: getFontSize(item.value, tagStats.max),
-                                    transform: `rotate(${item.rotation}deg)` 
-                                }}
-                                title={`${item.value} elements`}
-                            >
-                                {item.text}
-                            </button>
-                        ))
-                    )}
+            {/* Content */}
+            <div className="flex-grow p-6 overflow-y-auto flex flex-wrap content-center justify-center items-center gap-x-6 gap-y-2 z-10">
+                
+                {currentView.type === 'all_tags' && (
+                    tagStats.items.map((item, idx) => (
+                        <button
+                            key={`${item.text}-${idx}`}
+                            onClick={() => handleTagClick(item.text)}
+                            className={`hover:scale-110 transition-transform cursor-pointer ${item.color} font-bold leading-none opacity-90 hover:opacity-100`}
+                            style={{ 
+                                fontSize: getFontSize(item.value, tagStats.max),
+                                transform: `rotate(${item.rotation}deg)` 
+                            }}
+                            title={`${item.value} elements`}
+                        >
+                            {item.text}
+                        </button>
+                    ))
+                )}
 
-                    {currentView.type === 'all_words' && (
-                        wordStats.items.map((item, idx) => (
-                            <button
-                                key={`${item.text}-${idx}`}
-                                onClick={() => handleWordClick(item.text)}
-                                className={`hover:scale-110 transition-transform cursor-pointer ${item.color} font-bold leading-none capitalize opacity-90 hover:opacity-100`}
-                                style={{ 
-                                    fontSize: getFontSize(item.value, wordStats.max, 14, 72),
-                                    transform: `rotate(${item.rotation}deg)`
-                                }}
-                                title={`${item.value} occurrences`}
-                            >
-                                {item.text}
-                            </button>
-                        ))
-                    )}
-                    
-                    {currentView.type === 'all_nodes' && (
-                        nodeStats.items.map((item, idx) => (
-                            <button
-                                key={item.id}
-                                onClick={() => handleNodeClick(item.id!)}
-                                className={`hover:text-white hover:underline transition-all ${item.color} font-medium leading-tight text-center p-1 opacity-90 hover:opacity-100`}
-                                style={{ 
-                                    fontSize: getFontSize(item.value, nodeStats.max, 12, 56),
-                                    transform: `rotate(${item.rotation}deg)`
-                                }}
-                                title={`${item.value} connections`}
-                            >
-                                {item.text}
-                            </button>
-                        ))
-                    )}
-                    
-                    {(currentView.type === 'elements_by_tag' || currentView.type === 'elements_by_word') && (
-                        (currentView.type === 'elements_by_tag' ? elementsByTag : elementsByWord).items.map((item, idx) => (
-                            <button
-                                key={item.id}
-                                onClick={() => handleNodeClick(item.id!)}
-                                className={`hover:text-white hover:underline transition-all text-gray-300 font-medium leading-tight text-center p-1`}
-                                style={{ 
-                                    fontSize: getFontSize(item.value, (currentView.type === 'elements_by_tag' ? elementsByTag : elementsByWord).max, 14, 40),
-                                    transform: `rotate(${item.rotation}deg)`
-                                }}
-                                title={`${item.value} connections`}
-                            >
-                                {item.text}
-                            </button>
-                        ))
-                    )}
+                {(currentView.type === 'all_words' || currentView.type === 'all_full_text') && (
+                    (currentView.type === 'all_words' ? wordStats : fullTextStats).items.map((item, idx) => (
+                        <button
+                            key={`${item.text}-${idx}`}
+                            onClick={() => handleWordClick(item.text)}
+                            className={`hover:scale-110 transition-transform cursor-pointer ${item.color} font-bold leading-none capitalize opacity-90 hover:opacity-100`}
+                            style={{ 
+                                fontSize: getFontSize(item.value, (currentView.type === 'all_words' ? wordStats : fullTextStats).max, 14, 72),
+                                transform: `rotate(${item.rotation}deg)`
+                            }}
+                            title={`${item.value} occurrences`}
+                        >
+                            {item.text}
+                        </button>
+                    ))
+                )}
+                
+                {currentView.type === 'all_nodes' && (
+                    nodeStats.items.map((item, idx) => (
+                        <button
+                            key={item.id}
+                            onClick={() => handleNodeClick(item.id!)}
+                            className={`hover:text-white hover:underline transition-all ${item.color} font-medium leading-tight text-center p-1 opacity-90 hover:opacity-100`}
+                            style={{ 
+                                fontSize: getFontSize(item.value, nodeStats.max, 12, 56),
+                                transform: `rotate(${item.rotation}deg)`
+                            }}
+                            title={`${item.value} connections`}
+                        >
+                            {item.text}
+                        </button>
+                    ))
+                )}
+                
+                {(currentView.type === 'elements_by_tag' || currentView.type === 'elements_by_word') && (
+                    (currentView.type === 'elements_by_tag' ? elementsByTag : elementsByWord).items.map((item, idx) => (
+                        <button
+                            key={item.id}
+                            onClick={() => handleNodeClick(item.id!)}
+                            className={`hover:text-white hover:underline transition-all text-gray-300 font-medium leading-tight text-center p-1`}
+                            style={{ 
+                                fontSize: getFontSize(item.value, (currentView.type === 'elements_by_tag' ? elementsByTag : elementsByWord).max, 14, 40),
+                                transform: `rotate(${item.rotation}deg)`
+                            }}
+                            title={`${item.value} connections`}
+                        >
+                            {item.text}
+                        </button>
+                    ))
+                )}
 
-                    {/* Empty States */}
-                    {currentView.type === 'all_tags' && tagStats.items.length === 0 && (
-                        <div className="text-gray-500 text-xl italic">No tags found in this model.</div>
-                    )}
-                    
-                    {currentView.type === 'all_nodes' && nodeStats.items.length === 0 && (
-                        <div className="text-gray-500 text-xl italic">No elements found in this model.</div>
-                    )}
+                {/* Empty States */}
+                {currentView.type === 'all_tags' && tagStats.items.length === 0 && (
+                    <div className="text-gray-500 text-sm italic">No tags found in this model.</div>
+                )}
+                
+                {currentView.type === 'all_nodes' && nodeStats.items.length === 0 && (
+                    <div className="text-gray-500 text-sm italic">No elements found in this model.</div>
+                )}
 
-                    {currentView.type === 'all_words' && wordStats.items.length === 0 && (
-                        <div className="text-gray-500 text-xl italic">No significant text found in node names.</div>
-                    )}
-                </div>
+                {(currentView.type === 'all_words' && wordStats.items.length === 0) && (
+                    <div className="text-gray-500 text-sm italic">No significant text found in node names.</div>
+                )}
+
+                {(currentView.type === 'all_full_text' && fullTextStats.items.length === 0) && (
+                    <div className="text-gray-500 text-sm italic">No significant text found in fields.</div>
+                )}
             </div>
         </div>
     );
 };
-
-export default TagCloudModal;

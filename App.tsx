@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, MiningToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram } from './types';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram } from './types';
 import { DEFAULT_COLOR_SCHEMES, LINK_DISTANCE, DEFAULT_SYSTEM_PROMPT_CONFIG, TAGLINES, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
 import ElementDetailsPanel from './components/ElementDetailsPanel';
@@ -25,10 +25,11 @@ import TocToolbar from './components/TocToolbar';
 import TocModal from './components/TocModal';
 import SsmToolbar from './components/SsmToolbar';
 import SsmModal from './components/SsmModal';
-import MiningToolbar from './components/MiningToolbar';
-import MiningModal from './components/MiningModal';
+import ExplorerToolbar from './components/ExplorerToolbar';
+import { TreemapPanel, TagDistributionPanel, RelationshipDistributionPanel } from './components/ExplorerModal';
+import { SunburstPanel } from './components/SunburstPanel';
 import TagCloudToolbar from './components/TagCloudToolbar';
-import TagCloudModal from './components/TagCloudModal';
+import { TagCloudPanel } from './components/TagCloudModal';
 import SwotToolbar from './components/SwotToolbar';
 import SwotModal from './components/SwotModal';
 import MermaidToolbar from './components/MermaidToolbar';
@@ -151,12 +152,18 @@ export default function App() {
   const [isSsmModalOpen, setIsSsmModalOpen] = useState(false);
   const [ssmInitialParams, setSsmInitialParams] = useState<any>(null);
 
-  // --- Mining State ---
-  const [isMiningModalOpen, setIsMiningModalOpen] = useState(false);
+  // --- Explorer State ---
+  const [isTreemapPanelOpen, setIsTreemapPanelOpen] = useState(false);
+  const [isTagDistPanelOpen, setIsTagDistPanelOpen] = useState(false);
+  const [isRelDistPanelOpen, setIsRelDistPanelOpen] = useState(false);
+  const [isSunburstPanelOpen, setIsSunburstPanelOpen] = useState(false);
+  const [sunburstState, setSunburstState] = useState<{ active: boolean, centerId: string | null, hops: number }>({ active: false, centerId: null, hops: 0 });
 
   // --- Tag Cloud State ---
-  const [isTagCloudModalOpen, setIsTagCloudModalOpen] = useState(false);
-  const [activeTagCloudMode, setActiveTagCloudMode] = useState<'tags' | 'nodes' | 'words'>('tags');
+  const [isConceptCloudOpen, setIsConceptCloudOpen] = useState(false);
+  const [isInfluenceCloudOpen, setIsInfluenceCloudOpen] = useState(false);
+  const [isTextAnalysisOpen, setIsTextAnalysisOpen] = useState(false);
+  const [isFullTextAnalysisOpen, setIsFullTextAnalysisOpen] = useState(false);
 
   // --- SWOT State ---
   const [activeSwotTool, setActiveSwotTool] = useState<SwotToolType>(null);
@@ -285,11 +292,18 @@ export default function App() {
           setIsSsmModalOpen(true);
       } else if (tool === 'scamper') {
           setIsScamperModalOpen(true);
-      } else if (tool === 'mining') {
-          setIsMiningModalOpen(true);
+      } else if (tool === 'explorer') {
+          if (subTool === 'treemap') setIsTreemapPanelOpen(true);
+          else if (subTool === 'tags') setIsTagDistPanelOpen(true);
+          else if (subTool === 'relationships') setIsRelDistPanelOpen(true);
+          else if (subTool === 'sunburst') setIsSunburstPanelOpen(true);
+          else setIsTreemapPanelOpen(true); // Default
       } else if (tool === 'tagcloud') {
-          setActiveTagCloudMode((subTool as any) || 'tags');
-          setIsTagCloudModalOpen(true);
+          if (subTool === 'tags') setIsConceptCloudOpen(true);
+          else if (subTool === 'nodes') setIsInfluenceCloudOpen(true);
+          else if (subTool === 'words') setIsTextAnalysisOpen(true);
+          else if (subTool === 'full_text') setIsFullTextAnalysisOpen(true);
+          else setIsConceptCloudOpen(true);
       } else if (tool === 'swot') {
           setActiveSwotTool((subTool as SwotToolType) || 'matrix');
           setIsSwotModalOpen(true);
@@ -299,7 +313,7 @@ export default function App() {
   }, []);
 
   const handleReopenHistory = useCallback((entry: HistoryEntry) => {
-      const toolId = entry.tool.split(':')[0].toLowerCase().trim(); // e.g. "TRIZ: Contradiction" -> "triz"
+      const toolId = entry.tool.split(':')[0].toLowerCase().trim(); 
       const subTool = entry.subTool;
       const params = entry.toolParams;
 
@@ -329,9 +343,12 @@ export default function App() {
               setCurrentScamperOperator({ name: params.operator, letter: params.letter });
           }
           setIsScamperModalOpen(true);
-      } else if (toolId.includes('mining')) {
-          setActiveTool('mining');
-          setIsMiningModalOpen(true);
+      } else if (toolId.includes('explorer')) {
+          setActiveTool('explorer');
+          handleExplorerToolSelect((subTool as ExplorerToolType) || 'treemap');
+      } else if (toolId.includes('tagcloud') || toolId.includes('word')) {
+          setActiveTool('tagcloud');
+          handleTagCloudToolSelect((subTool as TagCloudToolType) || 'tags');
       } else if (toolId.includes('swot') || toolId.includes('strategic')) {
           setActiveTool('swot');
           setActiveSwotTool((subTool as SwotToolType) || 'matrix');
@@ -367,15 +384,23 @@ export default function App() {
       setSsmInitialParams(null);
   };
 
-  const handleMiningToolSelect = (tool: MiningToolType) => {
-      if (tool === 'dashboard') setIsMiningModalOpen(true);
+  const handleExplorerToolSelect = (tool: ExplorerToolType) => {
+      if (tool === 'treemap') setIsTreemapPanelOpen(prev => !prev);
+      if (tool === 'tags') setIsTagDistPanelOpen(prev => !prev);
+      if (tool === 'relationships') setIsRelDistPanelOpen(prev => !prev);
+      if (tool === 'sunburst') {
+          setIsSunburstPanelOpen(prev => !prev);
+          // Reset sunburst state if opening
+          setSunburstState(prev => ({ ...prev, active: true }));
+      }
+      setActiveTool(null); // Close the toolbar
   };
 
   const handleTagCloudToolSelect = (tool: TagCloudToolType) => {
-      if (tool) {
-          setActiveTagCloudMode(tool);
-          setIsTagCloudModalOpen(true);
-      }
+      if (tool === 'tags') setIsConceptCloudOpen(prev => !prev);
+      if (tool === 'nodes') setIsInfluenceCloudOpen(prev => !prev);
+      if (tool === 'words') setIsTextAnalysisOpen(prev => !prev);
+      if (tool === 'full_text') setIsFullTextAnalysisOpen(prev => !prev);
   };
 
   const handleSwotToolSelect = (tool: SwotToolType) => {
@@ -483,7 +508,37 @@ export default function App() {
   const tagCounts = useMemo(() => { const counts = new Map<string, number>(); elements.forEach(element => { element.tags.forEach(tag => { counts.set(tag, (counts.get(tag) || 0) + 1); }); }); return counts; }, [elements]);
   useEffect(() => { setTagFilter(prevFilter => { const allTagsSet = new Set(allTags); const newIncluded = new Set<string>(); for (const tag of allTags) { const wasPreviouslyIncluded = prevFilter.included.has(tag); const wasPreviouslyExcluded = prevFilter.excluded.has(tag); if (wasPreviouslyIncluded) { newIncluded.add(tag); } else if (!wasPreviouslyExcluded) { newIncluded.add(tag); } } const newExcluded = new Set<string>(); for (const tag of prevFilter.excluded) { if (allTagsSet.has(tag)) { newExcluded.add(tag); } } return { included: newIncluded, excluded: newExcluded }; }); }, [allTags]);
   
+  // --- Sunburst Logic ---
+  const getSunburstNodes = useCallback((centerId: string, depth: number) => {
+      const visibleIds = new Set<string>([centerId]);
+      let currentLayer = [centerId];
+      
+      for (let i = 0; i < depth; i++) {
+          const nextLayer: string[] = [];
+          currentLayer.forEach(nodeId => {
+              relationships.forEach(rel => {
+                  if (rel.source === nodeId && !visibleIds.has(rel.target as string)) {
+                      visibleIds.add(rel.target as string);
+                      nextLayer.push(rel.target as string);
+                  }
+                  if (rel.target === nodeId && !visibleIds.has(rel.source as string)) {
+                      visibleIds.add(rel.source as string);
+                      nextLayer.push(rel.source as string);
+                  }
+              });
+          });
+          currentLayer = nextLayer;
+      }
+      return visibleIds;
+  }, [relationships]);
+
   const filteredElements = useMemo(() => { 
+      // --- Sunburst Filtering ---
+      if (isSunburstPanelOpen && sunburstState.active && sunburstState.centerId) {
+          const visibleIds = getSunburstNodes(sunburstState.centerId, sunburstState.hops);
+          return elements.filter(e => visibleIds.has(e.id));
+      }
+
       const { included, excluded } = tagFilter; 
       const matchesDate = (element: Element) => { 
           const createdDate = element.createdAt.substring(0, 10); 
@@ -511,7 +566,7 @@ export default function App() {
           if (element.tags.length === 0) return true; 
           return element.tags.some(tag => included.has(tag)); 
       }); 
-  }, [elements, tagFilter, allTags, dateFilter, analysisFilterState]);
+  }, [elements, tagFilter, allTags, dateFilter, analysisFilterState, isSunburstPanelOpen, sunburstState, getSunburstNodes]);
 
   const filteredRelationships = useMemo(() => { const { included, excluded } = tagFilter; const visibleElementIds = new Set(filteredElements.map(f => f.id)); return relationships.filter(rel => visibleElementIds.has(rel.source as string) && visibleElementIds.has(rel.target as string)); }, [relationships, filteredElements, tagFilter, allTags]);
 
@@ -1099,6 +1154,47 @@ export default function App() {
           runImpactSimulation(elementId);
           return;
       }
+      
+      // Sunburst Activation Logic
+      if (isSunburstPanelOpen && sunburstState.active) {
+          // 1. Save layout if not saved (and this is the first center selection)
+          if (!originalElements && !sunburstState.centerId) {
+             setOriginalElements(elements);
+          }
+          
+          const cx = window.innerWidth / 2;
+          const cy = window.innerHeight / 2;
+
+          // Update elements to center the selected node and free others
+          setElements(prev => prev.map(e => {
+              if (e.id === elementId) {
+                  // Pin center
+                  return { ...e, x: cx, y: cy, fx: cx, fy: cy, vx: 0, vy: 0 };
+              }
+              // Free others
+              return { ...e, fx: null, fy: null };
+          }));
+
+          // Set as new center, preserve existing hops
+          setSunburstState(prev => ({ ...prev, centerId: elementId }));
+          
+          // Ensure physics is on
+          setIsPhysicsModeActive(true);
+
+          // Highlight the new center (Select it)
+          setSelectedElementId(elementId);
+          setMultiSelection(new Set([elementId]));
+          
+          // Center camera
+          setTimeout(() => {
+              if (graphCanvasRef.current) {
+                  graphCanvasRef.current.setCamera(0, 0, 1);
+              }
+          }, 50);
+          
+          return;
+      }
+
       if (isBulkEditActive) { if (bulkTagsToAdd.length === 0 && bulkTagsToRemove.length === 0) return; setElements(prev => prev.map(el => { if (el.id === elementId) { const currentTags = el.tags; let newTags = [...currentTags]; let changed = false; const lowerToRemove = bulkTagsToRemove.map(t => t.toLowerCase()); const filteredTags = newTags.filter(t => !lowerToRemove.includes(t.toLowerCase())); if (filteredTags.length !== newTags.length) { newTags = filteredTags; changed = true; } const lowerCurrent = newTags.map(t => t.toLowerCase()); const toAdd = bulkTagsToAdd.filter(t => !lowerCurrent.includes(t.toLowerCase())); if (toAdd.length > 0) { newTags = [...newTags, ...toAdd]; changed = true; } if (changed) { return { ...el, tags: newTags, updatedAt: new Date().toISOString() }; } } return el; })); return; } 
       
       // Multi-Selection Logic
@@ -1125,7 +1221,7 @@ export default function App() {
       setSelectedRelationshipId(null); 
       setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); 
       handleCloseContextMenu(); 
-  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState, multiSelection, selectedElementId]);
+  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState, multiSelection, selectedElementId, isSunburstPanelOpen, sunburstState, elements, originalElements]);
   
   const handleLinkClick = useCallback((relationshipId: string) => { setSelectedRelationshipId(relationshipId); setSelectedElementId(null); setMultiSelection(new Set()); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); }, [handleCloseContextMenu]);
   const handleCanvasClick = useCallback(() => { setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseCanvasContextMenu(); setAnalysisHighlights(new Map()); }, [handleCloseContextMenu, handleCloseCanvasContextMenu]);
@@ -1438,7 +1534,7 @@ export default function App() {
   const addRelationshipSourceElement = useMemo(() => elements.find(f => f.id === panelState.sourceElementId), [elements, panelState.sourceElementId]);
   const activeColorScheme = useMemo(() => { const current = colorSchemes.find(s => s.id === activeSchemeId); if (!current) return undefined; const defaultScheme = DEFAULT_COLOR_SCHEMES.find(d => d.id === current.id); if (defaultScheme) { const mergedTags = { ...defaultScheme.tagColors, ...current.tagColors }; const currentDefs = current.relationshipDefinitions || []; const defaultDefs = defaultScheme.relationshipDefinitions || []; const combinedDefsMap = new Map<string, RelationshipDefinition>(); defaultDefs.forEach(d => combinedDefsMap.set(d.label, d)); currentDefs.forEach(d => combinedDefsMap.set(d.label, d)); const mergedDefinitions = Array.from(combinedDefsMap.values()); const mergedDefaultLabel = current.defaultRelationshipLabel || defaultScheme.defaultRelationshipLabel; return { ...current, tagColors: mergedTags, relationshipDefinitions: mergedDefinitions, defaultRelationshipLabel: mergedDefaultLabel }; } return current; }, [colorSchemes, activeSchemeId]);
   const activeRelationshipLabels = useMemo(() => { return activeColorScheme?.relationshipDefinitions?.map(d => d.label) || []; }, [activeColorScheme]);
-  const isRightPanelOpen = isReportPanelOpen || isMarkdownPanelOpen || isJSONPanelOpen || isMatrixPanelOpen || isTablePanelOpen || isGridPanelOpen || isDocumentPanelOpen || isHistoryPanelOpen || isKanbanPanelOpen || isPresentationPanelOpen || isMermaidPanelOpen || openDocIds.length > 0 || detachedHistoryIds.length > 0;
+  const isRightPanelOpen = isReportPanelOpen || isMarkdownPanelOpen || isJSONPanelOpen || isMatrixPanelOpen || isTablePanelOpen || isGridPanelOpen || isDocumentPanelOpen || isHistoryPanelOpen || isKanbanPanelOpen || isPresentationPanelOpen || isMermaidPanelOpen || isTreemapPanelOpen || isTagDistPanelOpen || isRelDistPanelOpen || isSunburstPanelOpen || isConceptCloudOpen || isInfluenceCloudOpen || isTextAnalysisOpen || isFullTextAnalysisOpen || openDocIds.length > 0 || detachedHistoryIds.length > 0;
 
   // --- New Command Handlers ---
   const handleOpenCommandHistory = useCallback(() => {
@@ -1542,7 +1638,118 @@ export default function App() {
         },
         { id: 'markdown', title: 'Markdown', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>, content: <MarkdownPanel initialText={generateMarkdownFromGraph(elements, relationships)} onApply={(md) => handleApplyMarkdown(md, false)} onClose={() => setIsMarkdownPanelOpen(false)} modelName={currentModelName} />, isOpen: isMarkdownPanelOpen, onToggle: () => setIsMarkdownPanelOpen(prev => !prev) },
         { id: 'json', title: 'JSON', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>, content: <JSONPanel initialData={{ elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams }} onApply={handleApplyJSON} onClose={() => setIsJSONPanelOpen(false)} modelName={currentModelName} />, isOpen: isJSONPanelOpen, onToggle: () => setIsJSONPanelOpen(prev => !prev) },
-        { id: 'history', title: 'History', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, content: <HistoryPanel history={history} onClose={() => setIsHistoryPanelOpen(false)} onDetach={handleDetachHistory} onReopen={handleReopenHistory} onAnalyze={handleAnalyzeWithChat} onDelete={handleDeleteHistory} />, isOpen: isHistoryPanelOpen, onToggle: () => setIsHistoryPanelOpen(prev => !prev) }
+        { id: 'history', title: 'History', icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, content: <HistoryPanel history={history} onClose={() => setIsHistoryPanelOpen(false)} onDetach={handleDetachHistory} onReopen={handleReopenHistory} onAnalyze={handleAnalyzeWithChat} onDelete={handleDeleteHistory} />, isOpen: isHistoryPanelOpen, onToggle: () => setIsHistoryPanelOpen(prev => !prev) },
+        // --- Explorer Panels ---
+        { 
+            id: 'treemap', 
+            title: 'Treemap', 
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>, 
+            content: <TreemapPanel elements={filteredElements} relationships={filteredRelationships} onNodeSelect={(id) => handleNodeClick(id, new MouseEvent('click'))} />, 
+            isOpen: isTreemapPanelOpen, 
+            onToggle: () => setIsTreemapPanelOpen(p => !p) 
+        },
+        { 
+            id: 'sunburst', 
+            title: 'Sunburst', 
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+            content: <SunburstPanel
+                        centerNodeName={elements.find(e => e.id === sunburstState.centerId)?.name || null}
+                        hops={sunburstState.hops}
+                        visibleCount={filteredElements.length}
+                        onHopsChange={(newHops) => setSunburstState(prev => ({ ...prev, hops: newHops }))}
+                        onRestart={() => {
+                            setSunburstState(prev => ({ ...prev, centerId: null, hops: 0 }));
+                            setIsPhysicsModeActive(false);
+                            // Restore layout
+                            if (originalElements) {
+                                setElements(originalElements);
+                                setOriginalElements(null);
+                            }
+                        }}
+                        onReset={() => {
+                             // Reset focus to center node (hops 0)
+                             setSunburstState(prev => ({ ...prev, hops: 0 }));
+                             // Re-center camera just in case
+                             graphCanvasRef.current?.setCamera(0,0,1);
+                        }}
+                        onClose={() => {
+                            setIsSunburstPanelOpen(false);
+                            setSunburstState(prev => ({ ...prev, active: false }));
+                            setIsPhysicsModeActive(false);
+                            // Restore layout
+                            if (originalElements) {
+                                setElements(originalElements);
+                                setOriginalElements(null);
+                            }
+                        }}
+                     />,
+            isOpen: isSunburstPanelOpen,
+            onToggle: () => {
+                const willOpen = !isSunburstPanelOpen;
+                setIsSunburstPanelOpen(willOpen);
+                
+                if (willOpen) {
+                    setSunburstState(prev => ({ ...prev, active: true }));
+                } else {
+                    // Closing
+                    setSunburstState(prev => ({ ...prev, active: false }));
+                    setIsPhysicsModeActive(false);
+                    if (originalElements) {
+                        setElements(originalElements);
+                        setOriginalElements(null);
+                    }
+                }
+            }
+        },
+        { 
+            id: 'tag-dist', 
+            title: 'Tag Distribution', 
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>, 
+            content: <TagDistributionPanel elements={filteredElements} />, 
+            isOpen: isTagDistPanelOpen, 
+            onToggle: () => setIsTagDistPanelOpen(p => !p) 
+        },
+        { 
+            id: 'rel-dist', 
+            title: 'Relationship Types', 
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>, 
+            content: <RelationshipDistributionPanel relationships={filteredRelationships} />, 
+            isOpen: isRelDistPanelOpen, 
+            onToggle: () => setIsRelDistPanelOpen(p => !p) 
+        },
+        // --- Tag Cloud Panels ---
+        { 
+            id: 'concept-cloud', 
+            title: 'Tag Cloud', 
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>, 
+            content: <TagCloudPanel mode='tags' elements={filteredElements} relationships={filteredRelationships} onNodeSelect={(id) => handleNodeClick(id, new MouseEvent('click'))} />, 
+            isOpen: isConceptCloudOpen, 
+            onToggle: () => setIsConceptCloudOpen(p => !p) 
+        },
+        { 
+            id: 'influence-cloud', 
+            title: 'Relationship Cloud', 
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>, 
+            content: <TagCloudPanel mode='nodes' elements={filteredElements} relationships={filteredRelationships} onNodeSelect={(id) => handleNodeClick(id, new MouseEvent('click'))} />, 
+            isOpen: isInfluenceCloudOpen, 
+            onToggle: () => setIsInfluenceCloudOpen(p => !p) 
+        },
+        { 
+            id: 'text-cloud', 
+            title: 'Node Name Analysis', 
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>, 
+            content: <TagCloudPanel mode='words' elements={filteredElements} relationships={filteredRelationships} onNodeSelect={(id) => handleNodeClick(id, new MouseEvent('click'))} />, 
+            isOpen: isTextAnalysisOpen, 
+            onToggle: () => setIsTextAnalysisOpen(p => !p) 
+        },
+        { 
+            id: 'full-text-cloud', 
+            title: 'Full Text Analysis', 
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>, 
+            content: <TagCloudPanel mode='full_text' elements={filteredElements} relationships={filteredRelationships} onNodeSelect={(id) => handleNodeClick(id, new MouseEvent('click'))} />, 
+            isOpen: isFullTextAnalysisOpen, 
+            onToggle: () => setIsFullTextAnalysisOpen(p => !p) 
+        },
     ];
 
     const docPanels: PanelDefinition[] = openDocIds.map((id): PanelDefinition | null => {
@@ -1558,7 +1765,7 @@ export default function App() {
     }).filter((p): p is PanelDefinition => p !== null);
 
     return [...staticPanels, ...docPanels, ...historyItemPanels];
-  }, [ isReportPanelOpen, isDocumentPanelOpen, isTablePanelOpen, isMatrixPanelOpen, isGridPanelOpen, isMarkdownPanelOpen, isJSONPanelOpen, isHistoryPanelOpen, isKanbanPanelOpen, isPresentationPanelOpen, isMermaidPanelOpen, isMermaidGenerating, filteredElements, filteredRelationships, elements, relationships, documents, folders, openDocIds, currentModelName, activeColorScheme, history, slides, mermaidDiagrams, detachedHistoryIds, handleNodeClick, handleUpdateElement, handleDeleteElement, handleAddElementFromName, handleAddRelationshipDirect, handleDeleteRelationship, handleApplyMarkdown, handleApplyJSON, handleOpenDocument, handleCreateFolder, handleCreateDocument, handleDeleteDocument, handleDeleteFolder, handleUpdateDocument, handleDetachHistory, handleReopenHistory, handleAnalyzeWithChat, handleDeleteHistory, aiActions, handleCaptureSlide, handlePlayPresentation, handleSaveMermaidDiagram, handleDeleteMermaidDiagram, handleGenerateMermaid, selectedElementId, multiSelection ]);
+  }, [ isReportPanelOpen, isDocumentPanelOpen, isTablePanelOpen, isMatrixPanelOpen, isGridPanelOpen, isMarkdownPanelOpen, isJSONPanelOpen, isHistoryPanelOpen, isKanbanPanelOpen, isPresentationPanelOpen, isMermaidPanelOpen, isMermaidGenerating, isTreemapPanelOpen, isTagDistPanelOpen, isRelDistPanelOpen, isSunburstPanelOpen, sunburstState, isConceptCloudOpen, isInfluenceCloudOpen, isTextAnalysisOpen, isFullTextAnalysisOpen, filteredElements, filteredRelationships, elements, relationships, documents, folders, openDocIds, currentModelName, activeColorScheme, history, slides, mermaidDiagrams, detachedHistoryIds, handleNodeClick, handleUpdateElement, handleDeleteElement, handleAddElementFromName, handleAddRelationshipDirect, handleDeleteRelationship, handleApplyMarkdown, handleApplyJSON, handleOpenDocument, handleCreateFolder, handleCreateDocument, handleDeleteDocument, handleDeleteFolder, handleUpdateDocument, handleDetachHistory, handleReopenHistory, handleAnalyzeWithChat, handleDeleteHistory, aiActions, handleCaptureSlide, handlePlayPresentation, handleSaveMermaidDiagram, handleDeleteMermaidDiagram, handleGenerateMermaid, selectedElementId, multiSelection, getSunburstNodes ]);
 
   if (isInitialLoad && !isCreateModelModalOpen) { return ( <div className="w-screen h-screen flex items-center justify-center bg-gray-900 text-white"> Loading... </div> ); }
   const focusButtonTitle = () => { if (focusMode === 'narrow') return 'Switch to Wide Focus'; if (focusMode === 'wide') return 'Switch to Zoom Focus'; return 'Switch to Narrow Focus'; };
@@ -1657,7 +1864,7 @@ export default function App() {
                                 { id: 'toc', label: 'Theory of Constraints', color: 'text-amber-400' },
                                 { id: 'ssm', label: 'Soft Systems', color: 'text-cyan-400' },
                                 { id: 'swot', label: 'Strategic Analysis', color: 'text-lime-400' },
-                                { id: 'mining', label: 'Data Mining', color: 'text-yellow-400' },
+                                { id: 'explorer', label: 'Explorer', color: 'text-yellow-400' },
                                 { id: 'tagcloud', label: 'Word Cloud', color: 'text-pink-400' },
                                 { id: 'mermaid', label: 'Diagrams', color: 'text-cyan-400' },
                                 { id: 'bulk', label: 'Bulk Edit', color: 'text-pink-400' },
@@ -1680,6 +1887,11 @@ export default function App() {
                             <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Panels</div>
                             {[
                                 { label: 'Report', state: isReportPanelOpen, toggle: () => setIsReportPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
+                                { label: 'Tag Cloud', state: isConceptCloudOpen, toggle: () => setIsConceptCloudOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg> },
+                                { label: 'Sunburst', state: isSunburstPanelOpen, toggle: () => { setIsSunburstPanelOpen(p => !p); if(isSunburstPanelOpen) setSunburstState(prev => ({...prev, active: false})); else setSunburstState(prev => ({...prev, active: true})); }, icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg> },
+                                { label: 'Relationship Cloud', state: isInfluenceCloudOpen, toggle: () => setIsInfluenceCloudOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg> },
+                                { label: 'Node Name Analysis', state: isTextAnalysisOpen, toggle: () => setIsTextAnalysisOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
+                                { label: 'Full Text Analysis', state: isFullTextAnalysisOpen, toggle: () => setIsFullTextAnalysisOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg> },
                                 { label: 'Diagrams', state: isMermaidPanelOpen, toggle: () => setIsMermaidPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg> },
                                 { label: 'Story Mode', state: isPresentationPanelOpen, toggle: () => setIsPresentationPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> },
                                 { label: 'Kanban', state: isKanbanPanelOpen, toggle: () => setIsKanbanPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg> },
@@ -1944,10 +2156,10 @@ export default function App() {
                     onToggle={() => toggleTool('swot')}
                     onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
                 />
-                <MiningToolbar
-                    onSelectTool={handleMiningToolSelect}
-                    isCollapsed={activeTool !== 'mining'}
-                    onToggle={() => toggleTool('mining')}
+                <ExplorerToolbar
+                    onSelectTool={handleExplorerToolSelect}
+                    isCollapsed={activeTool !== 'explorer'}
+                    onToggle={() => toggleTool('explorer')}
                 />
                 <TagCloudToolbar
                     onSelectTool={handleTagCloudToolSelect}
@@ -2197,32 +2409,6 @@ export default function App() {
         onLogHistory={handleLogHistory}
         onOpenHistory={() => setIsHistoryPanelOpen(true)}
         customPrompt={getToolPrompt('swot', activeSwotTool)}
-      />
-
-      <MiningModal 
-        isOpen={isMiningModalOpen}
-        elements={elements}
-        relationships={relationships}
-        onClose={() => setIsMiningModalOpen(false)}
-        onNodeSelect={(id) => {
-            handleNodeClick(id, new MouseEvent('click'));
-            setIsMiningModalOpen(false);
-        }}
-        onLogHistory={handleLogHistory}
-        onOpenHistory={() => setIsHistoryPanelOpen(true)}
-        onAnalyze={handleAnalyzeWithChat}
-      />
-
-      <TagCloudModal
-        isOpen={isTagCloudModalOpen}
-        initialMode={activeTagCloudMode}
-        elements={elements}
-        relationships={relationships}
-        onClose={() => setIsTagCloudModalOpen(false)}
-        onNodeSelect={(id) => {
-            handleNodeClick(id, new MouseEvent('click'));
-            setIsTagCloudModalOpen(false);
-        }}
       />
 
       <SettingsModal 
