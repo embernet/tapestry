@@ -30,11 +30,10 @@ const AI_ACTIONS = [
     { name: "Gantt Chart", prompt: "Provide mermaid markdown for a Gantt chart breaking it down into phases as appropriate for this" },
 ];
 
-const MermaidPanel: React.FC<MermaidPanelProps> = ({ 
+export const MermaidPanel: React.FC<MermaidPanelProps> = ({ 
     savedDiagrams, onSaveDiagram, onDeleteDiagram, onGenerate, onClose, isGenerating,
     elements, relationships, multiSelection
 }) => {
-    const [activeTab, setActiveTab] = useState<'edit' | 'list'>('edit');
     const [currentId, setCurrentId] = useState<string | null>(null);
     const [title, setTitle] = useState('Untitled Diagram');
     const [code, setCode] = useState('graph TD;\n    A-->B;\n    A-->C;\n    B-->D;\n    C-->D;');
@@ -60,6 +59,32 @@ const MermaidPanel: React.FC<MermaidPanelProps> = ({
         });
     }, []);
 
+    // Auto-load last opened diagram or most recent
+    useEffect(() => {
+        const lastId = localStorage.getItem('tapestry_last_diagram_id');
+        const target = savedDiagrams.find(d => d.id === lastId);
+        
+        if (target) {
+            loadDiagram(target);
+        } else if (savedDiagrams.length > 0) {
+            // Load most recent
+            const recent = [...savedDiagrams].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+            loadDiagram(recent);
+        }
+    }, []); // Run once on mount
+
+    // Handle deletion of current diagram
+    useEffect(() => {
+        if (currentId && !savedDiagrams.find(d => d.id === currentId)) {
+             const recent = [...savedDiagrams].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+             if (recent) {
+                 loadDiagram(recent);
+             } else {
+                 handleCreateNew();
+             }
+        }
+    }, [savedDiagrams, currentId]);
+
     const zoomToFit = () => {
         if (!renderRef.current || !containerRef.current) return;
         
@@ -67,10 +92,6 @@ const MermaidPanel: React.FC<MermaidPanelProps> = ({
         if (!svg) return;
 
         try {
-            // Reset transform temporarily to get accurate measurements
-            // (Not strictly necessary if we calculate based on unscaled bbox, but safer)
-            
-            // Get bounding box of content
             const bbox = svg.getBBox();
             const { width: containerWidth, height: containerHeight } = containerRef.current.getBoundingClientRect();
             
@@ -82,9 +103,8 @@ const MermaidPanel: React.FC<MermaidPanelProps> = ({
 
             const scaleX = availableWidth / bbox.width;
             const scaleY = availableHeight / bbox.height;
-            const newZoom = Math.min(scaleX, scaleY, 1); // Don't zoom in more than 100% by default
+            const newZoom = Math.min(scaleX, scaleY, 1); 
 
-            // Center
             const newX = (containerWidth - bbox.width * newZoom) / 2 - (bbox.x * newZoom);
             const newY = (containerHeight - bbox.height * newZoom) / 2 - (bbox.y * newZoom);
 
@@ -105,7 +125,7 @@ const MermaidPanel: React.FC<MermaidPanelProps> = ({
             if (renderRef.current) {
                 renderRef.current.innerHTML = svg;
                 // Small delay to let DOM update before fitting
-                setTimeout(zoomToFit, 100);
+                // Only zoom to fit if it's a fresh load or render (optional optimization)
             }
         } catch (e: any) {
             console.error("Mermaid Render Error:", e);
@@ -113,14 +133,13 @@ const MermaidPanel: React.FC<MermaidPanelProps> = ({
         }
     };
 
+    // Debounced render
     useEffect(() => {
-        if (activeTab === 'edit') {
-            const timer = setTimeout(() => {
-                renderDiagram();
-            }, 800);
-            return () => clearTimeout(timer);
-        }
-    }, [code, activeTab]);
+        const timer = setTimeout(() => {
+            renderDiagram();
+        }, 800);
+        return () => clearTimeout(timer);
+    }, [code]);
 
     const handleSave = () => {
         const now = new Date().toISOString();
@@ -133,23 +152,23 @@ const MermaidPanel: React.FC<MermaidPanelProps> = ({
         };
         onSaveDiagram(diagram);
         setCurrentId(diagram.id);
-        alert("Diagram saved!");
+        localStorage.setItem('tapestry_last_diagram_id', diagram.id);
     };
 
-    const handleLoad = (diagram: MermaidDiagram) => {
-        setTitle(diagram.title);
-        setCode(diagram.code);
-        setCurrentId(diagram.id);
-        setActiveTab('edit');
+    const loadDiagram = (d: MermaidDiagram) => {
+        setCurrentId(d.id);
+        setTitle(d.title);
+        setCode(d.code);
+        localStorage.setItem('tapestry_last_diagram_id', d.id);
+        setTimeout(zoomToFit, 100);
     };
 
     const handleCreateNew = () => {
+        setCurrentId(null);
         setTitle('Untitled Diagram');
         setCode('graph TD;\n    A[Start] --> B{Decision};\n    B -->|Yes| C[Do Something];\n    B -->|No| D[End];');
-        setCurrentId(null);
-        setActiveTab('edit');
-        setPan({ x: 0, y: 0 });
-        setZoom(1);
+        localStorage.removeItem('tapestry_last_diagram_id');
+        setTimeout(zoomToFit, 100);
     };
 
     // Helper to get context
@@ -159,7 +178,6 @@ const MermaidPanel: React.FC<MermaidPanelProps> = ({
             ? elements.filter(e => multiSelection.has(e.id))
             : elements;
         
-        // If filtering, only show relationships where BOTH ends are in selection
         const contextRels = hasSelection
             ? relationships.filter(r => multiSelection.has(r.source as string) && multiSelection.has(r.target as string))
             : relationships;
@@ -168,14 +186,16 @@ const MermaidPanel: React.FC<MermaidPanelProps> = ({
     };
 
     const handleAIRequest = async (promptAction: string) => {
-        setIsDropdownOpen(false); // Close immediately
+        setIsDropdownOpen(false);
         const context = getGraphContext();
         const result = await onGenerate(promptAction, context);
         if (result) {
             let cleanCode = result.replace(/```mermaid/g, '').replace(/```/g, '').trim();
             setCode(cleanCode);
-            setTitle(`AI Generated ${new Date().toLocaleTimeString()}`);
-            setCurrentId(null);
+            // Only set title if it's a new unsaved diagram
+            if (!currentId) {
+                setTitle(`AI Generated ${new Date().toLocaleTimeString()}`);
+            }
         }
     };
 
@@ -223,190 +243,195 @@ const MermaidPanel: React.FC<MermaidPanelProps> = ({
 
     const handleMouseUp = () => setIsDragging(false);
 
-    return (
-        <div className="w-full h-full flex flex-col bg-gray-900 border-l border-gray-700">
-            {/* Header */}
-            <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900 flex-shrink-0">
-                <div className="flex items-center gap-3">
-                    <h2 className="text-xl font-bold text-cyan-400">Diagrams</h2>
-                    <div className="flex bg-gray-800 rounded border border-gray-600 p-0.5">
-                        <button 
-                            onClick={() => setActiveTab('edit')}
-                            className={`px-3 py-1 text-xs font-bold rounded transition-colors ${activeTab === 'edit' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                        >
-                            Editor
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab('list')}
-                            className={`px-3 py-1 text-xs font-bold rounded transition-colors ${activeTab === 'list' ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                        >
-                            Saved ({savedDiagrams.length})
-                        </button>
-                    </div>
-                </div>
-                <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-            </div>
+    const sortedDiagrams = useMemo(() => {
+        return [...savedDiagrams].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    }, [savedDiagrams]);
 
-            {activeTab === 'list' && (
-                <div className="flex-grow overflow-y-auto p-4 space-y-2 bg-gray-800">
+    return (
+        <div className="w-full h-full flex bg-gray-900 border-l border-gray-700">
+            {/* Left Sidebar: Saved Diagrams */}
+            <div className="w-64 flex-shrink-0 border-r border-gray-700 flex flex-col bg-gray-800/50">
+                <div className="p-4 border-b border-gray-700 flex-shrink-0">
+                    <div className="flex justify-between items-center mb-3">
+                        <h2 className="text-sm font-bold text-gray-300 uppercase tracking-wider">Diagrams</h2>
+                        <span className="text-xs bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded">{savedDiagrams.length}</span>
+                    </div>
                     <button 
                         onClick={handleCreateNew}
-                        className="w-full bg-cyan-900/30 hover:bg-cyan-900/50 border border-cyan-700/50 border-dashed rounded p-3 text-cyan-400 font-bold text-sm mb-4 transition-colors"
+                        className="w-full bg-cyan-700 hover:bg-cyan-600 text-white text-xs font-bold py-2 px-3 rounded flex items-center justify-center gap-2 transition-colors"
                     >
-                        + Create New Diagram
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                        </svg>
+                        New Diagram
                     </button>
-                    
-                    {savedDiagrams.length === 0 ? (
-                        <p className="text-center text-gray-500 italic mt-10">No saved diagrams.</p>
-                    ) : (
-                        savedDiagrams.map(d => (
-                            <div key={d.id} className="bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded p-3 flex justify-between items-center group cursor-pointer" onClick={() => handleLoad(d)}>
-                                <div>
-                                    <h3 className="font-bold text-white">{d.title}</h3>
-                                    <p className="text-xs text-gray-400">Updated: {new Date(d.updatedAt).toLocaleString()}</p>
-                                </div>
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); onDeleteDiagram(d.id); }}
-                                    className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-2"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
+                </div>
+                <div className="flex-grow overflow-y-auto p-2 space-y-1">
+                    {sortedDiagrams.map(d => (
+                        <div 
+                            key={d.id} 
+                            onClick={() => loadDiagram(d)}
+                            className={`p-2 rounded cursor-pointer group flex justify-between items-center transition-colors ${currentId === d.id ? 'bg-cyan-900/40 border border-cyan-700/50 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-gray-200 border border-transparent'}`}
+                        >
+                            <div className="truncate flex-grow min-w-0 mr-2">
+                                <div className="font-medium text-sm truncate">{d.title}</div>
+                                <div className="text-[10px] opacity-60">{new Date(d.updatedAt).toLocaleDateString()}</div>
                             </div>
-                        ))
+                            <button 
+                                onClick={(e) => { e.stopPropagation(); onDeleteDiagram(d.id); }}
+                                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 p-1.5 rounded hover:bg-gray-800 transition-all"
+                                title="Delete Diagram"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    ))}
+                    {sortedDiagrams.length === 0 && (
+                        <div className="text-center text-gray-500 text-xs py-8 italic">
+                            No saved diagrams.
+                        </div>
                     )}
                 </div>
-            )}
+            </div>
 
-            {activeTab === 'edit' && (
-                <div className="flex-grow flex flex-col min-h-0">
-                    {/* Editor Toolbar */}
-                    <div className="p-2 bg-gray-800 border-b border-gray-700 flex gap-2 items-center flex-wrap">
+            {/* Right Content: Editor & Preview */}
+            <div className="flex-grow flex flex-col min-w-0 bg-gray-900">
+                {/* Header */}
+                <div className="p-2 border-b border-gray-700 flex justify-between items-center bg-gray-800 flex-shrink-0">
+                    <div className="flex gap-2 items-center flex-wrap flex-grow">
                         <input 
                             type="text" 
                             value={title}
                             onChange={e => setTitle(e.target.value)}
-                            className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-sm text-white focus:border-cyan-500 outline-none flex-grow min-w-[150px]"
+                            className="bg-gray-900 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 outline-none flex-grow min-w-[150px] max-w-md font-bold"
                             placeholder="Diagram Title"
                         />
-                        <button onClick={() => renderDiagram()} className="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-3 py-1 rounded text-xs font-bold border border-gray-600">
+                        <button onClick={() => renderDiagram()} className="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-3 py-1.5 rounded text-xs font-bold border border-gray-600 transition-colors">
                             Render
                         </button>
-                        <button onClick={handleSave} className="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1 rounded text-xs font-bold shadow-sm">
+                        <button onClick={handleSave} className="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm transition-colors flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" />
+                            </svg>
                             Save
                         </button>
                     </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white p-2 hover:bg-gray-700 rounded">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
 
-                    {/* Split Content */}
-                    <div className="flex-grow flex flex-col lg:flex-row min-h-0">
-                        {/* Editor Side */}
-                        <div className="w-full lg:w-1/3 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-700 bg-gray-900">
-                            <div className="p-2 bg-gray-800 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-700 flex justify-between items-center">
-                                <span>Markdown Code</span>
-                                <div className="group relative">
-                                    <button 
-                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                                        className="text-cyan-400 hover:text-white flex items-center gap-1 bg-gray-700 px-2 py-0.5 rounded"
-                                    >
-                                        AI Templates ▼
-                                    </button>
-                                    {isDropdownOpen && (
-                                        <div className="absolute right-0 top-full mt-1 w-56 bg-gray-800 border border-gray-600 rounded shadow-xl z-50 max-h-64 overflow-y-auto">
-                                            {AI_ACTIONS.map(action => (
-                                                <button
-                                                    key={action.name}
-                                                    onClick={() => handleAIRequest(action.prompt)}
-                                                    disabled={isGenerating}
-                                                    className="block w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-700 hover:text-white border-b border-gray-700 last:border-0"
-                                                >
-                                                    {action.name}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                            <textarea
-                                value={code}
-                                onChange={e => setCode(e.target.value)}
-                                className="flex-grow w-full bg-gray-900 text-gray-300 font-mono text-xs p-3 focus:outline-none resize-none"
-                                spellCheck={false}
-                            />
-                            {/* Command Bar */}
-                            <div className="p-2 border-t border-gray-700 bg-gray-800 flex flex-col gap-1">
-                                <label className="text-[10px] text-cyan-400 font-bold uppercase">AI Command</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="text" 
-                                        value={commandInput}
-                                        onChange={(e) => setCommandInput(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && handleCommandExecute()}
-                                        placeholder="e.g. 'Make connections dashed' or 'Add a subgraph for Admin'"
-                                        className="flex-grow bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-500"
-                                    />
-                                    <button 
-                                        onClick={handleCommandExecute}
-                                        disabled={isGenerating || !commandInput.trim()}
-                                        className="bg-cyan-700 hover:bg-cyan-600 text-white px-2 py-1 rounded text-xs"
-                                    >
-                                        Send
-                                    </button>
-                                </div>
+                {/* Split View */}
+                <div className="flex-grow flex flex-col lg:flex-row min-h-0">
+                    {/* Editor Side */}
+                    <div className="w-full lg:w-1/3 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-700 bg-gray-900">
+                        <div className="p-2 bg-gray-800 text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-700 flex justify-between items-center">
+                            <span>Mermaid Code</span>
+                            <div className="group relative">
+                                <button 
+                                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                    className="text-cyan-400 hover:text-white flex items-center gap-1 bg-gray-700 px-2 py-0.5 rounded transition-colors"
+                                >
+                                    Templates ▼
+                                </button>
+                                {isDropdownOpen && (
+                                    <div className="absolute right-0 top-full mt-1 w-56 bg-gray-800 border border-gray-600 rounded shadow-xl z-50 max-h-64 overflow-y-auto">
+                                        {AI_ACTIONS.map(action => (
+                                            <button
+                                                key={action.name}
+                                                onClick={() => handleAIRequest(action.prompt)}
+                                                disabled={isGenerating}
+                                                className="block w-full text-left px-4 py-2 text-xs text-gray-300 hover:bg-gray-700 hover:text-white border-b border-gray-700 last:border-0"
+                                            >
+                                                {action.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
-
-                        {/* Preview Side */}
-                        <div className="w-full lg:w-2/3 bg-gray-800 flex flex-col relative overflow-hidden">
-                            {/* Zoom Controls */}
-                            <div className="absolute top-4 right-4 z-10 flex gap-1 bg-gray-800/80 p-1 rounded border border-gray-600 backdrop-blur">
-                                <button onClick={() => setZoom(z => Math.max(0.1, z - 0.1))} className="hover:bg-gray-600 text-white w-6 h-6 rounded flex items-center justify-center">-</button>
-                                <button onClick={zoomToFit} className="hover:bg-gray-600 text-white px-2 h-6 rounded text-xs" title="Zoom to Fit">Fit</button>
-                                <span className="text-gray-400 text-xs flex items-center px-1 select-none">{Math.round(zoom * 100)}%</span>
-                                <button onClick={() => setZoom(z => Math.min(5, z + 0.1))} className="hover:bg-gray-600 text-white w-6 h-6 rounded flex items-center justify-center">+</button>
-                            </div>
-                            
-                            {/* Loading Overlay */}
-                            {isGenerating && (
-                                <div className="absolute inset-0 z-20 bg-gray-900/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in">
-                                    <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                                    <h3 className="text-2xl font-bold text-cyan-400 animate-pulse">Generating Diagram...</h3>
-                                    <p className="text-gray-400 mt-2 text-sm">Analyzing model structure</p>
-                                </div>
-                            )}
-
-                            {/* Error Toast */}
-                            {error && (
-                                <div className="absolute bottom-4 left-4 right-4 bg-red-900/90 border border-red-500 text-white p-3 rounded text-xs font-mono shadow-lg z-20">
-                                    <strong className="block mb-1 text-red-300">Render Error:</strong>
-                                    {error}
-                                </div>
-                            )}
-
-                            {/* Canvas */}
-                            <div 
-                                ref={containerRef}
-                                className="flex-grow overflow-hidden bg-gray-800 bg-[radial-gradient(#374151_1px,transparent_1px)] [background-size:16px_16px] cursor-grab active:cursor-grabbing"
-                                onWheel={handleWheel}
-                                onMouseDown={handleMouseDown}
-                                onMouseMove={handleMouseMove}
-                                onMouseUp={handleMouseUp}
-                                onMouseLeave={handleMouseUp}
-                            >
-                                <div 
-                                    ref={renderRef} 
-                                    style={{ 
-                                        transformOrigin: '0 0',
-                                        transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                                        transition: isDragging ? 'none' : 'transform 0.1s ease-out'
-                                    }}
-                                    className="origin-top-left p-10 inline-block" // Add padding to content
+                        <textarea
+                            value={code}
+                            onChange={e => setCode(e.target.value)}
+                            className="flex-grow w-full bg-gray-900 text-gray-300 font-mono text-xs p-3 focus:outline-none resize-none"
+                            spellCheck={false}
+                        />
+                        
+                        {/* Command Bar */}
+                        <div className="p-2 border-t border-gray-700 bg-gray-800 flex flex-col gap-1">
+                            <label className="text-[10px] text-cyan-400 font-bold uppercase">AI Command</label>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    value={commandInput}
+                                    onChange={(e) => setCommandInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleCommandExecute()}
+                                    placeholder="e.g. 'Make connections dashed'..."
+                                    className="flex-grow bg-gray-900 border border-gray-600 rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500"
                                 />
+                                <button 
+                                    onClick={handleCommandExecute}
+                                    disabled={isGenerating || !commandInput.trim()}
+                                    className="bg-cyan-700 hover:bg-cyan-600 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors disabled:opacity-50"
+                                >
+                                    Send
+                                </button>
                             </div>
                         </div>
                     </div>
+
+                    {/* Preview Side */}
+                    <div className="w-full lg:w-2/3 bg-gray-800 flex flex-col relative overflow-hidden">
+                        {/* Zoom Controls */}
+                        <div className="absolute top-4 right-4 z-10 flex gap-1 bg-gray-800/80 p-1 rounded border border-gray-600 backdrop-blur shadow-lg">
+                            <button onClick={() => setZoom(z => Math.max(0.1, z - 0.1))} className="hover:bg-gray-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold">-</button>
+                            <button onClick={zoomToFit} className="hover:bg-gray-600 text-white px-2 h-6 rounded text-xs font-bold uppercase" title="Zoom to Fit">Fit</button>
+                            <span className="text-gray-400 text-xs flex items-center px-2 select-none font-mono border-x border-gray-600 mx-1">{Math.round(zoom * 100)}%</span>
+                            <button onClick={() => setZoom(z => Math.min(5, z + 0.1))} className="hover:bg-gray-600 text-white w-6 h-6 rounded flex items-center justify-center font-bold">+</button>
+                        </div>
+                        
+                        {/* Loading Overlay */}
+                        {isGenerating && (
+                            <div className="absolute inset-0 z-20 bg-gray-900/80 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in">
+                                <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                                <h3 className="text-2xl font-bold text-cyan-400 animate-pulse">Generating Diagram...</h3>
+                                <p className="text-gray-400 mt-2 text-sm">Analyzing model structure</p>
+                            </div>
+                        )}
+
+                        {/* Error Toast */}
+                        {error && (
+                            <div className="absolute bottom-4 left-4 right-4 bg-red-900/90 border border-red-500 text-white p-3 rounded text-xs font-mono shadow-lg z-20">
+                                <strong className="block mb-1 text-red-300">Render Error:</strong>
+                                {error}
+                            </div>
+                        )}
+
+                        {/* Canvas */}
+                        <div 
+                            ref={containerRef}
+                            className="flex-grow overflow-hidden bg-gray-800 bg-[radial-gradient(#374151_1px,transparent_1px)] [background-size:16px_16px] cursor-grab active:cursor-grabbing"
+                            onWheel={handleWheel}
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
+                        >
+                            <div 
+                                ref={renderRef} 
+                                style={{ 
+                                    transformOrigin: '0 0',
+                                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                                    transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+                                }}
+                                className="origin-top-left p-10 inline-block"
+                            />
+                        </div>
+                    </div>
                 </div>
-            )}
+            </div>
         </div>
     );
 };
