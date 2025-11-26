@@ -7,6 +7,7 @@ interface LayoutToolbarProps {
   onLinkDistanceChange: (val: number) => void;
   onRepulsionChange: (val: number) => void;
   onJiggle: () => void;
+  onZoomToFit: () => void;
   isPhysicsActive: boolean;
   onStartAutoLayout: () => void;
   onAcceptAutoLayout: () => void;
@@ -23,6 +24,7 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
   onLinkDistanceChange,
   onRepulsionChange,
   onJiggle,
+  onZoomToFit,
   isPhysicsActive,
   onStartAutoLayout,
   onAcceptAutoLayout,
@@ -134,6 +136,20 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
                                 className="h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-red-500"
                                 title="Node repulsion strength"
                             />
+                        </div>
+
+                         {/* Fit Button */}
+                         <div className="flex flex-col justify-center items-center">
+                             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">FIT</span>
+                            <button 
+                                onClick={onZoomToFit}
+                                className="flex flex-col items-center justify-center bg-gray-700 hover:bg-gray-600 text-white p-1 rounded border border-gray-600 transition-colors h-8 w-8"
+                                title="Zoom to Fit"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+                                </svg>
+                            </button>
                         </div>
 
                          {/* Shake Button */}

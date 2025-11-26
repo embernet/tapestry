@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { TapestryDocument, TapestryFolder } from '../types';
 
 // --- Document Manager Panel ---
@@ -130,6 +130,13 @@ const DocumentItem: React.FC<{
                 </svg>
             );
         }
+        if (doc.type === 'five-forces-analysis') {
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+            );
+        }
         if (doc.type === 'scamper-analysis') {
             return (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" viewBox="0 0 24 24" fill="none">
@@ -222,18 +229,17 @@ const FolderItem: React.FC<{
                 </div>
             </div>
             {isOpen && (
-                <div className="ml-4 border-l border-gray-700 pl-1">
-                    {documents.length > 0 ? (
-                        documents.map(doc => (
-                            <DocumentItem 
-                                key={doc.id} 
-                                doc={doc} 
-                                onOpen={onOpenDocument} 
-                                onDelete={onDeleteDocument}
-                            />
-                        ))
-                    ) : (
-                        <div className="text-xs text-gray-600 italic p-2">Empty</div>
+                <div className="pl-4 border-l border-gray-700 ml-2 mt-1 space-y-1">
+                    {documents.map(doc => (
+                        <DocumentItem 
+                            key={doc.id} 
+                            doc={doc} 
+                            onOpen={onOpenDocument} 
+                            onDelete={onDeleteDocument}
+                        />
+                    ))}
+                    {documents.length === 0 && (
+                        <div className="text-gray-600 text-xs italic pl-2 py-1">Empty</div>
                     )}
                 </div>
             )}
@@ -241,86 +247,19 @@ const FolderItem: React.FC<{
     );
 };
 
-// --- Document Editor ---
+// --- Document Editor Panel ---
 
 interface DocumentEditorPanelProps {
-    document: TapestryDocument;
-    onUpdate: (id: string, updates: Partial<TapestryDocument>) => void;
-    onClose: () => void;
-    initialViewMode?: 'edit' | 'preview';
+  document: TapestryDocument;
+  onUpdate: (docId: string, updates: Partial<TapestryDocument>) => void;
+  onClose: () => void;
+  initialViewMode?: 'edit' | 'preview';
 }
-
-const SimpleMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
-    const lines = content.split('\n');
-    const elements: React.ReactNode[] = [];
-    
-    let currentListItems: React.ReactNode[] = [];
-    
-    const flushList = (keyPrefix: number) => {
-        if (currentListItems.length > 0) {
-            elements.push(
-                <ul key={`list-${keyPrefix}`} className="list-disc list-inside mb-4 pl-4 text-gray-300 space-y-1">
-                    {currentListItems}
-                </ul>
-            );
-            currentListItems = [];
-        }
-    };
-
-    const parseInline = (text: string): React.ReactNode[] => {
-        const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
-        return parts.map((part, i) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-                return <strong key={i} className="font-bold text-white">{part.slice(2, -2)}</strong>;
-            }
-            if (part.startsWith('`') && part.endsWith('`')) {
-                return <code key={i} className="bg-gray-700 px-1 rounded text-xs font-mono text-blue-300">{part.slice(1, -1)}</code>;
-            }
-            return part;
-        });
-    };
-
-    lines.forEach((line, index) => {
-        const trimmed = line.trim();
-        
-        if (!trimmed) {
-            flushList(index);
-            return;
-        }
-
-        if (trimmed.startsWith('# ')) {
-            flushList(index);
-            elements.push(<h1 key={`h1-${index}`} className="text-2xl font-bold text-white mb-4 mt-6 border-b border-gray-700 pb-2">{trimmed.substring(2)}</h1>);
-        } else if (trimmed.startsWith('## ')) {
-            flushList(index);
-            elements.push(<h2 key={`h2-${index}`} className="text-xl font-bold text-blue-400 mb-3 mt-5">{trimmed.substring(3)}</h2>);
-        } else if (trimmed.startsWith('### ')) {
-            flushList(index);
-            elements.push(<h3 key={`h3-${index}`} className="text-lg font-bold text-gray-200 mb-2 mt-4">{trimmed.substring(4)}</h3>);
-        } else if (trimmed.startsWith('#### ')) {
-            flushList(index);
-            elements.push(<h4 key={`h4-${index}`} className="text-base font-bold text-gray-300 mb-2 mt-3">{trimmed.substring(5)}</h4>);
-        } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-            const content = trimmed.substring(2);
-            currentListItems.push(<li key={`li-${index}`}>{parseInline(content)}</li>);
-        } else if (/^\d+\.\s/.test(trimmed)) {
-             flushList(index);
-             elements.push(<p key={`p-${index}`} className="mb-2 text-gray-300 leading-relaxed">{parseInline(trimmed)}</p>);
-        } else {
-            flushList(index);
-            elements.push(<p key={`p-${index}`} className="mb-2 text-gray-300 leading-relaxed">{parseInline(trimmed)}</p>);
-        }
-    });
-    
-    flushList(lines.length);
-
-    return <div className="markdown-preview px-2">{elements}</div>;
-};
 
 export const DocumentEditorPanel: React.FC<DocumentEditorPanelProps> = ({ document, onUpdate, onClose, initialViewMode = 'edit' }) => {
     const [title, setTitle] = useState(document.title);
     const [content, setContent] = useState(document.content);
-    const [viewMode, setViewMode] = useState<'edit' | 'preview'>(initialViewMode);
+    const [mode, setMode] = useState<'edit' | 'preview'>(initialViewMode);
 
     useEffect(() => {
         setTitle(document.title);
@@ -331,6 +270,7 @@ export const DocumentEditorPanel: React.FC<DocumentEditorPanelProps> = ({ docume
         onUpdate(document.id, { title, content });
     };
 
+    // Auto-save on blur
     const handleBlur = () => {
         if (title !== document.title || content !== document.content) {
             handleSave();
@@ -338,37 +278,42 @@ export const DocumentEditorPanel: React.FC<DocumentEditorPanelProps> = ({ docume
     };
 
     return (
-        <div className="w-full h-full flex flex-col bg-gray-800">
-            <div className="p-4 border-b border-gray-700 bg-gray-900 flex justify-between items-center">
+        <div className="flex flex-col h-full bg-gray-800 border-l border-gray-700">
+            <div className="p-4 border-b border-gray-700 bg-gray-900 flex justify-between items-center shrink-0">
                 <input 
                     type="text" 
-                    value={title} 
+                    value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     onBlur={handleBlur}
-                    className="bg-transparent text-white font-bold text-lg outline-none placeholder-gray-500 w-full"
+                    className="bg-transparent text-white font-bold text-lg outline-none w-full mr-4"
                     placeholder="Document Title"
                 />
-                <div className="flex gap-2">
-                    <button onClick={() => setViewMode(viewMode === 'edit' ? 'preview' : 'edit')} className="text-gray-400 hover:text-white text-xs uppercase font-bold bg-gray-800 px-2 py-1 rounded">
-                        {viewMode === 'edit' ? 'Preview' : 'Edit'}
+                <div className="flex items-center gap-2">
+                    <button 
+                        onClick={() => setMode(mode === 'edit' ? 'preview' : 'edit')}
+                        className="text-gray-400 hover:text-white text-xs uppercase font-bold px-2 py-1 rounded hover:bg-gray-700"
+                    >
+                        {mode === 'edit' ? 'Preview' : 'Edit'}
                     </button>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
                     </button>
                 </div>
             </div>
-            <div className="flex-grow overflow-hidden bg-gray-900 relative">
-                {viewMode === 'edit' ? (
+            <div className="flex-grow overflow-hidden relative">
+                {mode === 'edit' ? (
                     <textarea 
-                        value={content} 
+                        value={content}
                         onChange={(e) => setContent(e.target.value)}
                         onBlur={handleBlur}
-                        className="w-full h-full bg-gray-900 text-gray-300 p-4 outline-none resize-none font-mono text-sm"
+                        className="w-full h-full bg-gray-800 text-gray-300 p-4 outline-none resize-none font-mono text-sm"
                         placeholder="Start typing..."
                     />
                 ) : (
-                    <div className="w-full h-full p-6 overflow-y-auto text-gray-300">
-                        <SimpleMarkdownRenderer content={content} />
+                    <div className="w-full h-full bg-gray-800 text-gray-300 p-4 overflow-y-auto prose prose-invert prose-sm max-w-none whitespace-pre-wrap">
+                        {content}
                     </div>
                 )}
             </div>

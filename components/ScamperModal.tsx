@@ -32,6 +32,7 @@ interface ScamperModalProps {
   // Settings
   defaultTags?: string[];
   activeModel?: string;
+  aiConfig: any;
 }
 
 const ScamperModal: React.FC<ScamperModalProps> = ({
@@ -50,7 +51,8 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
   initialDoc,
   onLogHistory,
   defaultTags = [],
-  activeModel
+  activeModel,
+  aiConfig
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<ScamperSuggestion[]>([]);
@@ -126,7 +128,7 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
       if (!isAppend) setSuggestions([]);
 
       try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const ai = new GoogleGenAI({ apiKey: aiConfig.apiKey || process.env.API_KEY });
         
         const customPrompt = DEFAULT_TOOL_PROMPTS[`scamper:${opLetter}`] || DEFAULT_TOOL_PROMPTS['scamper'];
         
@@ -143,7 +145,7 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
         For each idea, provide a name, a short description/rationale, and a short relationship label that connects the original concept to the new idea (e.g. "can be replaced by", "combined with", "adapted to").`;
         
         const response = await ai.models.generateContent({ 
-            model: activeModel || 'gemini-2.5-flash', 
+            model: aiConfig.modelId || activeModel || 'gemini-2.5-flash', 
             contents: prompt, 
             config: { 
                 responseMimeType: "application/json", 
@@ -319,10 +321,8 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
 
   if (!isOpen) return null;
 
-  const pendingCount = suggestions.filter(s => s.status === 'pending').length;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-[1000] p-4">
       <div className="bg-gray-800 rounded-lg w-full max-w-3xl shadow-2xl border border-gray-600 text-white flex flex-col max-h-[90vh]">
         
         {/* Header */}
@@ -346,159 +346,74 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
                 />
             </div>
             <div className="flex items-center gap-2">
-                <button 
-                    onClick={handleSaveToDocuments} 
-                    className="bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded transition shadow-sm flex items-center gap-1"
-                    title="Save to Documents"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" /></svg>
-                    Save
-                </button>
                 <button onClick={onClose} className="text-gray-400 hover:text-white transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
         </div>
 
-        {/* Sub-header Info */}
-        <div className="px-6 py-2 bg-gray-800 border-b border-gray-700">
-             <p className="text-sm text-gray-400">
-                Generating ideas for: <span className="text-blue-400 font-semibold">{sourceNodeName || 'Loading...'}</span>
-            </p>
-        </div>
-
-        {/* Content */}
-        <div className="flex-grow overflow-y-auto p-6 bg-gray-800">
-            {isLoading && suggestions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                    <div className="w-12 h-12 border-4 border-t-blue-500 border-gray-600 rounded-full animate-spin"></div>
-                    <p className="text-gray-400 animate-pulse">Brainstorming...</p>
-                </div>
-            ) : (
-                <div className="space-y-3">
-                    {suggestions.length === 0 && !isLoading && (
-                        <div className="text-center text-gray-500 py-10 italic">
-                            No ideas generated. Select a node and run SCAMPER from the toolbar.
-                        </div>
-                    )}
-                    {suggestions.map((s) => (
-                        <div 
-                            key={s.id} 
-                            className={`p-4 rounded-lg border flex items-start gap-4 transition-all ${
-                                s.status === 'accepted' ? 'bg-green-900/20 border-green-500/50' :
-                                s.status === 'rejected' ? 'bg-red-900/10 border-red-500/20 opacity-50' :
-                                'bg-gray-700 border-gray-600 hover:border-gray-500'
-                            }`}
-                        >
-                            <div className="flex-grow">
-                                <h3 className={`font-bold text-lg ${s.status === 'accepted' ? 'text-green-400' : 'text-white'}`}>
-                                    {s.name}
-                                </h3>
-                                <p className="text-sm text-gray-300 mt-1">{s.description}</p>
-                                <div className="mt-2 flex items-center gap-2">
-                                    <div className="inline-block bg-gray-900 px-2 py-0.5 rounded text-xs text-gray-500 border border-gray-700">
-                                        Link: {s.relationshipLabel}
-                                    </div>
-                                    {s.actionLog && (
-                                        <div className="text-[10px] text-gray-500 italic">
-                                            {s.actionLog}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {s.status === 'pending' && (
-                                <div className="flex flex-col gap-2">
-                                    <button 
-                                        onClick={() => handleAccept(s.id)}
-                                        className="p-2 bg-green-600 hover:bg-green-500 text-white rounded shadow-md transition-colors"
-                                        title="Add this idea"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                        </svg>
-                                    </button>
-                                    <button 
-                                        onClick={() => handleReject(s.id)}
-                                        className="p-2 bg-gray-600 hover:bg-gray-500 text-gray-300 hover:text-white rounded shadow-md transition-colors"
-                                        title="Discard"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414 1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            )}
-                            
-                            {s.status === 'accepted' && (
-                                <div className="flex items-center justify-center w-10 h-full text-green-500">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                    </svg>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                    {isLoading && suggestions.length > 0 && (
-                        <div className="flex items-center justify-center py-4">
-                            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-6 border-t border-gray-700 bg-gray-900 rounded-b-lg flex justify-between items-center">
-            <div className="flex gap-3">
-                <button 
-                    onClick={handleRegenerate}
-                    disabled={isLoading || !operator}
-                    className="flex items-center gap-2 text-blue-400 hover:text-blue-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Regenerate
-                </button>
-                <div className="border-l border-gray-700 h-6"></div>
-                <button 
-                    onClick={handleGenerateMore}
-                    disabled={isLoading || !operator}
-                    className="flex items-center gap-2 text-green-400 hover:text-green-300 font-semibold disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Generate More
-                </button>
-            </div>
-            
-            <div className="flex gap-3">
-                <button 
-                    onClick={handleRejectAll}
-                    disabled={isLoading || pendingCount === 0}
-                    className="px-4 py-2 rounded border border-gray-600 hover:bg-gray-800 text-gray-300 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    Reject Remaining
-                </button>
-                <button 
-                    onClick={handleAcceptAll}
-                    disabled={isLoading || pendingCount === 0}
-                    className="px-4 py-2 rounded bg-green-600 hover:bg-green-500 text-white font-bold transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    Accept All ({pendingCount})
-                </button>
-                {pendingCount === 0 && (
-                    <button 
-                        onClick={onClose}
-                        className="px-6 py-2 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold transition shadow-lg"
-                    >
-                        Done
-                    </button>
+        <div className="flex flex-grow overflow-hidden">
+            {/* Left: Suggestions List */}
+            <div className="w-1/3 p-4 border-r border-gray-700 overflow-y-auto bg-gray-800/50 flex flex-col gap-4">
+                {suggestions.length === 0 && !isLoading && (
+                    <div className="text-gray-500 text-sm text-center italic mt-10">
+                        Select a node and click a SCAMPER letter in the toolbar to generate ideas.
+                    </div>
                 )}
+
+                {isLoading && (
+                    <div className="flex flex-col items-center justify-center py-10">
+                        <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                        <span className="text-cyan-400 text-sm animate-pulse">Generating Ideas...</span>
+                    </div>
+                )}
+
+                {suggestions.map((s) => (
+                    <div key={s.id} className={`p-3 rounded border border-gray-600 bg-gray-700/50 text-sm ${s.status === 'accepted' ? 'border-green-500/50 bg-green-900/20' : ''} ${s.status === 'rejected' ? 'opacity-50' : ''}`}>
+                        <div className="font-bold text-cyan-300 mb-1">{s.name}</div>
+                        <div className="text-gray-300 text-xs mb-2">{s.description}</div>
+                        <div className="text-gray-500 text-[10px] mb-2 italic">{s.relationshipLabel}</div>
+                        
+                        {s.status === 'pending' && (
+                            <div className="flex justify-end gap-2 mt-2 border-t border-gray-600 pt-2">
+                                <button onClick={() => handleReject(s.id)} className="text-xs text-red-400 hover:text-red-300 px-2 py-1">Reject</button>
+                                <button onClick={() => handleAccept(s.id)} className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded shadow">Accept</button>
+                            </div>
+                        )}
+                        {s.status === 'accepted' && <div className="text-xs text-green-500 font-bold text-right">Accepted</div>}
+                        {s.status === 'rejected' && <div className="text-xs text-red-500 font-bold text-right">Rejected</div>}
+                    </div>
+                ))}
+
+                {suggestions.some(s => s.status === 'pending') && (
+                    <div className="flex gap-2 mt-2 pt-2 border-t border-gray-700 sticky bottom-0 bg-gray-800/90 pb-2">
+                        <button onClick={handleAcceptAll} className="flex-1 bg-green-900/30 hover:bg-green-900/50 text-green-400 text-xs py-2 rounded border border-green-800">Accept All</button>
+                        <button onClick={handleRejectAll} className="flex-1 bg-red-900/30 hover:bg-red-900/50 text-red-400 text-xs py-2 rounded border border-red-800">Reject All</button>
+                    </div>
+                )}
+                
+                {operator && !isLoading && (
+                   <div className="mt-2 flex gap-2">
+                        <button onClick={handleRegenerate} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs py-2 rounded border border-gray-600">Regenerate</button>
+                        <button onClick={handleGenerateMore} className="flex-1 bg-gray-700 hover:bg-gray-600 text-white text-xs py-2 rounded border border-gray-600">Generate More</button>
+                   </div>
+                )}
+            </div>
+
+            {/* Right: Preview */}
+            <div className="w-2/3 bg-gray-900 relative flex flex-col">
+                <div className="flex-grow p-6 overflow-y-auto">
+                    <div className="prose prose-invert prose-sm max-w-none">
+                        <pre className="whitespace-pre-wrap font-mono text-sm text-gray-300">{generateScamperMarkdown()}</pre>
+                    </div>
+                </div>
+                
+                <div className="p-4 border-t border-gray-800 bg-gray-800/50 flex justify-end">
+                     <button onClick={handleSaveToDocuments} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm font-bold shadow-lg transition flex items-center gap-2">
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" /></svg>
+                         Save to Documents
+                     </button>
+                </div>
             </div>
         </div>
       </div>

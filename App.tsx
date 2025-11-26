@@ -907,6 +907,12 @@ export default function App() {
             setSwotInitialDoc(doc);
             setIsSwotModalOpen(true);
             return;
+        } else if (doc.type === 'five-forces-analysis') {
+            setActiveTool('swot');
+            setActiveSwotTool('five_forces');
+            setSwotInitialDoc(doc);
+            setIsSwotModalOpen(true);
+            return;
         } else if (doc.type === 'scamper-analysis') {
             setActiveTool('scamper');
             setScamperInitialDoc(doc);
@@ -1942,7 +1948,7 @@ export default function App() {
       <input type="file" ref={importFileRef} onChange={handleImportInputChange} accept=".json" className="hidden" />
       
       {isPresenting && (
-          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[100] bg-gray-900/90 border border-gray-600 rounded-lg px-6 py-3 shadow-2xl flex items-center gap-4 text-white animate-fade-in-down">
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[3000] bg-gray-900/90 border border-gray-600 rounded-lg px-6 py-3 shadow-2xl flex items-center gap-4 text-white animate-fade-in-down">
               <button 
                 onClick={() => {
                     if (currentSlideIndex !== null && currentSlideIndex > 0) setCurrentSlideIndex(currentSlideIndex - 1);
@@ -1977,7 +1983,7 @@ export default function App() {
       )}
 
       {currentModelId && !isPresenting && (
-          <div className="absolute top-4 left-4 z-50 bg-gray-800 bg-opacity-80 p-2 rounded-lg flex items-center space-x-2">
+          <div className="absolute top-4 left-4 z-[600] bg-gray-800 bg-opacity-80 p-2 rounded-lg flex items-center space-x-2">
                 
                 {/* Main Menu Dropdown */}
                 <div className="relative" ref={mainMenuRef}>
@@ -2226,7 +2232,7 @@ export default function App() {
       )}
       
       {currentModelId && !isPresenting && (
-        <div className={`absolute left-4 z-40 max-w-[90vw] pointer-events-none transition-all duration-500 ease-in-out ${isToolsPanelOpen ? 'top-20 opacity-100' : 'top-4 opacity-0'}`}>
+        <div className={`absolute left-4 z-[500] max-w-[90vw] pointer-events-none transition-all duration-500 ease-in-out ${isToolsPanelOpen ? 'top-20 opacity-100' : 'top-4 opacity-0'}`}>
             <div className="flex flex-wrap items-start gap-2 pointer-events-auto">
                 
                 {/* Big Spanner Toggle */}
@@ -2262,6 +2268,7 @@ export default function App() {
                     onLinkDistanceChange={(val) => setLayoutParams(p => ({...p, linkDistance: val}))}
                     onRepulsionChange={(val) => setLayoutParams(p => ({...p, repulsion: val}))}
                     onJiggle={() => setJiggleTrigger(prev => prev + 1)}
+                    onZoomToFit={handleZoomToFit}
                     isPhysicsActive={isPhysicsModeActive}
                     onStartAutoLayout={handleStartPhysicsLayout}
                     onAcceptAutoLayout={handleAcceptLayout}
