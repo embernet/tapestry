@@ -15,3 +15,5 @@ export * from './OpenModelModal';
 export * from './SchemaUpdateModal';
 export * from './SelfTestModal';
 export * from './UserGuideModal';
+export * from './AiDisclaimer';
+export * from './CreatorInfo';

@@ -46,7 +46,7 @@ import HistoryPanel from './components/HistoryPanel';
 import HistoryItemPanel from './components/HistoryItemPanel';
 import { DocumentManagerPanel, DocumentEditorPanel } from './components/DocumentPanel';
 import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe, generateSelectionReport, callAI, AIConfig } from './utils';
-import { TextAnimator, ConflictResolutionModal, ContextMenu, CanvasContextMenu, CreateModelModal, SaveAsModal, OpenModelModal, HelpMenu, PatternGalleryModal, AboutModal, TAPESTRY_PATTERNS, TapestryBanner, SchemaUpdateModal, SelfTestModal, TestLog, UserGuideModal } from './components/ModalComponents';
+import { TextAnimator, ConflictResolutionModal, ContextMenu, CanvasContextMenu, CreateModelModal, SaveAsModal, OpenModelModal, HelpMenu, PatternGalleryModal, AboutModal, TAPESTRY_PATTERNS, TapestryBanner, SchemaUpdateModal, SelfTestModal, TestLog, UserGuideModal, AiDisclaimer, CreatorInfo } from './components/ModalComponents';
 
 // Explicitly define coordinate type to fix type inference issues
 type Coords = { x: number; y: number };
@@ -2659,7 +2659,7 @@ export default function App() {
           analysisHighlights={analysisHighlights}
         />
       ) : (
-        <div className="w-full h-full flex-col items-center justify-center bg-gray-900 text-white space-y-10 p-8 flex">
+        <div className="w-full h-full flex-col items-center justify-center bg-gray-900 text-white space-y-10 p-8 flex relative">
              <div className="text-center space-y-2">
                 <div className="flex items-center justify-center gap-4">
                     <TapestryBanner />
@@ -2684,8 +2684,15 @@ export default function App() {
                     <span className="text-sm text-gray-500 mt-2 text-center px-4 group-hover:text-gray-400">Open a JSON file from Disk</span>
                 </button>
              </div>
+
+             <div className="w-[600px] text-center space-y-4">
+                 <p className="font-bold text-blue-400">This project is in Alpha release and is in active development.</p>
+                 <p className="text-gray-300 text-lg leading-relaxed">Tapestry is a knowledge graph editor that brings together many engineering, business, creativity, and innovation tools and uses AI to bring them to life.</p>
+                 <AiDisclaimer />
+             </div>
+
              {modelsIndex.length > 0 && (
-                 <div className="mt-8 w-full max-w-2xl">
+                 <div className="mt-4 w-full max-w-2xl">
                     <div className="flex items-center justify-between mb-4 px-2">
                         <h3 className="text-lg font-semibold text-gray-400">Recent Models (Recovered)</h3>
                     </div>
@@ -2702,6 +2709,7 @@ export default function App() {
                      </div>
                  </div>
              )}
+             <CreatorInfo className="mt-8" />
         </div>
       )}
 
@@ -2804,5 +2812,3 @@ export default function App() {
     </div>
   );
 }
-
-                
