@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram } from './types';
 import { DEFAULT_COLOR_SCHEMES, LINK_DISTANCE, DEFAULT_SYSTEM_PROMPT_CONFIG, TAGLINES, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
@@ -28,6 +27,7 @@ import SsmModal from './components/SsmModal';
 import ExplorerToolbar from './components/ExplorerToolbar';
 import { TreemapPanel, TagDistributionPanel, RelationshipDistributionPanel } from './components/ExplorerModal';
 import { SunburstPanel } from './components/SunburstPanel';
+import { SelectiveExpansionPanel } from './components/SelectiveExpansionPanel';
 import TagCloudToolbar from './components/TagCloudToolbar';
 import { TagCloudPanel } from './components/TagCloudModal';
 import SwotToolbar from './components/SwotToolbar';
@@ -166,6 +166,9 @@ export default function App() {
   const [isRelDistPanelOpen, setIsRelDistPanelOpen] = useState(false);
   const [isSunburstPanelOpen, setIsSunburstPanelOpen] = useState(false);
   const [sunburstState, setSunburstState] = useState<{ active: boolean, centerId: string | null, hops: number }>({ active: false, centerId: null, hops: 0 });
+  
+  const [isSelectiveExpansionOpen, setIsSelectiveExpansionOpen] = useState(false);
+  const [selectiveExpansionState, setSelectiveExpansionState] = useState<{ active: boolean, centerId: string | null, expandedIds: Set<string>, physicsEnabled: boolean }>({ active: false, centerId: null, expandedIds: new Set(), physicsEnabled: true });
 
   // --- Tag Cloud State ---
   const [isConceptCloudOpen, setIsConceptCloudOpen] = useState(false);
@@ -199,6 +202,18 @@ export default function App() {
   const [isSelfTestModalOpen, setIsSelfTestModalOpen] = useState(false);
   const [testLogs, setTestLogs] = useState<TestLog[]>([]);
   const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'complete'>('idle');
+
+  // --- Panel System State ---
+  const [panelLayouts, setPanelLayouts] = useState<Record<string, PanelLayout>>({});
+  const [activeDockedPanelId, setActiveDockedPanelId] = useState<string | null>(null);
+  const [panelZIndex, setPanelZIndex] = useState(100);
+
+  // Floating Panel State
+  const [floatingPanelPos, setFloatingPanelPos] = useState<{x: number, y: number} | null>(null);
+  const dragStartRef = useRef<{x: number, y: number} | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Details Panel State (from User Request: drag details panel)
+  const [detailsPanelPosition, setDetailsPanelPosition] = useState<{x: number, y: number} | null>(null);
 
   // Calculate active configuration for AI calls
   const aiConfig = useMemo<AIConfig>(() => {
@@ -303,7 +318,7 @@ export default function App() {
               }
           }));
       }
-  }, [detachedHistoryIds]);
+  }, [detachedHistoryIds, panelZIndex]);
 
   // --- Tool Opening Logic (AI or History) ---
   const handleOpenTool = useCallback((tool: string, subTool?: string) => {
@@ -330,6 +345,16 @@ export default function App() {
           else if (subTool === 'tags') setIsTagDistPanelOpen(true);
           else if (subTool === 'relationships') setIsRelDistPanelOpen(true);
           else if (subTool === 'sunburst') setIsSunburstPanelOpen(true);
+          else if (subTool === 'selective_expansion') {
+              setIsSelectiveExpansionOpen(true);
+              // Force floating layout for selective expansion when opened from AI
+              const nextZ = panelZIndex + 1;
+              setPanelZIndex(nextZ);
+              setPanelLayouts(prev => ({
+                  ...prev,
+                  'selective_expansion': { x: 20, y: 100, w: 260, h: 450, zIndex: nextZ, isFloating: true }
+              }));
+          }
           else setIsTreemapPanelOpen(true); // Default
       } else if (tool === 'tagcloud') {
           if (subTool === 'tags') setIsConceptCloudOpen(true);
@@ -344,7 +369,7 @@ export default function App() {
       } else if (tool === 'mermaid') {
           setIsMermaidPanelOpen(true);
       }
-  }, []);
+  }, [panelZIndex]);
 
   const handleReopenHistory = useCallback((entry: HistoryEntry) => {
       const toolId = entry.tool.split(':')[0].toLowerCase().trim(); 
@@ -379,7 +404,12 @@ export default function App() {
           setIsScamperModalOpen(true);
       } else if (toolId.includes('explorer')) {
           setActiveTool('explorer');
-          handleExplorerToolSelect((subTool as ExplorerToolType) || 'treemap');
+          // For selective expansion in history, manually call the handler to ensure floating setup
+          if (subTool === 'selective_expansion') {
+              handleOpenTool('explorer', 'selective_expansion');
+          } else {
+              handleExplorerToolSelect((subTool as ExplorerToolType) || 'treemap');
+          }
       } else if (toolId.includes('tagcloud') || toolId.includes('word')) {
           setActiveTool('tagcloud');
           handleTagCloudToolSelect((subTool as TagCloudToolType) || 'tags');
@@ -393,7 +423,7 @@ export default function App() {
           setIsMermaidPanelOpen(true);
       }
       setIsToolsPanelOpen(true);
-  }, []);
+  }, [handleOpenTool]);
 
   const handleTrizToolSelect = (tool: TrizToolType) => {
       setActiveTrizTool(tool);
@@ -427,6 +457,31 @@ export default function App() {
           setIsSunburstPanelOpen(prev => !prev);
           // Reset sunburst state if opening
           setSunburstState(prev => ({ ...prev, active: true }));
+      }
+      if (tool === 'selective_expansion') {
+          const willOpen = !isSelectiveExpansionOpen;
+          setIsSelectiveExpansionOpen(willOpen);
+          if (willOpen) {
+              // Set as floating panel with narrow width by default
+              const nextZ = panelZIndex + 1;
+              setPanelZIndex(nextZ);
+              setPanelLayouts(prev => ({
+                  ...prev,
+                  'selective_expansion': { x: 20, y: 100, w: 260, h: 450, zIndex: nextZ, isFloating: true }
+              }));
+
+              setSelectiveExpansionState(prev => ({ ...prev, active: true }));
+              // Ensure physics follows the tool preference
+              setIsPhysicsModeActive(selectiveExpansionState.physicsEnabled);
+          } else {
+              setSelectiveExpansionState(prev => ({ ...prev, active: false }));
+              // Restore layout if it was saved (handled in close logic usually)
+              if (originalElements) {
+                  setElements(originalElements);
+                  setOriginalElements(null);
+                  setIsPhysicsModeActive(false);
+              }
+          }
       }
       setActiveTool(null); // Close the toolbar
   };
@@ -526,18 +581,6 @@ export default function App() {
   const importFileRef = useRef<HTMLInputElement>(null);
   const currentFileHandleRef = useRef<any>(null);
   
-  // Panel System State (Lifted from RightPanelContainer)
-  const [panelLayouts, setPanelLayouts] = useState<Record<string, PanelLayout>>({});
-  const [activeDockedPanelId, setActiveDockedPanelId] = useState<string | null>(null);
-  const [panelZIndex, setPanelZIndex] = useState(100);
-
-  // Floating Panel State
-  const [floatingPanelPos, setFloatingPanelPos] = useState<{x: number, y: number} | null>(null);
-  const dragStartRef = useRef<{x: number, y: number} | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  // Details Panel State (from User Request: drag details panel)
-  const [detailsPanelPosition, setDetailsPanelPosition] = useState<{x: number, y: number} | null>(null);
-
   // --- Self Test Runner ---
   const runSelfTest = async () => {
       setIsSelfTestModalOpen(true);
@@ -561,6 +604,7 @@ export default function App() {
           setIsTagDistPanelOpen(false);
           setIsRelDistPanelOpen(false);
           setIsSunburstPanelOpen(false);
+          setIsSelectiveExpansionOpen(false);
           setIsConceptCloudOpen(false);
           setIsInfluenceCloudOpen(false);
           setIsTextAnalysisOpen(false);
@@ -630,6 +674,7 @@ export default function App() {
           { name: 'Mermaid Diagrams', open: () => setIsMermaidPanelOpen(true), close: () => setIsMermaidPanelOpen(false), id: 'panel-mermaid' },
           { name: 'Treemap', open: () => setIsTreemapPanelOpen(true), close: () => setIsTreemapPanelOpen(false), id: 'panel-treemap' },
           { name: 'Sunburst', open: () => setIsSunburstPanelOpen(true), close: () => setIsSunburstPanelOpen(false), id: 'panel-sunburst' },
+          { name: 'Selective Expansion', open: () => setIsSelectiveExpansionOpen(true), close: () => setIsSelectiveExpansionOpen(false), id: 'panel-selective_expansion' },
           { name: 'Tag Cloud', open: () => setIsConceptCloudOpen(true), close: () => setIsConceptCloudOpen(false), id: 'panel-concept-cloud' },
       ];
 
@@ -708,10 +753,76 @@ export default function App() {
       return visibleIds;
   }, [relationships]);
 
+  // --- Selective Expansion Logic ---
+  const getSelectiveExpansionNodes = useCallback((centerId: string, expandedIds: Set<string>) => {
+      const visibleIds = new Set<string>([centerId]);
+      // Add neighbors of expanded nodes
+      relationships.forEach(rel => {
+          if (expandedIds.has(rel.source as string)) visibleIds.add(rel.target as string);
+          if (expandedIds.has(rel.target as string)) visibleIds.add(rel.source as string);
+      });
+      // Ensure center is always visible (redundant but safe)
+      visibleIds.add(centerId);
+      return visibleIds;
+  }, [relationships]);
+
+  // --- Visual Highlighting Update for Selective Expansion ---
+  useEffect(() => {
+      if (isSelectiveExpansionOpen && selectiveExpansionState.active && selectiveExpansionState.centerId) {
+          const newHighlights = new Map<string, string>();
+          const centerId = selectiveExpansionState.centerId;
+          const expandedIds = selectiveExpansionState.expandedIds;
+          
+          // Color Scheme
+          const COLOR_CENTER = '#f97316'; // Orange (matches Sunburst center)
+          const COLOR_EXPANDED = '#22c55e'; // Green (Active)
+          const COLOR_COMPLETED = '#000000'; // Black (Fully Expanded - Dead End)
+          
+          // Iterate all visible nodes
+          const visibleIds = getSelectiveExpansionNodes(centerId, expandedIds);
+          
+          visibleIds.forEach(id => {
+              // Logic: A node is "completed" (black) if ALL its neighbors are currently visible.
+              // It is "expanded" (green) if it is in the expandedIds set (meaning user clicked it).
+              
+              // 1. Get all neighbors for this node from full graph
+              const allNeighbors = relationships.filter(r => r.source === id || r.target === id)
+                                                .map(r => r.source === id ? r.target as string : r.source as string);
+              
+              // 2. Check if any neighbor is hidden (not in visibleIds)
+              const hasHiddenNeighbors = allNeighbors.some(neighborId => !visibleIds.has(neighborId));
+
+              if (id === centerId) {
+                  newHighlights.set(id, COLOR_CENTER);
+              } else if (!hasHiddenNeighbors) {
+                  // If no hidden neighbors, node is fully revealed -> Black
+                  newHighlights.set(id, COLOR_COMPLETED);
+              } else if (expandedIds.has(id)) {
+                  // If expanded (user clicked) but still has hidden (e.g. if expansion logic changes, usually won't happen in this mode as expansion reveals all neighbors, but good for safety or deeper hops logic later)
+                  newHighlights.set(id, COLOR_EXPANDED);
+              }
+              // Else: Node is visible but not expanded and has hidden neighbors -> Default (no highlight, indicates clickable)
+          });
+          setAnalysisHighlights(newHighlights);
+      } else if (!isSelectiveExpansionOpen) {
+          // Clear highlights if tool closed (and not used by other tools)
+          if (!isSimulationMode) {
+             setAnalysisHighlights(new Map());
+          }
+      }
+  }, [isSelectiveExpansionOpen, selectiveExpansionState, getSelectiveExpansionNodes, isSimulationMode, relationships]);
+
+
   const filteredElements = useMemo(() => { 
       // --- Sunburst Filtering ---
       if (isSunburstPanelOpen && sunburstState.active && sunburstState.centerId) {
           const visibleIds = getSunburstNodes(sunburstState.centerId, sunburstState.hops);
+          return elements.filter(e => visibleIds.has(e.id));
+      }
+
+      // --- Selective Expansion Filtering ---
+      if (isSelectiveExpansionOpen && selectiveExpansionState.active && selectiveExpansionState.centerId) {
+          const visibleIds = getSelectiveExpansionNodes(selectiveExpansionState.centerId, selectiveExpansionState.expandedIds);
           return elements.filter(e => visibleIds.has(e.id));
       }
 
@@ -742,7 +853,7 @@ export default function App() {
           if (element.tags.length === 0) return true; 
           return element.tags.some(tag => included.has(tag)); 
       }); 
-  }, [elements, tagFilter, allTags, dateFilter, analysisFilterState, isSunburstPanelOpen, sunburstState, getSunburstNodes]);
+  }, [elements, tagFilter, allTags, dateFilter, analysisFilterState, isSunburstPanelOpen, sunburstState, getSunburstNodes, isSelectiveExpansionOpen, selectiveExpansionState, getSelectiveExpansionNodes]);
 
   const filteredRelationships = useMemo(() => { const { included, excluded } = tagFilter; const visibleElementIds = new Set(filteredElements.map(f => f.id)); return relationships.filter(rel => visibleElementIds.has(rel.source as string) && visibleElementIds.has(rel.target as string)); }, [relationships, filteredElements, tagFilter, allTags]);
 
@@ -1328,6 +1439,77 @@ export default function App() {
           return;
       }
       
+      if (isSelectiveExpansionOpen && selectiveExpansionState.active) {
+          // If no center, set center
+          if (!selectiveExpansionState.centerId) {
+               // Center selection logic: Save layout if needed, pin node if in physics mode
+               if (selectiveExpansionState.physicsEnabled) {
+                   const cx = window.innerWidth / 2;
+                   const cy = window.innerHeight / 2;
+                   
+                   if (!originalElements) {
+                       setOriginalElements(elements);
+                   }
+
+                   setElements(prev => prev.map(e => {
+                      if (e.id === elementId) {
+                          // Pin center in physics mode
+                          return { ...e, x: cx, y: cy, fx: cx, fy: cy, vx: 0, vy: 0 };
+                      }
+                      // Free others in physics mode
+                      return { ...e, fx: null, fy: null };
+                   }));
+                   
+                   setIsPhysicsModeActive(true);
+               } else {
+                   // Static mode: Ensure physics is OFF
+                   setIsPhysicsModeActive(false);
+                   
+                   // Center camera on the node
+                   const node = elements.find(e => e.id === elementId);
+                   if (node && graphCanvasRef.current) {
+                        const currentCamera = graphCanvasRef.current.getCamera();
+                        const k = currentCamera.k;
+                        const tx = (window.innerWidth / 2) - (node.x || 0) * k;
+                        const ty = (window.innerHeight / 2) - (node.y || 0) * k;
+                        graphCanvasRef.current.setCamera(tx, ty, k);
+                   }
+               }
+
+               setSelectiveExpansionState(prev => {
+                   const newExpanded = new Set(prev.expandedIds);
+                   newExpanded.add(elementId); // Auto-expand center
+                   return { ...prev, centerId: elementId, expandedIds: newExpanded };
+               });
+               return;
+          }
+          
+          // Toggle expansion
+          setSelectiveExpansionState(prev => {
+               const newExpanded = new Set(prev.expandedIds);
+               if (newExpanded.has(elementId)) {
+                   newExpanded.delete(elementId);
+               } else {
+                   newExpanded.add(elementId);
+               }
+               return { ...prev, expandedIds: newExpanded };
+          });
+          
+          // In static mode, re-center camera on the newly expanded node if expanding
+          if (!selectiveExpansionState.physicsEnabled && !selectiveExpansionState.expandedIds.has(elementId)) {
+               const node = elements.find(e => e.id === elementId);
+               if (node && graphCanvasRef.current) {
+                    const currentCamera = graphCanvasRef.current.getCamera();
+                    const k = currentCamera.k;
+                    const tx = (window.innerWidth / 2) - (node.x || 0) * k;
+                    const ty = (window.innerHeight / 2) - (node.y || 0) * k;
+                    graphCanvasRef.current.setCamera(tx, ty, k);
+               }
+          }
+          
+          return;
+      }
+      
       // Sunburst Activation Logic
       if (isSunburstPanelOpen && sunburstState.active) {
           // 1. Save layout if not saved (and this is the first center selection)
@@ -1394,7 +1576,7 @@ export default function App() {
       setSelectedRelationshipId(null); 
       setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); 
       handleCloseContextMenu(); 
-  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState, multiSelection, selectedElementId, isSunburstPanelOpen, sunburstState, elements, originalElements]);
+  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState, multiSelection, selectedElementId, isSunburstPanelOpen, sunburstState, elements, originalElements, isSelectiveExpansionOpen, selectiveExpansionState]);
   
   const handleLinkClick = useCallback((relationshipId: string) => { setSelectedRelationshipId(relationshipId); setSelectedElementId(null); setMultiSelection(new Set()); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); }, [handleCloseContextMenu]);
   const handleCanvasClick = useCallback(() => { setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseCanvasContextMenu(); setAnalysisHighlights(new Map()); }, [handleCloseContextMenu, handleCloseCanvasContextMenu]);
@@ -1707,7 +1889,7 @@ export default function App() {
   const addRelationshipSourceElement = useMemo(() => elements.find(f => f.id === panelState.sourceElementId), [elements, panelState.sourceElementId]);
   const activeColorScheme = useMemo(() => { const current = colorSchemes.find(s => s.id === activeSchemeId); if (!current) return undefined; const defaultScheme = DEFAULT_COLOR_SCHEMES.find(d => d.id === current.id); if (defaultScheme) { const mergedTags = { ...defaultScheme.tagColors, ...current.tagColors }; const currentDefs = current.relationshipDefinitions || []; const defaultDefs = defaultScheme.relationshipDefinitions || []; const combinedDefsMap = new Map<string, RelationshipDefinition>(); defaultDefs.forEach(d => combinedDefsMap.set(d.label, d)); currentDefs.forEach(d => combinedDefsMap.set(d.label, d)); const mergedDefinitions = Array.from(combinedDefsMap.values()); const mergedDefaultLabel = current.defaultRelationshipLabel || defaultScheme.defaultRelationshipLabel; return { ...current, tagColors: mergedTags, relationshipDefinitions: mergedDefinitions, defaultRelationshipLabel: mergedDefaultLabel }; } return current; }, [colorSchemes, activeSchemeId]);
   const activeRelationshipLabels = useMemo(() => { return activeColorScheme?.relationshipDefinitions?.map(d => d.label) || []; }, [activeColorScheme]);
-  const isRightPanelOpen = isReportPanelOpen || isMarkdownPanelOpen || isJSONPanelOpen || isMatrixPanelOpen || isTablePanelOpen || isGridPanelOpen || isDocumentPanelOpen || isHistoryPanelOpen || isKanbanPanelOpen || isPresentationPanelOpen || isMermaidPanelOpen || isTreemapPanelOpen || isTagDistPanelOpen || isRelDistPanelOpen || isSunburstPanelOpen || isConceptCloudOpen || isInfluenceCloudOpen || isTextAnalysisOpen || isFullTextAnalysisOpen || openDocIds.length > 0 || detachedHistoryIds.length > 0;
+  const isRightPanelOpen = isReportPanelOpen || isMarkdownPanelOpen || isJSONPanelOpen || isMatrixPanelOpen || isTablePanelOpen || isGridPanelOpen || isDocumentPanelOpen || isHistoryPanelOpen || isKanbanPanelOpen || isPresentationPanelOpen || isMermaidPanelOpen || isTreemapPanelOpen || isTagDistPanelOpen || isRelDistPanelOpen || isSunburstPanelOpen || isConceptCloudOpen || isInfluenceCloudOpen || isTextAnalysisOpen || isFullTextAnalysisOpen || isSelectiveExpansionOpen || openDocIds.length > 0 || detachedHistoryIds.length > 0;
 
   // --- New Command Handlers ---
   const handleOpenCommandHistory = useCallback(() => {
@@ -1874,6 +2056,68 @@ export default function App() {
                 }
             }
         },
+        {
+            id: 'selective_expansion',
+            title: 'Selective Expansion',
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01" /></svg>,
+            content: <SelectiveExpansionPanel
+                        centerNodeName={elements.find(e => e.id === selectiveExpansionState.centerId)?.name || null}
+                        expandedCount={selectiveExpansionState.expandedIds.size}
+                        visibleCount={filteredElements.length}
+                        onRestart={() => {
+                            setSelectiveExpansionState(prev => ({ ...prev, centerId: null, expandedIds: new Set() }));
+                            if (originalElements) {
+                                setElements(originalElements);
+                                setOriginalElements(null);
+                            }
+                        }}
+                        onClose={() => {
+                            setIsSelectiveExpansionOpen(false);
+                            setSelectiveExpansionState(prev => ({ ...prev, active: false }));
+                            setIsPhysicsModeActive(false);
+                            if (originalElements) {
+                                setElements(originalElements);
+                                setOriginalElements(null);
+                            }
+                        }}
+                        physicsEnabled={selectiveExpansionState.physicsEnabled}
+                        onTogglePhysics={() => {
+                             setSelectiveExpansionState(prev => {
+                                 const next = !prev.physicsEnabled;
+                                 // Only update global physics active state if the tool is actually open and active
+                                 if (isSelectiveExpansionOpen && prev.active) {
+                                     setIsPhysicsModeActive(next);
+                                 }
+                                 return { ...prev, physicsEnabled: next };
+                             });
+                        }}
+                     />,
+            isOpen: isSelectiveExpansionOpen,
+            onToggle: () => {
+                const willOpen = !isSelectiveExpansionOpen;
+                setIsSelectiveExpansionOpen(willOpen);
+                if (willOpen) {
+                    // Set as floating panel with narrow width by default
+                    const nextZ = panelZIndex + 1;
+                    setPanelZIndex(nextZ);
+                    setPanelLayouts(prev => ({
+                        ...prev,
+                        'selective_expansion': { x: 20, y: 100, w: 260, h: 450, zIndex: nextZ, isFloating: true }
+                    }));
+
+                    setSelectiveExpansionState(prev => ({ ...prev, active: true }));
+                    // Set initial physics state based on saved preference
+                    setIsPhysicsModeActive(selectiveExpansionState.physicsEnabled);
+                } else {
+                    setSelectiveExpansionState(prev => ({ ...prev, active: false }));
+                    setIsPhysicsModeActive(false);
+                    if (originalElements) {
+                        setElements(originalElements);
+                        setOriginalElements(null);
+                    }
+                }
+            }
+        },
         { 
             id: 'tag-dist', 
             title: 'Tag Distribution', 
@@ -1938,7 +2182,7 @@ export default function App() {
     }).filter((p): p is PanelDefinition => p !== null);
 
     return [...staticPanels, ...docPanels, ...historyItemPanels];
-  }, [ isReportPanelOpen, isDocumentPanelOpen, isTablePanelOpen, isMatrixPanelOpen, isGridPanelOpen, isMarkdownPanelOpen, isJSONPanelOpen, isHistoryPanelOpen, isKanbanPanelOpen, isPresentationPanelOpen, isMermaidPanelOpen, isMermaidGenerating, isTreemapPanelOpen, isTagDistPanelOpen, isRelDistPanelOpen, isSunburstPanelOpen, sunburstState, isConceptCloudOpen, isInfluenceCloudOpen, isTextAnalysisOpen, isFullTextAnalysisOpen, filteredElements, filteredRelationships, elements, relationships, documents, folders, openDocIds, currentModelName, activeColorScheme, history, slides, mermaidDiagrams, detachedHistoryIds, handleNodeClick, handleUpdateElement, handleDeleteElement, handleAddElementFromName, handleAddRelationshipDirect, handleDeleteRelationship, handleApplyMarkdown, handleApplyJSON, handleOpenDocument, handleCreateFolder, handleCreateDocument, handleDeleteDocument, handleDeleteFolder, handleUpdateDocument, handleDetachHistory, handleReopenHistory, handleAnalyzeWithChat, handleDeleteHistory, aiActions, handleCaptureSlide, handlePlayPresentation, handleSaveMermaidDiagram, handleDeleteMermaidDiagram, handleGenerateMermaid, selectedElementId, multiSelection, getSunburstNodes ]);
+  }, [ isReportPanelOpen, isDocumentPanelOpen, isTablePanelOpen, isMatrixPanelOpen, isGridPanelOpen, isMarkdownPanelOpen, isJSONPanelOpen, isHistoryPanelOpen, isKanbanPanelOpen, isPresentationPanelOpen, isMermaidPanelOpen, isMermaidGenerating, isTreemapPanelOpen, isTagDistPanelOpen, isRelDistPanelOpen, isSunburstPanelOpen, sunburstState, isSelectiveExpansionOpen, selectiveExpansionState, isConceptCloudOpen, isInfluenceCloudOpen, isTextAnalysisOpen, isFullTextAnalysisOpen, filteredElements, filteredRelationships, elements, relationships, documents, folders, openDocIds, currentModelName, activeColorScheme, history, slides, mermaidDiagrams, detachedHistoryIds, handleNodeClick, handleUpdateElement, handleDeleteElement, handleAddElementFromName, handleAddRelationshipDirect, handleDeleteRelationship, handleApplyMarkdown, handleApplyJSON, handleOpenDocument, handleCreateFolder, handleCreateDocument, handleDeleteDocument, handleDeleteFolder, handleUpdateDocument, handleDetachHistory, handleReopenHistory, handleAnalyzeWithChat, handleDeleteHistory, aiActions, handleCaptureSlide, handlePlayPresentation, handleSaveMermaidDiagram, handleDeleteMermaidDiagram, handleGenerateMermaid, selectedElementId, multiSelection, getSunburstNodes, getSelectiveExpansionNodes ]);
 
   if (isInitialLoad && !isCreateModelModalOpen) { return ( <div className="w-screen h-screen flex items-center justify-center bg-gray-900 text-white"> Loading... </div> ); }
   const focusButtonTitle = () => { if (focusMode === 'narrow') return 'Switch to Wide Focus'; if (focusMode === 'wide') return 'Switch to Zoom Focus'; return 'Switch to Narrow Focus'; };
@@ -2064,6 +2308,7 @@ export default function App() {
                                     { label: 'Report', state: isReportPanelOpen, toggle: () => setIsReportPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
                                     { label: 'Tag Cloud', state: isConceptCloudOpen, toggle: () => setIsConceptCloudOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg> },
                                     { label: 'Sunburst', state: isSunburstPanelOpen, toggle: () => { setIsSunburstPanelOpen(p => !p); if(isSunburstPanelOpen) setSunburstState(prev => ({...prev, active: false})); else setSunburstState(prev => ({...prev, active: true})); }, icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg> },
+                                    { label: 'Selective Expansion', state: isSelectiveExpansionOpen, toggle: () => { setIsSelectiveExpansionOpen(p => !p); if(isSelectiveExpansionOpen) setSelectiveExpansionState(prev => ({...prev, active: false})); else setSelectiveExpansionState(prev => ({...prev, active: true})); }, icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
                                     { label: 'Relationship Cloud', state: isInfluenceCloudOpen, toggle: () => setIsInfluenceCloudOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg> },
                                     { label: 'Node Name Analysis', state: isTextAnalysisOpen, toggle: () => setIsTextAnalysisOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
                                     { label: 'Full Text Analysis', state: isFullTextAnalysisOpen, toggle: () => setIsFullTextAnalysisOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg> },
@@ -2696,48 +2941,49 @@ export default function App() {
              {modelsIndex.length > 0 && (
                  <div className="mt-4 w-full max-w-2xl">
                     <div className="flex items-center justify-between mb-4 px-2">
-                        <h3 className="text-lg font-semibold text-gray-400">Recent Models (Recovered)</h3>
+                        <h3 className="text-gray-400 font-bold uppercase tracking-wider text-xs">Recent Models (Browser Storage)</h3>
+                        <button onClick={() => setIsOpenModelModalOpen(true)} className="text-xs text-blue-400 hover:text-blue-300">View All</button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {modelsIndex.slice(0, 4).map(model => (
-                             <button key={model.id} onClick={() => handleLoadModel(model.id)} className="bg-gray-800 hover:bg-gray-700 border border-gray-700 p-4 rounded-lg text-left transition group flex flex-col">
-                                <span className="font-medium text-gray-200 group-hover:text-blue-400 transition-colors">{model.name}</span>
-                                <span className="text-xs text-gray-500 mt-1">Last updated: {new Date(model.updatedAt).toLocaleDateString()}</span>
-                             </button>
+                    <div className="grid grid-cols-1 gap-2">
+                        {modelsIndex.slice(-3).reverse().map(m => (
+                            <button 
+                                key={m.id} 
+                                onClick={() => handleLoadModel(m.id)}
+                                className="flex items-center justify-between p-4 bg-gray-800 border border-gray-700 rounded-lg hover:border-blue-500 hover:bg-gray-750 transition-all group text-left"
+                            >
+                                <div>
+                                    <div className="font-bold text-gray-200 group-hover:text-white">{m.name}</div>
+                                    <div className="text-xs text-gray-500 mt-1">{new Date(m.updatedAt).toLocaleDateString()} • {m.description || "No description"}</div>
+                                </div>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-600 group-hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                            </button>
                         ))}
                     </div>
-                     <div className="text-center mt-4">
-                        <button onClick={() => setIsOpenModelModalOpen(true)} className="text-sm text-blue-400 hover:text-blue-300 hover:underline">View All Recovered Models</button>
-                     </div>
                  </div>
              )}
-             <CreatorInfo className="mt-8" />
         </div>
       )}
 
-      {contextMenu && currentModelId && (
-        <ContextMenu
-          x={contextMenu.x}
-          y={contextMenu.y}
-          onClose={handleCloseContextMenu}
-          onAddRelationship={() => {
-            setPanelState({ view: 'addRelationship', sourceElementId: contextMenu.elementId, targetElementId: null, isNewTarget: false });
-            setSelectedElementId(null);
-            setMultiSelection(new Set());
-            setSelectedRelationshipId(null);
-            handleCloseContextMenu();
-          }}
-          onDeleteElement={() => {
-             handleDeleteElement(contextMenu.elementId);
-             handleCloseContextMenu();
-          }}
-        />
+      {isCreateModelModalOpen && <CreateModelModal onCreate={handleCreateModel} onClose={() => setIsCreateModelModalOpen(false)} isInitialSetup={!currentModelId && modelsIndex.length === 0} />}
+      {isSaveAsModalOpen && currentModelId && <SaveAsModal currentName={currentModelName} currentDesc={modelsIndex.find(m => m.id === currentModelId)?.description || ''} onSave={handleSaveAs} onClose={() => setIsSaveAsModalOpen(false)} />}
+      {isOpenModelModalOpen && <OpenModelModal models={modelsIndex} onLoad={handleLoadModel} onClose={() => setIsOpenModelModalOpen(false)} onTriggerCreate={() => { setIsOpenModelModalOpen(false); setIsCreateModelModalOpen(true); }} />}
+      {isAboutModalOpen && <AboutModal onClose={() => setIsAboutModalOpen(false)} />}
+      {isPatternGalleryModalOpen && <PatternGalleryModal onClose={() => setIsPatternGalleryModalOpen(false)} />}
+      
+      {/* Context Menus */}
+      {contextMenu && (
+          <ContextMenu 
+            x={contextMenu.x} 
+            y={contextMenu.y} 
+            onClose={handleCloseContextMenu}
+            onAddRelationship={() => { setPanelState({ view: 'addRelationship', sourceElementId: contextMenu.elementId, targetElementId: null, isNewTarget: false }); setSelectedElementId(null); setSelectedRelationshipId(null); }}
+            onDeleteElement={() => handleDeleteElement(contextMenu.elementId)}
+          />
       )}
-
-      {canvasContextMenu && currentModelId && (
-        <CanvasContextMenu
-            x={canvasContextMenu.x}
-            y={canvasContextMenu.y}
+      {canvasContextMenu && (
+          <CanvasContextMenu 
+            x={canvasContextMenu.x} 
+            y={canvasContextMenu.y} 
             onClose={handleCloseCanvasContextMenu}
             onZoomToFit={handleZoomToFit}
             onAutoLayout={handleStartPhysicsLayout}
@@ -2745,72 +2991,53 @@ export default function App() {
             onToggleMarkdown={() => setIsMarkdownPanelOpen(p => !p)}
             onToggleJSON={() => setIsJSONPanelOpen(p => !p)}
             onToggleFilter={() => setIsFilterPanelOpen(p => !p)}
-            onToggleMatrix={() => setIsMatrixPanelOpen(p => !p)}
             onToggleTable={() => setIsTablePanelOpen(p => !p)}
+            onToggleMatrix={() => setIsMatrixPanelOpen(p => !p)}
             onToggleGrid={() => setIsGridPanelOpen(p => !p)}
-            onOpenModel={handleImportClick}
+            onOpenModel={() => setIsOpenModelModalOpen(true)}
+            onCreateModel={() => handleNewModelClick()}
             onSaveModel={handleDiskSave}
-            onCreateModel={handleNewModelClick}
             onSaveAs={() => setIsSaveAsModalOpen(true)}
             isReportOpen={isReportPanelOpen}
             isMarkdownOpen={isMarkdownPanelOpen}
             isJSONOpen={isJSONPanelOpen}
             isFilterOpen={isFilterPanelOpen}
-            isMatrixOpen={isMatrixPanelOpen}
             isTableOpen={isTablePanelOpen}
+            isMatrixOpen={isMatrixPanelOpen}
             isGridOpen={isGridPanelOpen}
-        />
+          />
       )}
 
-      {isCreateModelModalOpen && (
-        <CreateModelModal
-          onCreate={handleCreateModel}
-          onClose={() => setIsCreateModelModalOpen(false)}
-          isInitialSetup={!modelsIndex || modelsIndex.length === 0}
-        />
-      )}
-
-      {isSaveAsModalOpen && (
-        <SaveAsModal
-            currentName={modelsIndex.find(m => m.id === currentModelId)?.name || ''}
-            currentDesc={modelsIndex.find(m => m.id === currentModelId)?.description || ''}
-            onSave={handleSaveAs}
-            onClose={() => setIsSaveAsModalOpen(false)}
-        />
-      )}
-
-      {isOpenModelModalOpen && (
-        <OpenModelModal
-          models={modelsIndex}
-          onLoad={handleLoadModel}
-          onClose={() => setIsOpenModelModalOpen(false)}
-          onTriggerCreate={() => {
-            setIsOpenModelModalOpen(false);
-            setIsCreateModelModalOpen(true);
-          }}
-        />
-      )}
-      
       {pendingImport && (
           <ConflictResolutionModal 
             localMetadata={pendingImport.localMetadata}
             diskMetadata={pendingImport.diskMetadata}
             localData={pendingImport.localData}
             diskData={pendingImport.diskData}
-            onCancel={() => setPendingImport(null)}
-            onChooseLocal={() => {
-                handleLoadModel(pendingImport.localMetadata.id);
+            onCancel={() => { setPendingImport(null); if (importFileRef.current) importFileRef.current.value = ''; currentFileHandleRef.current = null; }}
+            onChooseLocal={() => { setPendingImport(null); if (importFileRef.current) importFileRef.current.value = ''; currentFileHandleRef.current = null; handleLoadModel(pendingImport.localMetadata.id); }}
+            onChooseDisk={() => { 
+                const { diskData, diskMetadata } = pendingImport;
+                // Update index with disk metadata
+                setModelsIndex(prevIndex => {
+                    const exists = prevIndex.find(m => m.id === diskMetadata.id);
+                    if (exists) {
+                        return prevIndex.map(m => m.id === diskMetadata.id ? { ...m, ...diskMetadata } : m);
+                    } else {
+                        return [...prevIndex, diskMetadata];
+                    }
+                });
+                // Save disk data to local storage (overwriting)
+                localStorage.setItem(`${MODEL_DATA_PREFIX}${diskMetadata.id}`, JSON.stringify(diskData));
+                localStorage.setItem(MODELS_INDEX_KEY, JSON.stringify(modelsIndex)); // This might be stale closure, but the effect handles it usually. Safe to rely on effect or update manually if needed.
+                
                 setPendingImport(null);
-            }}
-            onChooseDisk={() => {
-                loadModelData(pendingImport.diskData, pendingImport.diskMetadata.id, pendingImport.diskMetadata);
-                setPendingImport(null);
+                if (importFileRef.current) importFileRef.current.value = '';
+                // Load
+                loadModelData(diskData, diskMetadata.id, diskMetadata);
             }}
           />
       )}
-
-      {isAboutModalOpen && <AboutModal onClose={() => setIsAboutModalOpen(false)} />}
-      {isPatternGalleryModalOpen && <PatternGalleryModal onClose={() => setIsPatternGalleryModalOpen(false)} />}
     </div>
   );
 }
