@@ -14,3 +14,4 @@ export * from './SaveAsModal';
 export * from './OpenModelModal';
 export * from './SchemaUpdateModal';
 export * from './SelfTestModal';
+export * from './UserGuideModal';

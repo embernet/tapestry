@@ -46,7 +46,7 @@ import HistoryPanel from './components/HistoryPanel';
 import HistoryItemPanel from './components/HistoryItemPanel';
 import { DocumentManagerPanel, DocumentEditorPanel } from './components/DocumentPanel';
 import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe, generateSelectionReport, callAI, AIConfig } from './utils';
-import { TextAnimator, ConflictResolutionModal, ContextMenu, CanvasContextMenu, CreateModelModal, SaveAsModal, OpenModelModal, HelpMenu, PatternGalleryModal, AboutModal, TAPESTRY_PATTERNS, TapestryBanner, SchemaUpdateModal, SelfTestModal, TestLog } from './components/ModalComponents';
+import { TextAnimator, ConflictResolutionModal, ContextMenu, CanvasContextMenu, CreateModelModal, SaveAsModal, OpenModelModal, HelpMenu, PatternGalleryModal, AboutModal, TAPESTRY_PATTERNS, TapestryBanner, SchemaUpdateModal, SelfTestModal, TestLog, UserGuideModal } from './components/ModalComponents';
 
 // Explicitly define coordinate type to fix type inference issues
 type Coords = { x: number; y: number };
@@ -507,6 +507,7 @@ export default function App() {
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isPatternGalleryModalOpen, setIsPatternGalleryModalOpen] = useState(false);
+  const [isUserGuideModalOpen, setIsUserGuideModalOpen] = useState(false);
   const [pendingImport, setPendingImport] = useState<{ localMetadata: ModelMetadata, diskMetadata: ModelMetadata, localData: any, diskData: any } | null>(null);
   const helpMenuRef = useRef<HTMLDivElement>(null);
   useClickOutside(helpMenuRef, () => setIsHelpMenuOpen(false));
@@ -2065,7 +2066,7 @@ export default function App() {
                                 { label: 'History', state: isHistoryPanelOpen, toggle: () => setIsHistoryPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
                                 { label: 'Table', state: isTablePanelOpen, toggle: () => setIsTablePanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" /></svg> },
                                 { label: 'Matrix', state: isMatrixPanelOpen, toggle: () => setIsMatrixPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> },
-                                { label: 'Grid', state: isGridPanelOpen, toggle: () => setIsGridPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7H4v-7z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /></svg> },
+                                { label: 'Grid', state: isGridPanelOpen, toggle: () => setIsGridPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /></svg> },
                                 { label: 'Markdown', state: isMarkdownPanelOpen, toggle: () => setIsMarkdownPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg> },
                                 { label: 'JSON', state: isJSONPanelOpen, toggle: () => setIsJSONPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg> }
                             ].map((panel, idx) => (
@@ -2215,6 +2216,7 @@ export default function App() {
                         onAbout={() => setIsAboutModalOpen(true)}
                         onPatternGallery={() => setIsPatternGalleryModalOpen(true)}
                         onSelfTest={runSelfTest}
+                        onUserGuide={() => setIsUserGuideModalOpen(true)}
                     />
                 )}
                 </div>
@@ -2623,6 +2625,13 @@ export default function App() {
           status={testStatus}
       />
 
+      {/* User Guide Modal */}
+      {isUserGuideModalOpen && (
+          <UserGuideModal 
+            onClose={() => setIsUserGuideModalOpen(false)} 
+          />
+      )}
+
       {currentModelId ? (
         <GraphCanvas
           ref={graphCanvasRef}
@@ -2795,3 +2804,5 @@ export default function App() {
     </div>
   );
 }
+
+                
