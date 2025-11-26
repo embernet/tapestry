@@ -47,7 +47,7 @@ import HistoryItemPanel from './components/HistoryItemPanel';
 import { DocumentManagerPanel, DocumentEditorPanel } from './components/DocumentPanel';
 import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe, generateSelectionReport } from './utils';
 import { GoogleGenAI, Type } from '@google/genai';
-import { TextAnimator, ConflictResolutionModal, ContextMenu, CanvasContextMenu, CreateModelModal, SaveAsModal, OpenModelModal, HelpMenu, PatternGalleryModal, AboutModal, TAPESTRY_PATTERNS, TapestryBanner, SchemaUpdateModal } from './components/ModalComponents';
+import { TextAnimator, ConflictResolutionModal, ContextMenu, CanvasContextMenu, CreateModelModal, SaveAsModal, OpenModelModal, HelpMenu, PatternGalleryModal, AboutModal, TAPESTRY_PATTERNS, TapestryBanner, SchemaUpdateModal, SelfTestModal, TestLog } from './components/ModalComponents';
 
 // Explicitly define coordinate type to fix type inference issues
 type Coords = { x: number; y: number };
@@ -186,6 +186,11 @@ export default function App() {
 
   // --- Internal Clipboard for Copy/Paste ---
   const [internalClipboard, setInternalClipboard] = useState<{ elements: Element[], relationships: Relationship[] } | null>(null);
+
+  // --- Self Test State ---
+  const [isSelfTestModalOpen, setIsSelfTestModalOpen] = useState(false);
+  const [testLogs, setTestLogs] = useState<TestLog[]>([]);
+  const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'complete'>('idle');
 
   // Load Global Settings on Mount
   useEffect(() => {
@@ -511,6 +516,148 @@ export default function App() {
   // Details Panel State (from User Request: drag details panel)
   const [detailsPanelPosition, setDetailsPanelPosition] = useState<{x: number, y: number} | null>(null);
 
+  // --- Self Test Runner ---
+  const runSelfTest = async () => {
+      setIsSelfTestModalOpen(true);
+      setTestStatus('running');
+      setTestLogs([]);
+      
+      // Reset state: Close everything first
+      const resetUI = () => {
+          setIsReportPanelOpen(false);
+          setIsTablePanelOpen(false);
+          setIsMatrixPanelOpen(false);
+          setIsGridPanelOpen(false);
+          setIsKanbanPanelOpen(false);
+          setIsPresentationPanelOpen(false);
+          setIsDocumentPanelOpen(false);
+          setIsHistoryPanelOpen(false);
+          setIsChatPanelOpen(false);
+          setIsMarkdownPanelOpen(false);
+          setIsJSONPanelOpen(false);
+          setIsTreemapPanelOpen(false);
+          setIsTagDistPanelOpen(false);
+          setIsRelDistPanelOpen(false);
+          setIsSunburstPanelOpen(false);
+          setIsConceptCloudOpen(false);
+          setIsInfluenceCloudOpen(false);
+          setIsTextAnalysisOpen(false);
+          setIsFullTextAnalysisOpen(false);
+          setIsMermaidPanelOpen(false);
+          setIsTrizModalOpen(false);
+          setIsScamperModalOpen(false);
+          setIsLssModalOpen(false);
+          setIsTocModalOpen(false);
+          setIsSsmModalOpen(false);
+          setIsSwotModalOpen(false);
+          setActiveTool(null);
+          setPanelLayouts({}); // Reset docking/floating
+      };
+      
+      resetUI();
+      await new Promise(r => setTimeout(r, 500)); // Wait for clear
+
+      const log = (name: string, status: 'running' | 'ok' | 'error' | 'pending', message?: string) => {
+          setTestLogs(prev => {
+              // Update existing log entry if it exists (to change running -> ok/error)
+              const existingIndex = prev.findIndex(l => l.name === name);
+              if (existingIndex >= 0) {
+                  const newLogs = [...prev];
+                  newLogs[existingIndex] = { ...newLogs[existingIndex], status, message };
+                  return newLogs;
+              }
+              // Add new log
+              return [...prev, { id: prev.length + 1, name, status, message }];
+          });
+      };
+
+      const checkElement = (selector: string) => {
+          // Search body text if specific ID not found, or use data-testid
+          const el = document.querySelector(selector);
+          if (el) return true;
+          
+          // Fallback: search for text content in body if checking a modal title
+          if (selector.startsWith('text:')) {
+              return document.body.textContent?.includes(selector.substring(5));
+          }
+          return false;
+      };
+
+      const testPanel = async (name: string, openFn: () => void, closeFn: () => void, checkId: string) => {
+          log(name, 'running');
+          openFn();
+          await new Promise(r => setTimeout(r, 200)); // Render wait
+          const success = checkElement(`[data-testid="${checkId}"]`);
+          log(name, success ? 'ok' : 'error');
+          closeFn();
+          await new Promise(r => setTimeout(r, 50));
+      };
+
+      // Phase 1: Panels (Dockable)
+      const panels = [
+          { name: 'Report Panel', open: () => setIsReportPanelOpen(true), close: () => setIsReportPanelOpen(false), id: 'panel-report' },
+          { name: 'Table View', open: () => setIsTablePanelOpen(true), close: () => setIsTablePanelOpen(false), id: 'panel-table' },
+          { name: 'Matrix View', open: () => setIsMatrixPanelOpen(true), close: () => setIsMatrixPanelOpen(false), id: 'panel-matrix' },
+          { name: 'Grid View', open: () => setIsGridPanelOpen(true), close: () => setIsGridPanelOpen(false), id: 'panel-grid' },
+          { name: 'Documents', open: () => setIsDocumentPanelOpen(true), close: () => setIsDocumentPanelOpen(false), id: 'panel-documents' },
+          { name: 'Kanban', open: () => setIsKanbanPanelOpen(true), close: () => setIsKanbanPanelOpen(false), id: 'panel-kanban' },
+          { name: 'Story Mode', open: () => setIsPresentationPanelOpen(true), close: () => setIsPresentationPanelOpen(false), id: 'panel-presentation' },
+          { name: 'History', open: () => setIsHistoryPanelOpen(true), close: () => setIsHistoryPanelOpen(false), id: 'panel-history' },
+          { name: 'Markdown', open: () => setIsMarkdownPanelOpen(true), close: () => setIsMarkdownPanelOpen(false), id: 'panel-markdown' },
+          { name: 'JSON', open: () => setIsJSONPanelOpen(true), close: () => setIsJSONPanelOpen(false), id: 'panel-json' },
+          { name: 'Mermaid Diagrams', open: () => setIsMermaidPanelOpen(true), close: () => setIsMermaidPanelOpen(false), id: 'panel-mermaid' },
+          { name: 'Treemap', open: () => setIsTreemapPanelOpen(true), close: () => setIsTreemapPanelOpen(false), id: 'panel-treemap' },
+          { name: 'Sunburst', open: () => setIsSunburstPanelOpen(true), close: () => setIsSunburstPanelOpen(false), id: 'panel-sunburst' },
+          { name: 'Tag Cloud', open: () => setIsConceptCloudOpen(true), close: () => setIsConceptCloudOpen(false), id: 'panel-concept-cloud' },
+      ];
+
+      for (const p of panels) {
+          await testPanel(p.name, p.open, p.close, p.id);
+      }
+
+      // Phase 2: Tools & Modals
+      // Strategy: Open Toolbar -> Verify -> Open Modal -> Verify Text -> Close
+      const testTool = async (toolId: string, toolName: string, checkText: string, openModal?: () => void, closeModal?: () => void) => {
+          log(`${toolName} Toolbar`, 'running');
+          setIsToolsPanelOpen(true);
+          setActiveTool(toolId);
+          await new Promise(r => setTimeout(r, 400)); // Wait for expansion transition
+          // Verify toolbar exists by looking for unique tool buttons or headers in DOM (rough check by text)
+          // Most toolbars render a header or buttons with specific text.
+          // We rely on the user seeing it blink, but programmatically we check if body has the toolbar text
+          const toolbarOk = document.body.innerText.includes(toolName.toUpperCase()); 
+          log(`${toolName} Toolbar`, toolbarOk ? 'ok' : 'error');
+
+          if (openModal && closeModal) {
+              log(`${toolName} Modal`, 'running');
+              openModal();
+              await new Promise(r => setTimeout(r, 400)); // Modal anim
+              const modalOk = document.body.innerText.includes(checkText);
+              log(`${toolName} Modal`, modalOk ? 'ok' : 'error', modalOk ? undefined : `Expected text '${checkText}' not found`);
+              closeModal();
+              await new Promise(r => setTimeout(r, 50));
+          }
+          setActiveTool(null);
+          await new Promise(r => setTimeout(r, 50));
+      };
+
+      await testTool('scamper', 'SCAMPER', 'Generating ideas for', () => setIsScamperModalOpen(true), () => setIsScamperModalOpen(false));
+      await testTool('triz', 'TRIZ', 'Contradiction Matrix', () => { setActiveTrizTool('contradiction'); setIsTrizModalOpen(true); }, () => setIsTrizModalOpen(false));
+      await testTool('lss', 'LSS', 'Project Charter', () => { setActiveLssTool('charter'); setIsLssModalOpen(true); }, () => setIsLssModalOpen(false));
+      await testTool('toc', 'TOC', 'Current Reality Tree', () => { setActiveTocTool('crt'); setIsTocModalOpen(true); }, () => setIsTocModalOpen(false));
+      await testTool('ssm', 'SSM', 'Rich Picture', () => { setActiveSsmTool('rich_picture'); setIsSsmModalOpen(true); }, () => setIsSsmModalOpen(false));
+      await testTool('swot', 'Strategy', 'SWOT Matrix', () => { setActiveSwotTool('matrix'); setIsSwotModalOpen(true); }, () => setIsSwotModalOpen(false));
+      
+      // Tools without unique modals (just toolbars or re-using panels)
+      await testTool('schema', 'Schema', 'Active Schema');
+      await testTool('layout', 'Layout', 'Spread');
+      await testTool('analysis', 'Analysis', 'Simulation');
+      await testTool('bulk', 'Bulk', 'Add Tags');
+      await testTool('command', 'CMD', 'Quick Add');
+
+      setTestStatus('complete');
+  };
+
   const allTags = useMemo(() => { const tags = new Set<string>(); elements.forEach(element => { element.tags.forEach(tag => tags.add(tag)); }); return Array.from(tags).sort(); }, [elements]);
   const tagCounts = useMemo(() => { const counts = new Map<string, number>(); elements.forEach(element => { element.tags.forEach(tag => { counts.set(tag, (counts.get(tag) || 0) + 1); }); }); return counts; }, [elements]);
   useEffect(() => { setTagFilter(prevFilter => { const allTagsSet = new Set(allTags); const newIncluded = new Set<string>(); for (const tag of allTags) { const wasPreviouslyIncluded = prevFilter.included.has(tag); const wasPreviouslyExcluded = prevFilter.excluded.has(tag); if (wasPreviouslyIncluded) { newIncluded.add(tag); } else if (!wasPreviouslyExcluded) { newIncluded.add(tag); } } const newExcluded = new Set<string>(); for (const tag of prevFilter.excluded) { if (allTagsSet.has(tag)) { newExcluded.add(tag); } } return { included: newIncluded, excluded: newExcluded }; }); }, [allTags]);
@@ -708,6 +855,8 @@ export default function App() {
   useEffect(() => { if (currentModelId && !isInitialLoad) { const modelData = { elements, relationships, documents, folders, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams }; const currentContentHash = computeContentHash(modelData); const currentMeta = modelsIndex.find(m => m.id === currentModelId); if (!currentMeta || currentMeta.contentHash !== currentContentHash) { localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData)); setModelsIndex(prevIndex => { const now = new Date().toISOString(); return prevIndex.map(m => m.id === currentModelId ? { ...m, updatedAt: now, contentHash: currentContentHash } : m); }); } } }, [elements, relationships, documents, folders, colorSchemes, activeSchemeId, currentModelId, isInitialLoad, modelsIndex, systemPromptConfig, history, slides, mermaidDiagrams]);
   
   const handleCreateModel = useCallback((name: string, description: string) => { const now = new Date().toISOString(); const newModelData = { elements: [], relationships: [], documents: [], folders: [], colorSchemes: DEFAULT_COLOR_SCHEMES, activeSchemeId: DEFAULT_COLOR_SCHEMES[0]?.id || null, systemPromptConfig: DEFAULT_SYSTEM_PROMPT_CONFIG, history: [], slides: [], mermaidDiagrams: [] }; const initialHash = computeContentHash(newModelData); const newModel: ModelMetadata = { id: generateUUID(), name, description, createdAt: now, updatedAt: now, filename: `${name.replace(/ /g, '_')}.json`, contentHash: initialHash, }; setModelsIndex(prevIndex => [...prevIndex, newModel]); localStorage.setItem(`${MODEL_DATA_PREFIX}${newModel.id}`, JSON.stringify(newModelData)); currentFileHandleRef.current = null; handleLoadModel(newModel.id); setIsCreateModelModalOpen(false); }, [handleLoadModel]);
+  // ... (Rest of actions same as previous, omitted for brevity) ...
+  // Re-declaring actions for context
   const handleAddElement = useCallback((coords: { x: number; y: number }) => { const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.y, }; setElements(prev => [...prev, newElement]); setSelectedElementId(newElement.id); setMultiSelection(new Set([newElement.id])); setSelectedRelationshipId(null); setPanelState({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); }, [defaultTags]);
   const handleAddElementFromName = useCallback((name: string) => { const centerX = window.innerWidth / 2; const centerY = window.innerHeight / 2; const randomOffset = () => (Math.random() - 0.5) * 100; const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: name, notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: centerX + randomOffset(), y: centerY + randomOffset(), fx: null, fy: null, }; setElements(prev => [...prev, newElement]); }, [defaultTags]);
   const handleUpdateElement = useCallback((updatedElement: Element) => { setElements(prev => prev.map(f => f.id === updatedElement.id ? { ...updatedElement, updatedAt: new Date().toISOString() } : f)); }, []);
@@ -962,6 +1111,7 @@ export default function App() {
   };
 
   const handleDiskSave = useCallback(async () => {
+    // ... (Keep existing implementation)
     if (!currentModelId) { alert("No active model to save."); return; }
     const modelMetadata = modelsIndex.find(m => m.id === currentModelId);
     if (!modelMetadata) { alert("Could not find model metadata to save."); return; }
@@ -1954,7 +2104,7 @@ export default function App() {
                 <div className="border-l border-gray-600 h-6 mx-1"></div>
                 <button onClick={() => setIsFilterPanelOpen(prev => !prev)} title="Filter by Tag" className="p-2 rounded-md hover:bg-gray-700 transition">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h14a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                 </svg>
                 </button>
                 <button onClick={handleToggleFocusMode} title={focusButtonTitle()} className="p-2 rounded-md hover:bg-gray-700 transition">
@@ -2048,6 +2198,7 @@ export default function App() {
                         onClose={() => setIsHelpMenuOpen(false)} 
                         onAbout={() => setIsAboutModalOpen(true)}
                         onPatternGallery={() => setIsPatternGalleryModalOpen(true)}
+                        onSelfTest={runSelfTest}
                     />
                 )}
                 </div>
@@ -2440,6 +2591,14 @@ export default function App() {
             onClose={() => setIsSchemaUpdateModalOpen(false)} 
           />
       )}
+
+      {/* Self Test Modal */}
+      <SelfTestModal 
+          isOpen={isSelfTestModalOpen} 
+          onClose={() => setIsSelfTestModalOpen(false)} 
+          logs={testLogs}
+          status={testStatus}
+      />
 
       {currentModelId ? (
         <GraphCanvas

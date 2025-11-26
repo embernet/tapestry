@@ -268,6 +268,7 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
             {dockedPanels.map(panel => (
                 <div 
                     key={panel.id} 
+                    data-testid={`panel-${panel.id}`}
                     className={`absolute inset-0 ${panel.id === activeDockedId ? 'block' : 'hidden'}`}
                 >
                     {panel.content}
@@ -285,6 +286,7 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
         return (
           <div
             key={panel.id}
+            data-testid={`panel-${panel.id}`}
             className="fixed flex flex-col bg-gray-800 border border-gray-600 rounded-lg shadow-2xl overflow-hidden"
             style={{
               left: layout.x,
