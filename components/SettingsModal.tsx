@@ -1,19 +1,17 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { SystemPromptConfig, GlobalSettings, AIConfig, AIProvider } from '../types';
+import { SystemPromptConfig, GlobalSettings } from '../types';
 import { AVAILABLE_AI_TOOLS, DEFAULT_SYSTEM_PROMPT_CONFIG, DEFAULT_TOOL_PROMPTS } from '../constants';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'general' | 'ai_settings' | 'ai_prompts' | 'ai_tools' | 'tool_prompts';
+  initialTab?: 'general' | 'ai' | 'tools' | 'prompts';
   initialTool?: string;
   globalSettings: GlobalSettings;
   onGlobalSettingsChange: (settings: GlobalSettings) => void;
   modelSettings: SystemPromptConfig;
   onModelSettingsChange: (settings: SystemPromptConfig) => void;
-  aiConfig: AIConfig;
-  onAiConfigChange: (config: AIConfig) => void;
 }
 
 const TOOL_STRUCTURE = [
@@ -92,22 +90,12 @@ const TOOL_STRUCTURE = [
     }
 ];
 
-const PROVIDERS: { id: AIProvider, name: string, url: string, help: string }[] = [
-    { id: 'google', name: 'Google Gemini', url: 'https://aistudio.google.com/app/apikey', help: 'Get your API key from Google AI Studio.' },
-    { id: 'openai', name: 'OpenAI', url: 'https://platform.openai.com/api-keys', help: 'Get your API key from the OpenAI Platform.' },
-    { id: 'anthropic', name: 'Anthropic', url: 'https://console.anthropic.com/settings/keys', help: 'Get your API key from the Anthropic Console.' },
-    { id: 'grok', name: 'xAI (Grok)', url: 'https://console.x.ai/', help: 'Get your API key from the xAI Console.' },
-    { id: 'ollama', name: 'Ollama (Local)', url: 'https://ollama.com', help: 'Ensure Ollama is running locally (default: http://localhost:11434).' },
-    { id: 'custom', name: 'Custom / OpenAI Compatible', url: '', help: 'Connect to any OpenAI-compatible API endpoint (e.g. LM Studio, LocalAI).' },
-];
-
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
     isOpen, onClose, initialTab = 'general', initialTool,
     globalSettings, onGlobalSettingsChange, 
-    modelSettings, onModelSettingsChange,
-    aiConfig, onAiConfigChange
+    modelSettings, onModelSettingsChange 
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'ai_settings' | 'ai_prompts' | 'ai_tools' | 'tool_prompts'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'general' | 'ai' | 'tools' | 'prompts'>(initialTab);
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set(initialTool ? [initialTool] : []));
   const [expandedSubPromptTools, setExpandedSubPromptTools] = useState<Set<string>>(new Set());
   const modalRef = useRef<HTMLDivElement>(null);
@@ -142,33 +130,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleGlobalSettingChange = (key: keyof GlobalSettings, value: any) => {
       onGlobalSettingsChange({ ...globalSettings, [key]: value });
-  };
-
-  const handleAiConfigFieldChange = (key: keyof AIConfig, value: any) => {
-      let updates: Partial<AIConfig> = { [key]: value };
-      
-      // Smart defaults when switching provider
-      if (key === 'provider') {
-          const provider = value as AIProvider;
-          if (provider === 'ollama') {
-              updates.baseUrl = 'http://localhost:11434/v1';
-              updates.modelId = 'llama3';
-          } else if (provider === 'google') {
-              updates.baseUrl = '';
-              updates.modelId = 'gemini-2.5-flash';
-          } else if (provider === 'openai') {
-              updates.baseUrl = '';
-              updates.modelId = 'gpt-4o';
-          } else if (provider === 'anthropic') {
-              updates.baseUrl = '';
-              updates.modelId = 'claude-3-opus-20240229';
-          } else if (provider === 'grok') {
-              updates.baseUrl = 'https://api.x.ai/v1';
-              updates.modelId = 'grok-beta';
-          }
-      }
-      
-      onAiConfigChange({ ...aiConfig, ...updates });
   };
 
   const toggleTool = (toolId: string) => {
@@ -226,8 +187,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       return DEFAULT_TOOL_PROMPTS[key] || "";
   };
 
-  const currentProviderInfo = PROVIDERS.find(p => p.id === aiConfig.provider);
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
       <div ref={modalRef} className="bg-gray-800 rounded-lg w-full max-w-4xl shadow-xl border border-gray-600 text-white flex flex-col max-h-[90vh]">
@@ -242,26 +201,20 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     General
                 </button>
                 <button 
-                    onClick={() => setActiveTab('ai_settings')}
-                    className={`text-sm font-bold uppercase tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap ${activeTab === 'ai_settings' ? 'bg-gray-700 text-yellow-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                    onClick={() => setActiveTab('ai')}
+                    className={`text-sm font-bold uppercase tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap ${activeTab === 'ai' ? 'bg-gray-700 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
                 >
-                    AI Settings
+                    AI Advisor
                 </button>
                 <button 
-                    onClick={() => setActiveTab('ai_prompts')}
-                    className={`text-sm font-bold uppercase tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap ${activeTab === 'ai_prompts' ? 'bg-gray-700 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                    onClick={() => setActiveTab('tools')}
+                    className={`text-sm font-bold uppercase tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap ${activeTab === 'tools' ? 'bg-gray-700 text-green-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
                 >
-                    AI Prompts
+                    Tools
                 </button>
                 <button 
-                    onClick={() => setActiveTab('ai_tools')}
-                    className={`text-sm font-bold uppercase tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap ${activeTab === 'ai_tools' ? 'bg-gray-700 text-green-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
-                >
-                    AI Tools
-                </button>
-                <button 
-                    onClick={() => setActiveTab('tool_prompts')}
-                    className={`text-sm font-bold uppercase tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap ${activeTab === 'tool_prompts' ? 'bg-gray-700 text-purple-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                    onClick={() => setActiveTab('prompts')}
+                    className={`text-sm font-bold uppercase tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap ${activeTab === 'prompts' ? 'bg-gray-700 text-purple-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
                 >
                     Tool Prompts
                 </button>
@@ -294,88 +247,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
             )}
 
-            {/* --- AI SETTINGS TAB (New) --- */}
-            {activeTab === 'ai_settings' && (
-                <div className="space-y-6">
-                    <div className="space-y-4">
-                        {/* Provider Selection */}
-                        <div>
-                            <label className="block text-sm font-bold text-gray-400 uppercase mb-1">AI Provider</label>
-                            <select
-                                value={aiConfig.provider}
-                                onChange={(e) => handleAiConfigFieldChange('provider', e.target.value)}
-                                className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                            >
-                                {PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                            </select>
-                        </div>
-
-                        {/* Helper Block */}
-                        {currentProviderInfo && (
-                            <div className="bg-blue-900/20 border border-blue-500/30 rounded p-3 flex gap-3 items-start">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <div className="text-sm text-gray-300">
-                                    {currentProviderInfo.help}
-                                    {currentProviderInfo.url && (
-                                        <div className="mt-1">
-                                            <a href={currentProviderInfo.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline flex items-center gap-1">
-                                                Get API Key <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                            </a>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* API Key (Hidden for Ollama) */}
-                        {aiConfig.provider !== 'ollama' && (
-                            <div>
-                                <label className="block text-sm font-bold text-gray-400 uppercase mb-1">API Key</label>
-                                <input
-                                    type="password"
-                                    value={aiConfig.apiKey}
-                                    onChange={(e) => handleAiConfigFieldChange('apiKey', e.target.value)}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                    placeholder="sk-..."
-                                />
-                            </div>
-                        )}
-
-                        {/* Model Name */}
-                        <div>
-                            <label className="block text-sm font-bold text-gray-400 uppercase mb-1">Model Name</label>
-                            <input
-                                type="text"
-                                value={aiConfig.modelId}
-                                onChange={(e) => handleAiConfigFieldChange('modelId', e.target.value)}
-                                className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                placeholder={aiConfig.provider === 'ollama' ? 'llama3' : 'gpt-4o'}
-                            />
-                            <p className="text-xs text-gray-500 mt-1">Enter the specific model ID (e.g. gpt-4o, gemini-1.5-pro, claude-3-opus).</p>
-                        </div>
-
-                        {/* Base URL (Visible for Ollama, Custom, Grok) */}
-                        {(aiConfig.provider === 'ollama' || aiConfig.provider === 'custom' || aiConfig.provider === 'grok' || aiConfig.provider === 'openai') && (
-                            <div>
-                                <label className="block text-sm font-bold text-gray-400 uppercase mb-1">Base URL (Optional)</label>
-                                <input
-                                    type="text"
-                                    value={aiConfig.baseUrl || ''}
-                                    onChange={(e) => handleAiConfigFieldChange('baseUrl', e.target.value)}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded p-3 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                                    placeholder="https://api.example.com/v1"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Override the default API endpoint. Useful for proxies or local servers.</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* --- AI PROMPTS TAB --- */}
-            {activeTab === 'ai_prompts' && (
+            {/* --- AI ADVISOR TAB --- */}
+            {activeTab === 'ai' && (
                 <div className="space-y-6">
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
@@ -403,8 +276,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
             )}
 
-            {/* --- AI TOOLS TAB (Enable/Disable) --- */}
-            {activeTab === 'ai_tools' && (
+            {/* --- TOOLS TAB (Enable/Disable) --- */}
+            {activeTab === 'tools' && (
                 <div className="space-y-4">
                     <p className="text-sm text-gray-400">Select which AI tools are available in the chat.</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -427,7 +300,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
 
             {/* --- TOOL PROMPTS TAB (Detailed Configuration) --- */}
-            {activeTab === 'tool_prompts' && (
+            {activeTab === 'prompts' && (
                 <div className="space-y-4">
                     <p className="text-sm text-gray-400 mb-4">
                         Customize the AI instructions for each tool and its subtools. 

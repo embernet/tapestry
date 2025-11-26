@@ -241,12 +241,81 @@ const FolderItem: React.FC<{
     );
 };
 
+// --- Document Editor ---
+
 interface DocumentEditorPanelProps {
     document: TapestryDocument;
     onUpdate: (id: string, updates: Partial<TapestryDocument>) => void;
     onClose: () => void;
     initialViewMode?: 'edit' | 'preview';
 }
+
+const SimpleMarkdownRenderer: React.FC<{ content: string }> = ({ content }) => {
+    const lines = content.split('\n');
+    const elements: React.ReactNode[] = [];
+    
+    let currentListItems: React.ReactNode[] = [];
+    
+    const flushList = (keyPrefix: number) => {
+        if (currentListItems.length > 0) {
+            elements.push(
+                <ul key={`list-${keyPrefix}`} className="list-disc list-inside mb-4 pl-4 text-gray-300 space-y-1">
+                    {currentListItems}
+                </ul>
+            );
+            currentListItems = [];
+        }
+    };
+
+    const parseInline = (text: string): React.ReactNode[] => {
+        const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
+        return parts.map((part, i) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                return <strong key={i} className="font-bold text-white">{part.slice(2, -2)}</strong>;
+            }
+            if (part.startsWith('`') && part.endsWith('`')) {
+                return <code key={i} className="bg-gray-700 px-1 rounded text-xs font-mono text-blue-300">{part.slice(1, -1)}</code>;
+            }
+            return part;
+        });
+    };
+
+    lines.forEach((line, index) => {
+        const trimmed = line.trim();
+        
+        if (!trimmed) {
+            flushList(index);
+            return;
+        }
+
+        if (trimmed.startsWith('# ')) {
+            flushList(index);
+            elements.push(<h1 key={`h1-${index}`} className="text-2xl font-bold text-white mb-4 mt-6 border-b border-gray-700 pb-2">{trimmed.substring(2)}</h1>);
+        } else if (trimmed.startsWith('## ')) {
+            flushList(index);
+            elements.push(<h2 key={`h2-${index}`} className="text-xl font-bold text-blue-400 mb-3 mt-5">{trimmed.substring(3)}</h2>);
+        } else if (trimmed.startsWith('### ')) {
+            flushList(index);
+            elements.push(<h3 key={`h3-${index}`} className="text-lg font-bold text-gray-200 mb-2 mt-4">{trimmed.substring(4)}</h3>);
+        } else if (trimmed.startsWith('#### ')) {
+            flushList(index);
+            elements.push(<h4 key={`h4-${index}`} className="text-base font-bold text-gray-300 mb-2 mt-3">{trimmed.substring(5)}</h4>);
+        } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            const content = trimmed.substring(2);
+            currentListItems.push(<li key={`li-${index}`}>{parseInline(content)}</li>);
+        } else if (/^\d+\.\s/.test(trimmed)) {
+             flushList(index);
+             elements.push(<p key={`p-${index}`} className="mb-2 text-gray-300 leading-relaxed">{parseInline(trimmed)}</p>);
+        } else {
+            flushList(index);
+            elements.push(<p key={`p-${index}`} className="mb-2 text-gray-300 leading-relaxed">{parseInline(trimmed)}</p>);
+        }
+    });
+    
+    flushList(lines.length);
+
+    return <div className="markdown-preview px-2">{elements}</div>;
+};
 
 export const DocumentEditorPanel: React.FC<DocumentEditorPanelProps> = ({ document, onUpdate, onClose, initialViewMode = 'edit' }) => {
     const [title, setTitle] = useState(document.title);
@@ -298,9 +367,8 @@ export const DocumentEditorPanel: React.FC<DocumentEditorPanelProps> = ({ docume
                         placeholder="Start typing..."
                     />
                 ) : (
-                    <div className="w-full h-full p-6 overflow-y-auto text-gray-300 markdown-content">
-                        {/* Use CSS class to handle markdown styling or a simple pre-wrap for now */}
-                        <div className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{content}</div>
+                    <div className="w-full h-full p-6 overflow-y-auto text-gray-300">
+                        <SimpleMarkdownRenderer content={content} />
                     </div>
                 )}
             </div>
