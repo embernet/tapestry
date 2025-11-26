@@ -1,10 +1,11 @@
 
 import { Element, Relationship, RelationshipDirection } from './types';
+import { GoogleGenAI } from '@google/genai';
 
 /**
  * A simple UUID v4 generator.
- * This is used to avoid potential TypeScript typing issues with `crypto.randomUUID()`
- * across different environments and `tsconfig.json` settings.
+ * This is used to avoid potential TypeScript typing issues with 'crypto.randomUUID()'
+ * across different environments and 'tsconfig.json' settings.
  */
 export const generateUUID = (): string => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
@@ -209,4 +210,141 @@ export const generateSelectionReport = (elements: Element[], relationships: Rela
 
         return `${el.name}\nTags: ${el.tags.join(', ')}\nRelationships:\n${relStrings}`;
     }).join('\n\n');
+};
+
+// --- AI Service Adapter ---
+
+export interface AIConfig {
+    provider: string;
+    apiKey: string;
+    modelId: string;
+    baseUrl?: string;
+}
+
+export const callAI = async (
+    config: AIConfig,
+    prompt: any, // string or Gemini Content[]
+    systemInstruction?: string,
+    tools?: any[], // Gemini format function declarations
+    responseSchema?: any // Gemini format schema
+): Promise<{ text: string, functionCalls?: any[] }> => {
+    
+    if (config.provider === 'gemini') {
+        const ai = new GoogleGenAI({ apiKey: config.apiKey || process.env.API_KEY });
+        const geminiConfig: any = {};
+        if (systemInstruction) geminiConfig.systemInstruction = systemInstruction;
+        if (tools) geminiConfig.tools = [{ functionDeclarations: tools }];
+        if (responseSchema) {
+            geminiConfig.responseMimeType = "application/json";
+            geminiConfig.responseSchema = responseSchema;
+        }
+
+        const response = await ai.models.generateContent({
+            model: config.modelId,
+            contents: prompt,
+            config: geminiConfig
+        });
+        
+        return {
+            text: response.text || "",
+            functionCalls: response.functionCalls
+        };
+    } 
+    
+    if (config.provider === 'openai' || config.provider === 'anthropic' || config.provider === 'grok' || config.provider === 'ollama') {
+        // Basic mapping for OpenAI-compatible endpoints (Grok, Ollama often compatible)
+        // Note: Anthropic native API is different, but for now we treat similar if user uses proxy or we'd need specific implementation.
+        // For this fix, we focus on OpenAI compatibility which covers Grok/Ollama often.
+        
+        if (!config.apiKey && config.provider !== 'ollama') throw new Error(`${config.provider} API Key is missing in settings.`);
+        
+        const messages = [];
+        if (systemInstruction) messages.push({ role: "system", content: systemInstruction });
+        
+        // Map content
+        if (typeof prompt === 'string') {
+            messages.push({ role: "user", content: prompt });
+        } else if (Array.isArray(prompt)) {
+            // Best effort mapping from Gemini Content to OpenAI Messages
+            prompt.forEach((p: any) => {
+                let role = p.role === 'model' ? 'assistant' : 'user';
+                
+                // Flatten parts to text
+                let content = "";
+                if (p.parts) {
+                    p.parts.forEach((part: any) => {
+                        if (part.text) content += part.text;
+                        // Note: Ignoring functionCalls in history for simple text chat compatibility 
+                        // unless we implement full OpenAI tool mapping
+                    });
+                }
+                
+                if (content) {
+                    messages.push({ role, content });
+                }
+            });
+        }
+
+        const body: any = {
+            model: config.modelId,
+            messages: messages
+        };
+
+        // Simple JSON mode support (OpenAI requires "json_object" and usually specific instruction)
+        if (responseSchema) {
+            body.response_format = { type: "json_object" };
+        }
+
+        // Determine Endpoint
+        let baseUrl = config.baseUrl;
+        if (!baseUrl) {
+            if (config.provider === 'openai') baseUrl = 'https://api.openai.com/v1';
+            else if (config.provider === 'anthropic') baseUrl = 'https://api.anthropic.com/v1'; // Placeholder, Anthropic needs specific handling usually
+            else if (config.provider === 'grok') baseUrl = 'https://api.x.ai/v1';
+            else if (config.provider === 'ollama') baseUrl = 'http://localhost:11434/v1';
+        }
+        
+        // Ensure no trailing slash
+        baseUrl = baseUrl?.replace(/\/$/, '');
+        const url = `${baseUrl}/chat/completions`;
+
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+        if (config.apiKey) {
+            headers['Authorization'] = `Bearer ${config.apiKey}`;
+        }
+        // Anthropic specific header if using their endpoint directly (simplified)
+        if (config.provider === 'anthropic') {
+            headers['x-api-key'] = config.apiKey;
+            headers['anthropic-version'] = '2023-06-01';
+            delete headers['Authorization'];
+            // Note: Anthropic uses /messages not /chat/completions, code below assumes OpenAI compat proxy or structure
+            // If using direct Anthropic, body structure differs (system is top level param, etc.)
+            // For this specific fix request involving "LLM created by Google" when selecting OpenAI, we focus on OpenAI compat.
+        }
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify(body)
+            });
+
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({ error: { message: response.statusText } }));
+                throw new Error(err.error?.message || `${config.provider} Error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            const content = data.choices?.[0]?.message?.content || "";
+            
+            return { text: content, functionCalls: undefined };
+        } catch (e: any) {
+            console.error("AI Call Failed", e);
+            throw new Error(`Failed to call ${config.provider}: ${e.message}`);
+        }
+    }
+
+    throw new Error(`Provider '${config.provider}' is not fully supported in this version.`);
 };

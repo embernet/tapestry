@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, Content, Part, Type, Tool, FunctionCall, FunctionResponse } from '@google/genai';
+import { Content, Part, Type, Tool, FunctionCall, FunctionResponse } from '@google/genai';
 import { Element, Relationship, ModelActions, ColorScheme, SystemPromptConfig, TapestryDocument, TapestryFolder } from '../types';
-import { generateMarkdownFromGraph } from '../utils';
+import { generateMarkdownFromGraph, callAI, AIConfig } from '../utils';
 import { AVAILABLE_AI_TOOLS } from '../constants';
 
 interface ChatPanelProps {
@@ -20,10 +20,12 @@ interface ChatPanelProps {
   documents?: TapestryDocument[];
   folders?: TapestryFolder[];
   openDocIds?: string[];
-  onLogHistory?: (tool: string, content: string, summary?: string) => void;
+  onLogHistory?: (tool: string, content: string, summary?: string, subTool?: string, toolParams?: any) => void;
   onOpenHistory?: () => void;
   onOpenTool?: (tool: string, subTool?: string) => void;
   initialInput?: string;
+  activeModel?: string;
+  aiConfig: AIConfig;
 }
 
 interface Message {
@@ -34,7 +36,12 @@ interface Message {
   isPending?: boolean; // If true, the tool calls are waiting for user confirmation
 }
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSchemes, activeSchemeId, onClose, currentModelId, modelActions, className, isOpen, onOpenPromptSettings, systemPromptConfig, documents, folders, openDocIds, onLogHistory, onOpenHistory, onOpenTool, initialInput }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({ 
+    elements, relationships, colorSchemes, activeSchemeId, onClose, currentModelId, 
+    modelActions, className, isOpen, onOpenPromptSettings, systemPromptConfig, 
+    documents, folders, openDocIds, onLogHistory, onOpenHistory, onOpenTool, 
+    initialInput, activeModel, aiConfig 
+}) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -43,10 +50,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSch
   
   // Track decisions for pending actions: index -> status
   const [actionDecisions, setActionDecisions] = useState<Record<number, 'pending' | 'accepted' | 'rejected'>>({});
-  
-  const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null);
-  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
-  const exportButtonRef = useRef<HTMLDivElement>(null);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -94,17 +97,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSch
         textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [input, isOpen]);
-  
-  // Close export menu on outside click
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-        if (exportButtonRef.current && !exportButtonRef.current.contains(event.target as Node)) {
-            setIsExportMenuOpen(false);
-        }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const tools: Tool[] = [
       {
@@ -546,456 +538,192 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ elements, relationships, colorSch
         7. **BATCHING:** If a user request involves creating multiple elements and connecting them (e.g. "Add 3 actions to mitigate X"), you MUST generate ALL the necessary 'addElement' and 'addRelationship' tool calls in a SINGLE response. Do not ask for confirmation between individual steps of a single logical request.
         8. **RATIONALE:** You MUST provide a clear 'rationale' parameter for every tool call, explaining why you are proposing this specific action.
         9. **ATTRIBUTES:** You can read custom attributes from the context (e.g. {cost="high"}) and modify them using 'setElementAttribute' or 'setRelationshipAttribute'.
-        10. **DOCUMENTS:** If the user asks to edit "the open document" and there is only one open, infer which one it is. If ambiguous, ask. Use 'readDocument' to get content before editing if you need context.
         
-        Current Model Data:
-        ---\n${modelMarkdown}\n---`;
+        GRAPH DATA:
+        ${modelMarkdown}
+        `;
 
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-        const chatHistory = buildApiHistory(newMessages);
-
-        // Step 1: Send User Message
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: chatHistory,
-            config: {
-                systemInstruction: systemInstruction,
-                tools: tools
-            }
-        });
-
-        const text = response.text;
-        const functionCalls = response.functionCalls;
+        const contents: Content[] = buildApiHistory(newMessages);
         
-        const nextMessages = [...newMessages];
+        const result = await callAI(aiConfig, contents, systemInstruction, tools[0].functionDeclarations);
 
-        // If there is text, add it as a message
-        if (text) {
-            nextMessages.push({ role: 'model', text });
-            // Log history
-            if (onLogHistory) {
-                onLogHistory('Chat', text, userMessageText.substring(0, 50));
-            }
-        }
+        const text = result.text;
+        const functionCalls = result.functionCalls;
 
-        // If there are function calls, add them as a SEPARATE pending message
-        if (functionCalls && functionCalls.length > 0) {
-            nextMessages.push({ 
-                role: 'model', 
-                functionCalls: functionCalls, 
-                isPending: true 
-            });
-        } else if (!text) {
-             throw new Error("No text or function call received.");
-        }
+        const modelMsg: Message = {
+            role: 'model',
+            text,
+            functionCalls: functionCalls && functionCalls.length > 0 ? functionCalls : undefined,
+            isPending: functionCalls && functionCalls.length > 0 ? true : false
+        };
 
-        setMessages(nextMessages);
+        setMessages(prev => [...prev, modelMsg]);
 
-    } catch (e) {
-        console.error("Error sending message:", e);
-        const errorMessage = e instanceof Error ? e.message : "Sorry, I couldn't get a response. Please check your API key and network connection.";
-        setMessages(prev => [...prev, { role: 'model', text: errorMessage }]);
-        setError(errorMessage);
+    } catch (e: any) {
+        setError(e.message || "Error communicating with AI.");
+        setMessages(prev => prev.slice(0, -1));
     } finally {
         setIsLoading(false);
     }
   };
-  
-  const handleDecision = (index: number, status: 'accepted' | 'rejected') => {
-      setActionDecisions(prev => ({ ...prev, [index]: status }));
-  };
 
-  const handleAcceptAll = () => {
-      const pendingIndex = messages.findIndex(m => m.isPending);
-      if (pendingIndex !== -1) {
-          const msg = messages[pendingIndex];
-          const newDecisions = { ...actionDecisions };
-          msg.functionCalls?.forEach((_, i) => {
-              newDecisions[i] = 'accepted';
-          });
-          setActionDecisions(newDecisions);
-      }
-  };
-
-  const handleRejectAll = () => {
-      const pendingIndex = messages.findIndex(m => m.isPending);
-      if (pendingIndex !== -1) {
-          const msg = messages[pendingIndex];
-          const newDecisions = { ...actionDecisions };
-          msg.functionCalls?.forEach((_, i) => {
-              newDecisions[i] = 'rejected';
-          });
-          setActionDecisions(newDecisions);
-      }
-  };
-
-  const handleApplyDecisions = async () => {
-      // Find the pending message
-      const pendingIndex = messages.findIndex(m => m.isPending);
-      if (pendingIndex === -1) return;
-      
-      const pendingMessage = messages[pendingIndex];
-      if (!pendingMessage.functionCalls) return;
+  const handleApplyPending = async (msgIndex: number) => {
+      const msg = messages[msgIndex];
+      if (!msg.functionCalls) return;
 
       setIsLoading(true);
-
+      
+      // Execute accepted calls
+      const functionResponses = executeFunctionCalls(msg.functionCalls);
+      
+      // Send responses back to model
       try {
-          // 1. Execute the tools (only accepted ones, but generate responses for all)
-          const responses = executeFunctionCalls(pendingMessage.functionCalls);
-
-          // 2. Update the pending message to be confirmed (not pending)
-          const confirmedMessages = [...messages];
-          confirmedMessages[pendingIndex] = { ...pendingMessage, isPending: false };
+          const currentHistory = buildApiHistory(messages.slice(0, msgIndex)); // History before this message
           
-          // 3. Add the tool responses to the history
-          const historyWithResponses = [
-              ...confirmedMessages,
-              { role: 'user' as const, functionResponses: responses }
-          ];
-
-          setMessages(historyWithResponses); // Update UI state optimistically
-
-          // 4. Get the final text response from the model
-          const modelMarkdown = generateMarkdownFromGraph(elements, relationships);
-          const systemInstruction = `You are an AI assistant for Tapestry. You have just executed tools to modify the graph. 
-          Summarize what you did based on the tool outputs. If some actions were skipped/rejected by the user, mention that.
-          Current Model Data: ---\n${modelMarkdown}\n---`;
+          // Add the model message with tool calls
+          const modelParts: Part[] = [];
+          if (msg.text) modelParts.push({ text: msg.text });
+          msg.functionCalls.forEach(fc => modelParts.push({ functionCall: fc }));
+          currentHistory.push({ role: 'model', parts: modelParts });
           
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-          const apiHistory = buildApiHistory(historyWithResponses);
+          // Add the function responses
+          const responseParts: Part[] = functionResponses.map(fr => ({ functionResponse: fr }));
+          currentHistory.push({ role: 'user', parts: responseParts });
 
-          const finalResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: apiHistory,
-            config: { systemInstruction }
+          const result = await callAI(
+              aiConfig, 
+              currentHistory, 
+              systemPromptConfig.defaultPrompt // Use default prompt for tool follow-up
+          );
+          
+          const responseText = result.text;
+          const nextCalls = result.functionCalls;
+          
+          setMessages(prev => {
+              const newMsgs = [...prev];
+              // Mark current as processed
+              newMsgs[msgIndex] = { ...msg, isPending: false, functionResponses: functionResponses.map(r => r.response as FunctionResponse) };
+              // Add model response
+              newMsgs.push({ 
+                  role: 'model', 
+                  text: responseText,
+                  functionCalls: nextCalls && nextCalls.length > 0 ? nextCalls : undefined,
+                  isPending: nextCalls && nextCalls.length > 0 ? true : false
+              });
+              return newMsgs;
           });
 
-          if (finalResponse.text) {
-              setMessages(prev => [...prev, { role: 'model', text: finalResponse.text }]);
-              // Log post-action summary to history
-              if (onLogHistory) {
-                  onLogHistory('Chat (Action Summary)', finalResponse.text, "Actions applied");
-              }
-          }
-
       } catch (e) {
-          console.error("Error confirming action:", e);
-          setError("Failed to execute actions.");
+          setError("Failed to send tool results to AI.");
       } finally {
           setIsLoading(false);
       }
   };
 
-  const handleRegenerate = () => {
-      // 1. Remove the pending message
-      const messagesWithoutPending = messages.filter(m => !m.isPending);
-      setMessages(messagesWithoutPending);
-      
-      // 2. Automatically trigger a new request asking for alternatives
-      handleSendMessage("Those proposed actions weren't quite right. Please suggest a different set of actions or alternatives.");
-  };
-
-  const handleCopy = (text: string, index: number) => {
-    navigator.clipboard.writeText(text);
-    setCopiedMessageIndex(index);
-    setTimeout(() => setCopiedMessageIndex(null), 2000);
-  };
-
-  const handleDelete = (indexToDelete: number) => {
-    // Deletes the model's message and the user's prompt that preceded it.
-    const newMessages = messages.filter((_, i) => i !== indexToDelete && i !== indexToDelete - 1);
-    setMessages(newMessages);
-  };
-  
-  const handleExport = (format: 'json' | 'md') => {
-    let content = '';
-    let mimeType = '';
-    let fileExtension = '';
-
-    if (format === 'json') {
-      content = JSON.stringify(messages, null, 2);
-      mimeType = 'application/json';
-      fileExtension = 'json';
-    } else { // markdown
-      content = messages.map(msg => {
-          let text = `**${msg.role === 'user' ? 'You' : 'AI Assistant'}**:`;
-          if (msg.text) text += `\n\n${msg.text}`;
-          if (msg.functionCalls) {
-              text += `\n\n*Executed Actions:*\n` + msg.functionCalls.map(f => `- ${f.name}(${JSON.stringify(f.args)})`).join('\n');
-          }
-          return text;
-      }).join('\n\n---\n\n');
-      mimeType = 'text/markdown';
-      fileExtension = 'md';
-    }
-
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `tapestry-chat-export.${fileExtension}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    setIsExportMenuOpen(false);
-  };
-
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-  
-  const isWaitingForConfirmation = messages.some(m => m.isPending);
-
   return (
-    <div className={`absolute top-44 left-4 bottom-4 w-96 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl z-30 flex flex-col ${className || ''}`}>
-      <div className="p-4 flex-shrink-0 flex justify-between items-center border-b border-gray-700 bg-gray-900">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-            </svg>
-            AI Assistant
-        </h2>
-        <div className="flex items-center space-x-2">
-          {onOpenHistory && (
-              <button
-                onClick={onOpenHistory}
-                title="View AI History"
-                className="p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition"
-              >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-              </button>
-          )}
-          <button
-            onClick={onOpenPromptSettings}
-            title="AI Settings (Context, Style, Tools)"
-            className="p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-            </svg>
-          </button>
-          <button
-            onClick={() => setIsCreativeMode(!isCreativeMode)}
-            title={isCreativeMode ? "Creative Mode: ENABLED. AI uses general knowledge to suggest improvements. Click to switch to Strict Context." : "Creative Mode: DISABLED. AI is restricted to current graph data. Click to enable Creativity."}
-            className={`p-2 rounded-md transition ${isCreativeMode ? 'text-yellow-400 hover:bg-gray-700' : 'text-gray-400 hover:text-white hover:bg-gray-700'}`}
-          >
-            {isCreativeMode ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-                </svg>
-            ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                    <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-                </svg>
-            )}
-          </button>
-
-          <div ref={exportButtonRef} className="relative">
-            <button 
-              onClick={() => setIsExportMenuOpen(prev => !prev)}
-              title="Export Chat"
-              className="p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 transition"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-            </button>
-            {isExportMenuOpen && (
-              <div className="absolute right-0 mt-2 w-40 bg-gray-900 border border-gray-600 rounded-md shadow-lg py-1 z-10">
-                <button onClick={() => handleExport('md')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">As Markdown (.md)</button>
-                <button onClick={() => handleExport('json')} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">As JSON (.json)</button>
-              </div>
-            )}
-          </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <div className="flex-grow p-4 overflow-y-auto">
-        <div className="space-y-4">
-          {messages.map((msg, index) => (
-            <div key={index} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-              {/* Text Bubble */}
-              {(msg.text || (msg.role === 'model' && !msg.functionCalls && !msg.isPending)) && (
-                  <div className={`max-w-md p-3 rounded-lg ${ msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200' }`}>
-                    <p className="whitespace-pre-wrap text-sm">{msg.text || <span className="italic text-gray-400">Processing...</span>}</p>
-                  </div>
-              )}
-
-              {/* Function Call / Proposed Actions Block */}
-              {msg.functionCalls && msg.functionCalls.length > 0 && (
-                  <div className={`mt-2 w-full max-w-[340px] rounded-lg border ${msg.isPending ? 'bg-gray-800 border-yellow-600' : 'bg-gray-700 border-gray-600'} p-0 overflow-hidden`}>
-                      <div className={`flex items-center gap-2 p-3 border-b ${msg.isPending ? 'border-yellow-600/50 bg-yellow-900/20' : 'border-gray-600 bg-gray-700'}`}>
-                          <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${msg.isPending ? 'text-yellow-500' : 'text-green-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            {msg.isPending 
-                                ? <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                                : <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            }
-                          </svg>
-                          <span className={`text-sm font-bold ${msg.isPending ? 'text-yellow-500' : 'text-gray-300'}`}>
-                              {msg.isPending ? 'Proposed Actions' : 'Executed Actions'}
-                          </span>
-                      </div>
-                      
-                      <div className="flex flex-col gap-2 p-2">
-                          {msg.functionCalls.map((fc, i) => {
-                              const decision = msg.isPending ? (actionDecisions[i] || 'accepted') : 'accepted';
-                              const isAccepted = decision === 'accepted';
-                              const isRejected = decision === 'rejected';
-                              
-                              const isAttributeAction = fc.name.includes('Attribute');
-                              const isDelete = fc.name.includes('delete');
-                              const isDocument = fc.name.toLowerCase().includes('document');
-                              const isOpenTool = fc.name === 'openTool';
-                              
-                              return (
-                                <div 
-                                    key={i} 
-                                    className={`rounded p-2 border flex flex-col gap-1 transition-colors ${
-                                        msg.isPending
-                                            ? isRejected ? 'bg-red-900/10 border-red-500/20 opacity-60' : 'bg-green-900/20 border-green-500/50'
-                                            : 'bg-gray-800 border-gray-700'
-                                    }`}
-                                >
-                                    <div className="flex justify-between items-start gap-2">
-                                        <div className="flex items-center gap-1.5 min-w-0">
-                                            {/* Icon based on action type */}
-                                            {isDelete ? <span className="text-red-400">🗑️</span> :
-                                             isOpenTool ? <span className="text-blue-400">🔧</span> :
-                                             isDocument ? <span className="text-yellow-400">📄</span> :
-                                             isAttributeAction ? <span className="text-purple-400">🏷️</span> :
-                                             <span className="text-green-400">⚡</span>}
-                                            
-                                            <span className="text-xs font-mono text-gray-300 truncate" title={getActionTitle(fc)}>
-                                                {getActionTitle(fc)}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="text-[10px] text-gray-500 pl-6">
-                                        {getActionDetails(fc)}
-                                    </div>
-                                    
-                                    {/* Rationale */}
-                                    {(fc.args as any).rationale && (
-                                        <div className="text-[10px] text-gray-400 italic pl-6 mt-0.5 border-l-2 border-gray-600 ml-1">
-                                            "{(fc.args as any).rationale}"
-                                        </div>
-                                    )}
-
-                                    {/* Decision Buttons for Pending */}
-                                    {msg.isPending && (
-                                        <div className="flex justify-end gap-2 mt-1">
-                                            <button 
-                                                onClick={() => handleDecision(i, 'accepted')}
-                                                className={`px-2 py-0.5 text-[10px] rounded border ${isAccepted ? 'bg-green-700 border-green-500 text-white' : 'bg-gray-900 border-gray-600 text-gray-400 hover:border-green-500'}`}
-                                            >
-                                                Accept
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDecision(i, 'rejected')}
-                                                className={`px-2 py-0.5 text-[10px] rounded border ${isRejected ? 'bg-red-900 border-red-500 text-white' : 'bg-gray-900 border-gray-600 text-gray-400 hover:border-red-500'}`}
-                                            >
-                                                Reject
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                              );
-                          })}
-                      </div>
-                      
-                      {msg.isPending && (
-                          <div className="p-2 bg-gray-800 border-t border-gray-700 flex justify-between items-center">
-                              <div className="flex gap-2">
-                                  <button onClick={handleAcceptAll} className="text-[10px] text-green-400 hover:text-green-300 hover:underline">All</button>
-                                  <span className="text-gray-600">|</span>
-                                  <button onClick={handleRejectAll} className="text-[10px] text-red-400 hover:text-red-300 hover:underline">None</button>
-                              </div>
-                              <div className="flex gap-2">
-                                  <button onClick={handleRegenerate} className="text-[10px] text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-700 transition">Retry</button>
-                                  <button 
-                                      onClick={handleApplyDecisions}
-                                      className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-xs font-bold transition shadow-sm flex items-center gap-1"
-                                  >
-                                      Confirm
-                                  </button>
-                              </div>
-                          </div>
-                      )}
-                  </div>
-              )}
-
-              {/* Message Actions */}
-              <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => handleCopy(msg.text || JSON.stringify(msg.functionCalls), index)} className="text-gray-500 hover:text-white text-xs">
-                      {copiedMessageIndex === index ? 'Copied' : 'Copy'}
-                  </button>
-                  <button onClick={() => handleDelete(index)} className="text-gray-500 hover:text-red-400 text-xs">
-                      Delete
-                  </button>
-              </div>
+    <div className={`fixed top-20 right-4 w-96 bottom-4 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl flex flex-col z-30 ${className} ${isOpen ? '' : 'hidden'}`}>
+        {/* Header */}
+        <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800 rounded-t-lg">
+            <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                <h2 className="text-lg font-bold text-white">AI Assistant</h2>
             </div>
-          ))}
-          
-          {isLoading && (
-              <div className="flex justify-start">
-                  <div className="bg-gray-700 text-gray-300 p-3 rounded-lg rounded-tl-none flex items-center gap-2">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-75"></div>
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-150"></div>
-                  </div>
-              </div>
-          )}
-          {error && (
-              <div className="flex justify-center my-2">
-                  <span className="text-red-400 text-xs bg-red-900/20 border border-red-900 px-2 py-1 rounded">{error}</span>
-              </div>
-          )}
-          <div ref={messagesEndRef} />
+            <div className="flex items-center gap-2">
+                <button onClick={onOpenPromptSettings} className="text-gray-400 hover:text-white p-1" title="Settings">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
+                </button>
+                <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
         </div>
-      </div>
 
-      {/* Input Area */}
-      <div className="p-4 border-t border-gray-700 bg-gray-900 rounded-b-lg">
-          <div className="relative">
-              <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={isWaitingForConfirmation ? "Please confirm actions above first..." : "Ask a question or request a change..."}
-                  disabled={isWaitingForConfirmation || isLoading}
-                  className="w-full bg-gray-800 text-white text-sm rounded-lg pl-4 pr-12 py-3 focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed max-h-32 overflow-y-auto"
-                  rows={1}
-              />
-              <button 
-                  onClick={() => handleSendMessage()}
-                  disabled={!input.trim() || isLoading || isWaitingForConfirmation}
-                  className="absolute right-2 bottom-2 p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                  </svg>
-              </button>
-          </div>
-          <div className="text-[10px] text-gray-500 mt-2 text-center">
-              AI can make mistakes. Review proposed actions carefully.
-          </div>
-      </div>
+        {/* Messages */}
+        <div className="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar">
+            {messages.map((msg, idx) => (
+                <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    {msg.text && (
+                        <div className={`p-3 rounded-lg max-w-[90%] text-sm whitespace-pre-wrap ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
+                            {msg.text}
+                        </div>
+                    )}
+                    {msg.functionCalls && (
+                        <div className="mt-2 bg-gray-800 border border-gray-600 rounded-lg p-2 w-full max-w-[95%] shadow-lg">
+                            <div className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider px-1">Suggested Actions</div>
+                            <div className="space-y-1">
+                                {msg.functionCalls.map((fc, i) => (
+                                    <div key={i} className="flex items-center gap-2 bg-gray-900/50 p-2 rounded text-xs">
+                                        {msg.isPending && (
+                                            <input 
+                                                type="checkbox" 
+                                                checked={actionDecisions[i] === 'accepted'}
+                                                onChange={() => setActionDecisions(prev => ({ ...prev, [i]: prev[i] === 'accepted' ? 'rejected' : 'accepted' }))}
+                                                className="cursor-pointer"
+                                            />
+                                        )}
+                                        <div className={`flex-grow ${actionDecisions[i] === 'rejected' ? 'opacity-50 line-through' : ''}`}>
+                                            <span className="font-bold text-blue-400">{fc.name}</span>
+                                            <span className="text-gray-400 ml-1">{getActionDetails(fc)}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {msg.isPending && (
+                                <div className="mt-3 flex justify-end">
+                                    <button 
+                                        onClick={() => handleApplyPending(idx)}
+                                        disabled={isLoading}
+                                        className="bg-green-600 hover:bg-green-500 text-white px-3 py-1 rounded text-xs font-bold"
+                                    >
+                                        Apply Selected
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            ))}
+            {isLoading && (
+                <div className="flex items-center gap-2 text-gray-500 text-xs animate-pulse">
+                    <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
+                    Thinking...
+                </div>
+            )}
+            <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="p-3 bg-gray-800 border-t border-gray-700">
+            <div className="flex gap-2 relative">
+                <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage();
+                        }
+                    }}
+                    placeholder="Ask to create nodes, analyze connections..."
+                    className="w-full bg-gray-900 text-white text-sm rounded p-2 border border-gray-600 focus:border-blue-500 outline-none resize-none max-h-32 scrollbar-thin"
+                    rows={1}
+                />
+                <button 
+                    onClick={() => handleSendMessage()} 
+                    disabled={isLoading || !input.trim()}
+                    className="bg-blue-600 hover:bg-blue-500 text-white p-2 rounded disabled:opacity-50 disabled:cursor-not-allowed self-end h-9 w-9 flex items-center justify-center"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>
+                </button>
+            </div>
+            <div className="flex justify-between items-center mt-2 px-1">
+                <button onClick={() => setIsCreativeMode(!isCreativeMode)} className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${isCreativeMode ? 'border-purple-500 text-purple-400' : 'border-gray-600 text-gray-500'}`}>
+                    {isCreativeMode ? 'Creative Mode' : 'Strict Mode'}
+                </button>
+                {error && <span className="text-red-400 text-xs truncate max-w-[200px]" title={error}>{error}</span>}
+            </div>
+        </div>
     </div>
   );
 };

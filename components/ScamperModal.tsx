@@ -31,6 +31,7 @@ interface ScamperModalProps {
   
   // Settings
   defaultTags?: string[];
+  activeModel?: string;
 }
 
 const ScamperModal: React.FC<ScamperModalProps> = ({
@@ -48,7 +49,8 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
   modelName,
   initialDoc,
   onLogHistory,
-  defaultTags = []
+  defaultTags = [],
+  activeModel
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<ScamperSuggestion[]>([]);
@@ -141,7 +143,7 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
         For each idea, provide a name, a short description/rationale, and a short relationship label that connects the original concept to the new idea (e.g. "can be replaced by", "combined with", "adapted to").`;
         
         const response = await ai.models.generateContent({ 
-            model: 'gemini-2.5-flash', 
+            model: activeModel || 'gemini-2.5-flash', 
             contents: prompt, 
             config: { 
                 responseMimeType: "application/json", 

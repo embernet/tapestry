@@ -21,9 +21,11 @@ interface LssModalProps {
   onUpdateDocument: (docId: string, updates: Partial<TapestryDocument>) => void;
   initialParams?: any;
   customPrompt?: string;
+  activeModel?: string;
 }
 
-// --- Define Phase Tool Panels ---
+// ... (Keep Sub Components CharterPanel, SipocPanel, VocPanel, CtqPanel, StakeholderPanel, DmaicPanel, FiveWhysPanel, FishbonePanel, FmeaPanel, VsmPanel identical) ...
+// [Subcomponents omitted for brevity]
 
 const CharterPanel: React.FC<{ onGenerate: (context: string) => void, isLoading: boolean }> = ({ onGenerate, isLoading }) => {
     const [context, setContext] = useState('');
@@ -152,8 +154,6 @@ const StakeholderPanel: React.FC<{ onGenerate: (context: string) => void, isLoad
         </div>
     );
 };
-
-// --- Existing Process Improvement Tool Panels ---
 
 const DmaicPanel: React.FC<{ onGenerate: (phase: string) => void, isLoading: boolean }> = ({ onGenerate, isLoading }) => {
     const PHASES = [
@@ -296,9 +296,7 @@ const VsmPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> = ({ on
     );
 };
 
-// --- Main Modal ---
-
-const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, documents, folders, onUpdateDocument, initialParams, customPrompt }) => {
+const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, documents, folders, onUpdateDocument, initialParams, customPrompt, activeModel }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -424,7 +422,7 @@ const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relat
           }
 
           const response = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: activeModel || 'gemini-2.5-flash',
               contents: userPrompt,
               config: {
                   systemInstruction,

@@ -1,12 +1,12 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { SystemPromptConfig, GlobalSettings } from '../types';
+import { SystemPromptConfig, GlobalSettings, AIProvider } from '../types';
 import { AVAILABLE_AI_TOOLS, DEFAULT_SYSTEM_PROMPT_CONFIG, DEFAULT_TOOL_PROMPTS } from '../constants';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: 'general' | 'ai' | 'tools' | 'prompts';
+  initialTab?: 'general' | 'ai_settings' | 'ai_prompts' | 'ai_tools' | 'prompts';
   initialTool?: string;
   globalSettings: GlobalSettings;
   onGlobalSettingsChange: (settings: GlobalSettings) => void;
@@ -90,12 +90,21 @@ const TOOL_STRUCTURE = [
     }
 ];
 
+const PROVIDER_DEFAULTS: Record<string, { url: string, model: string }> = {
+    openai: { url: 'https://api.openai.com/v1', model: 'gpt-4o' },
+    anthropic: { url: 'https://api.anthropic.com/v1', model: 'claude-3-5-sonnet-20240620' },
+    grok: { url: 'https://api.x.ai/v1', model: 'grok-beta' },
+    ollama: { url: 'http://localhost:11434/v1', model: 'llama3' },
+    gemini: { url: '', model: 'gemini-2.5-flash' },
+    custom: { url: '', model: '' }
+};
+
 const SettingsModal: React.FC<SettingsModalProps> = ({ 
     isOpen, onClose, initialTab = 'general', initialTool,
     globalSettings, onGlobalSettingsChange, 
     modelSettings, onModelSettingsChange 
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'ai' | 'tools' | 'prompts'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'general' | 'ai_settings' | 'ai_prompts' | 'ai_tools' | 'prompts'>(initialTab);
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set(initialTool ? [initialTool] : []));
   const [expandedSubPromptTools, setExpandedSubPromptTools] = useState<Set<string>>(new Set());
   const modalRef = useRef<HTMLDivElement>(null);
@@ -187,6 +196,29 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       return DEFAULT_TOOL_PROMPTS[key] || "";
   };
 
+  // AI Connection Logic
+  const handleProviderChange = (provider: AIProvider) => {
+      handleGlobalSettingChange('activeProvider', provider);
+  };
+
+  const handleConnectionChange = (key: string, value: string) => {
+      const provider = globalSettings.activeProvider;
+      const currentConnection = globalSettings.aiConnections[provider] || { provider, apiKey: '', modelId: '' };
+      
+      const updatedConnections = {
+          ...globalSettings.aiConnections,
+          [provider]: {
+              ...currentConnection,
+              [key]: value
+          }
+      };
+      
+      handleGlobalSettingChange('aiConnections', updatedConnections);
+  };
+
+  const activeConnection = globalSettings.aiConnections[globalSettings.activeProvider];
+  const defaultUrl = PROVIDER_DEFAULTS[globalSettings.activeProvider]?.url || '';
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
       <div ref={modalRef} className="bg-gray-800 rounded-lg w-full max-w-4xl shadow-xl border border-gray-600 text-white flex flex-col max-h-[90vh]">
@@ -201,16 +233,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     General
                 </button>
                 <button 
-                    onClick={() => setActiveTab('ai')}
-                    className={`text-sm font-bold uppercase tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap ${activeTab === 'ai' ? 'bg-gray-700 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                    onClick={() => setActiveTab('ai_settings')}
+                    className={`text-sm font-bold uppercase tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap ${activeTab === 'ai_settings' ? 'bg-gray-700 text-yellow-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
                 >
-                    AI Advisor
+                    AI Settings
                 </button>
                 <button 
-                    onClick={() => setActiveTab('tools')}
-                    className={`text-sm font-bold uppercase tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap ${activeTab === 'tools' ? 'bg-gray-700 text-green-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                    onClick={() => setActiveTab('ai_prompts')}
+                    className={`text-sm font-bold uppercase tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap ${activeTab === 'ai_prompts' ? 'bg-gray-700 text-blue-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
                 >
-                    Tools
+                    AI Prompts
+                </button>
+                <button 
+                    onClick={() => setActiveTab('ai_tools')}
+                    className={`text-sm font-bold uppercase tracking-wide px-3 py-2 rounded transition-colors whitespace-nowrap ${activeTab === 'ai_tools' ? 'bg-gray-700 text-green-400' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`}
+                >
+                    AI Tools
                 </button>
                 <button 
                     onClick={() => setActiveTab('prompts')}
@@ -247,8 +285,84 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 </div>
             )}
 
-            {/* --- AI ADVISOR TAB --- */}
-            {activeTab === 'ai' && (
+            {/* --- AI SETTINGS TAB --- */}
+            {activeTab === 'ai_settings' && (
+                <div className="space-y-6">
+                    <div className="space-y-4">
+                        <p className="text-sm text-gray-300 bg-gray-900 p-3 rounded border border-gray-700">
+                            Configure your AI provider. Tapestry connects directly to the provider's API from your browser. 
+                            Your API key is stored locally in your browser and is never sent to our servers.
+                        </p>
+
+                        <div className="space-y-2">
+                            <label className="block text-sm font-bold text-white uppercase tracking-wide">Active Provider</label>
+                            <select 
+                                value={globalSettings.activeProvider} 
+                                onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
+                                className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                            >
+                                <option value="gemini">Google Gemini</option>
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic (Claude)</option>
+                                <option value="grok">Grok (xAI)</option>
+                                <option value="ollama">Ollama (Local)</option>
+                                <option value="custom">Custom / Other</option>
+                            </select>
+                        </div>
+
+                        <div className="p-4 bg-gray-700 rounded-lg border border-gray-600 space-y-4">
+                            {/* Specific Provider Guidance */}
+                            {globalSettings.activeProvider === 'gemini' && (
+                                <div className="text-xs text-blue-200 mb-2 flex gap-2 items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                    </svg>
+                                    <span>
+                                        Don't have a key? <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline font-bold hover:text-white">Get a Gemini API Key</a>
+                                    </span>
+                                </div>
+                            )}
+                            
+                            <div className="space-y-2">
+                                <label className="block text-xs font-bold text-gray-300">API Key</label>
+                                <input 
+                                    type="password" 
+                                    value={activeConnection?.apiKey || ''} 
+                                    onChange={(e) => handleConnectionChange('apiKey', e.target.value)}
+                                    placeholder={globalSettings.activeProvider === 'ollama' ? 'Not required for Ollama' : 'sk-...'}
+                                    className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-blue-500"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="block text-xs font-bold text-gray-300">Model ID</label>
+                                <input 
+                                    type="text" 
+                                    value={activeConnection?.modelId || ''} 
+                                    onChange={(e) => handleConnectionChange('modelId', e.target.value)}
+                                    placeholder={PROVIDER_DEFAULTS[globalSettings.activeProvider]?.model || 'e.g. gpt-4o'}
+                                    className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="block text-xs font-bold text-gray-300">Base URL</label>
+                                <input 
+                                    type="text" 
+                                    value={activeConnection?.baseUrl !== undefined ? activeConnection.baseUrl : defaultUrl} 
+                                    onChange={(e) => handleConnectionChange('baseUrl', e.target.value)}
+                                    placeholder={defaultUrl}
+                                    className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-blue-500 font-mono text-sm"
+                                />
+                                <p className="text-[10px] text-gray-400">Leave empty to use default provider URL. Use full URL (e.g., include /v1).</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- AI PROMPTS TAB --- */}
+            {activeTab === 'ai_prompts' && (
                 <div className="space-y-6">
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
@@ -264,120 +378,107 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
 
                     <div className="space-y-2">
-                        <label className="font-semibold text-green-400 block">User Context / Custom Instructions</label>
-                        <p className="text-xs text-gray-500 mb-2">Additional context about your specific domain or preferences (e.g. "Focus on healthcare", "Be concise").</p>
+                        <label className="font-semibold text-green-400 block">User Context / Style Instructions</label>
+                        <p className="text-xs text-gray-500">Add custom instructions that apply to all queries in this model (e.g., "Always act as a business consultant").</p>
                         <textarea
-                            value={modelSettings.userPrompt}
-                            onChange={(e) => handleModelSettingChange('userPrompt', e.target.value)}
-                            className="w-full h-32 bg-gray-900 border border-gray-600 rounded-md p-3 text-sm font-mono text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                            placeholder="Enter custom context here..."
+                            value={modelSettings.userContext || ''}
+                            onChange={(e) => handleModelSettingChange('userContext', e.target.value)}
+                            placeholder="Enter custom instructions here..."
+                            className="w-full h-32 bg-gray-900 border border-gray-600 rounded-md p-3 text-sm font-mono text-gray-300 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
                         />
                     </div>
                 </div>
             )}
 
-            {/* --- TOOLS TAB (Enable/Disable) --- */}
-            {activeTab === 'tools' && (
+            {/* --- AI TOOLS TAB --- */}
+            {activeTab === 'ai_tools' && (
                 <div className="space-y-4">
-                    <p className="text-sm text-gray-400">Select which AI tools are available in the chat.</p>
+                    <p className="text-sm text-gray-300">
+                        Select which tools the AI should know about. Disabling irrelevant tools can improve focus and reduce token usage.
+                    </p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {AVAILABLE_AI_TOOLS.map(tool => {
-                            const isEnabled = (modelSettings.enabledTools || AVAILABLE_AI_TOOLS.map(t => t.id)).includes(tool.id);
-                            return (
-                                <div key={tool.id} className={`p-4 rounded-lg border cursor-pointer transition-all ${isEnabled ? 'bg-gray-700 border-blue-500' : 'bg-gray-800 border-gray-700 opacity-70'}`} onClick={() => toggleTool(tool.id)}>
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className={`font-bold ${isEnabled ? 'text-white' : 'text-gray-400'}`}>{tool.name}</span>
-                                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center ${isEnabled ? 'bg-blue-500 border-blue-500' : 'border-gray-500'}`}>
-                                            {isEnabled && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                                        </div>
-                                    </div>
-                                    <p className="text-xs text-gray-400">{tool.description}</p>
+                        {AVAILABLE_AI_TOOLS.map(tool => (
+                            <div key={tool.id} className="bg-gray-700 border border-gray-600 rounded-lg p-3 flex items-start gap-3">
+                                <input 
+                                    type="checkbox" 
+                                    checked={(modelSettings.enabledTools || []).includes(tool.id)}
+                                    onChange={() => toggleTool(tool.id)}
+                                    className="mt-1 rounded bg-gray-900 border-gray-500 text-green-500 focus:ring-green-500"
+                                />
+                                <div>
+                                    <div className="font-bold text-white text-sm">{tool.name}</div>
+                                    <div className="text-xs text-gray-400 leading-snug">{tool.description}</div>
                                 </div>
-                            );
-                        })}
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
 
-            {/* --- TOOL PROMPTS TAB (Detailed Configuration) --- */}
+            {/* --- PROMPTS TAB --- */}
             {activeTab === 'prompts' && (
-                <div className="space-y-4">
-                    <p className="text-sm text-gray-400 mb-4">
-                        Customize the AI instructions for each tool and its subtools. 
-                        Specific subtool prompts override the category base prompt.
-                    </p>
+                <div className="space-y-6">
+                    <p className="text-sm text-gray-300">Customize the prompts used by specific tools.</p>
                     
-                    {TOOL_STRUCTURE.map(tool => {
-                        const isExpanded = expandedSubPromptTools.has(tool.id);
-                        const baseKey = tool.id;
-                        
-                        return (
-                            <div key={tool.id} className="border border-gray-700 rounded-lg overflow-hidden bg-gray-900">
-                                <button 
-                                    onClick={() => toggleAccordion(tool.id, expandedSubPromptTools, setExpandedSubPromptTools)}
-                                    className="w-full flex items-center justify-between p-4 bg-gray-800 hover:bg-gray-700 transition-colors"
-                                >
-                                    <span className="font-bold text-gray-200">{tool.name}</span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 text-gray-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                                    </svg>
-                                </button>
-                                
-                                {isExpanded && (
-                                    <div className="p-4 space-y-6 border-t border-gray-700">
-                                        {/* Base Category Prompt */}
-                                        <div>
-                                            <div className="flex justify-between items-end mb-2">
-                                                <label className="text-xs font-bold text-blue-400 uppercase">Base {tool.name} Prompt</label>
-                                                <button onClick={() => handleResetToolPrompt(baseKey)} className="text-[10px] text-gray-500 hover:text-red-400">Reset</button>
-                                            </div>
-                                            <textarea
-                                                value={getPromptValue(baseKey)}
-                                                onChange={(e) => handleToolPromptChange(baseKey, e.target.value)}
-                                                className="w-full h-32 bg-gray-800 border border-gray-600 rounded p-3 text-xs font-mono text-gray-300 focus:outline-none focus:border-blue-500 resize-y"
-                                                placeholder={`Default prompt for ${tool.name}...`}
-                                            />
+                    {TOOL_STRUCTURE.map(toolGroup => (
+                        <div key={toolGroup.id} className="border border-gray-600 rounded-lg overflow-hidden">
+                            <button 
+                                onClick={() => toggleAccordion(toolGroup.id, expandedSubPromptTools, setExpandedSubPromptTools)}
+                                className="w-full flex justify-between items-center p-3 bg-gray-700 hover:bg-gray-600 transition-colors"
+                            >
+                                <span className="font-bold text-white">{toolGroup.name}</span>
+                                <span className="text-gray-400 text-xs">{expandedSubPromptTools.has(toolGroup.id) ? 'Hide' : 'Show'}</span>
+                            </button>
+                            
+                            {expandedSubPromptTools.has(toolGroup.id) && (
+                                <div className="p-4 bg-gray-800 space-y-6 border-t border-gray-600">
+                                    {/* Base Prompt */}
+                                    <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="text-xs font-bold text-blue-400 uppercase">Base Prompt</label>
+                                            <button onClick={() => handleResetToolPrompt(toolGroup.id)} className="text-[10px] text-gray-500 hover:text-white underline">Reset</button>
                                         </div>
-
-                                        {/* Subtools Accordion */}
-                                        <div className="pl-4 border-l-2 border-gray-700 space-y-4">
-                                            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Subtool Overrides</h4>
-                                            {tool.subtools.map(sub => {
-                                                const subKey = `${tool.id}:${sub.id}`;
-                                                const subValue = (modelSettings.toolPrompts && modelSettings.toolPrompts[subKey]) || "";
-                                                
-                                                return (
-                                                    <div key={sub.id} className="group">
-                                                        <div className="flex justify-between items-center mb-1">
-                                                            <label className="text-xs font-semibold text-gray-300">{sub.name}</label>
-                                                            {subValue && (
-                                                                <button onClick={() => handleResetToolPrompt(subKey)} className="text-[10px] text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">Clear Override</button>
-                                                            )}
-                                                        </div>
-                                                        <textarea
-                                                            value={subValue}
-                                                            onChange={(e) => handleToolPromptChange(subKey, e.target.value)}
-                                                            className={`w-full h-20 bg-gray-800 border rounded p-2 text-xs font-mono focus:outline-none focus:border-purple-500 resize-y ${subValue ? 'border-purple-500/50 text-white' : 'border-gray-600 text-gray-500'}`}
-                                                            placeholder={`(Optional) Override prompt specifically for ${sub.name}. Leave empty to use Base Prompt.`}
-                                                        />
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                        <textarea
+                                            value={getPromptValue(toolGroup.id)}
+                                            onChange={(e) => handleToolPromptChange(toolGroup.id, e.target.value)}
+                                            className="w-full h-24 bg-gray-900 border border-gray-600 rounded p-2 text-xs font-mono text-gray-300 focus:outline-none focus:border-blue-500 resize-y"
+                                        />
                                     </div>
-                                )}
-                            </div>
-                        );
-                    })}
+
+                                    {/* Subtool Prompts */}
+                                    <div className="pl-4 border-l-2 border-gray-700 space-y-4">
+                                        {toolGroup.subtools.map(sub => {
+                                            const key = `${toolGroup.id}:${sub.id}`;
+                                            const fallback = toolGroup.id;
+                                            return (
+                                                <div key={sub.id}>
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <label className="text-xs font-bold text-gray-400">{sub.name} ({sub.id})</label>
+                                                        <button onClick={() => handleResetToolPrompt(key)} className="text-[10px] text-gray-500 hover:text-white underline">Reset</button>
+                                                    </div>
+                                                    <textarea
+                                                        value={getPromptValue(key, fallback)}
+                                                        onChange={(e) => handleToolPromptChange(key, e.target.value)}
+                                                        placeholder={`(Inherits from ${toolGroup.name} base prompt if empty)`}
+                                                        className="w-full h-20 bg-gray-900 border border-gray-600 rounded p-2 text-xs font-mono text-gray-300 focus:outline-none focus:border-purple-500 resize-y placeholder-gray-600"
+                                                    />
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
                 </div>
             )}
 
         </div>
 
-        <div className="p-4 border-t border-gray-700 flex justify-end bg-gray-900 rounded-b-lg flex-shrink-0">
-            <button onClick={onClose} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded transition duration-150">
-                Done
-            </button>
+        <div className="p-4 border-t border-gray-700 flex justify-end space-x-4 bg-gray-900 rounded-b-lg flex-shrink-0">
+          <button onClick={onClose} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-md transition duration-150 shadow-lg">
+            Done
+          </button>
         </div>
       </div>
     </div>

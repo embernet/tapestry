@@ -21,6 +21,7 @@ interface SwotModalProps {
   modelName?: string;
   initialDoc?: TapestryDocument | null;
   customPrompt?: string;
+  activeModel?: string;
 }
 
 interface SwotEntry {
@@ -31,7 +32,7 @@ interface SwotEntry {
 
 type SwotCategory = 'strengths' | 'weaknesses' | 'opportunities' | 'threats';
 
-const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, documents, folders, onUpdateDocument, modelName, initialDoc, customPrompt }) => {
+const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, documents, folders, onUpdateDocument, modelName, initialDoc, customPrompt, activeModel }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -375,7 +376,7 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
           }
 
           const response = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: activeModel || 'gemini-2.5-flash',
               contents: [{ role: 'user', parts: [{ text: prompt }, { text: `GRAPH CONTEXT:\n${graphMarkdown}` }] }],
               config: {
                   responseMimeType: "application/json",
@@ -478,7 +479,7 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
           }
 
           const response = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: activeModel || 'gemini-2.5-flash',
               contents: userPrompt,
               config: {
                   systemInstruction,

@@ -21,10 +21,11 @@ interface TocModalProps {
   folders: TapestryFolder[];
   onUpdateDocument: (docId: string, updates: Partial<TapestryDocument>) => void;
   customPrompt?: string;
+  activeModel?: string;
 }
 
 // ... (Keep Sub Components CrtPanel, EcPanel, FrtPanel, TtPanel identical) ...
-// [Re-declaring for context]
+// [Subcomponents omitted for brevity]
 
 const CrtPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> = ({ onGenerate, isLoading }) => {
     return (
@@ -138,9 +139,7 @@ const TtPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> = ({ onG
     );
 };
 
-// --- Main Modal ---
-
-const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt }) => {
+const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -216,7 +215,7 @@ const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relat
           }
 
           const response = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: activeModel || 'gemini-2.5-flash',
               contents: userPrompt,
               config: {
                   systemInstruction,
@@ -315,6 +314,8 @@ const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relat
       }
   };
 
+  // ... (Keep all handlers like handleApplyAction, handleCopy, etc. identical) ...
+  // [Handlers omitted for brevity]
   const handleApplyAction = (index: number) => {
       const action = suggestions[index];
       if (!action) return;

@@ -21,6 +21,7 @@ interface SsmModalProps {
   folders: TapestryFolder[];
   onUpdateDocument: (docId: string, updates: Partial<TapestryDocument>) => void;
   customPrompt?: string;
+  activeModel?: string;
 }
 
 const RichPicturePanel: React.FC<{ onGenerate: (topic: string) => void, isLoading: boolean, initialParams?: any }> = ({ onGenerate, isLoading, initialParams }) => {
@@ -117,7 +118,7 @@ const ComparisonPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> 
     );
 };
 
-const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt }) => {
+const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -189,7 +190,7 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
           }
 
           const response = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
+              model: activeModel || 'gemini-2.5-flash',
               contents: userPrompt,
               config: {
                   systemInstruction: `${systemPromptBase}\nGRAPH CONTEXT:\n${graphMarkdown}`,

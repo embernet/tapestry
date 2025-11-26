@@ -107,8 +107,19 @@ export interface SystemPromptConfig {
   toolPrompts?: Record<string, string>;
 }
 
+export type AIProvider = 'gemini' | 'openai' | 'anthropic' | 'grok' | 'ollama' | 'custom';
+
+export interface AIConnection {
+  provider: AIProvider;
+  apiKey: string;
+  baseUrl?: string;
+  modelId: string;
+}
+
 export interface GlobalSettings {
   toolsBarOpenByDefault: boolean;
+  activeProvider: AIProvider;
+  aiConnections: Record<AIProvider, AIConnection>;
 }
 
 export interface ModelMetadata {
@@ -145,7 +156,7 @@ export interface ModelActions {
   setElementAttribute: (elementName: string, key: string, value: string) => boolean;
   deleteElementAttribute: (elementName: string, key: string) => boolean;
   setRelationshipAttribute: (sourceName: string, targetName: string, key: string, value: string) => boolean;
-  deleteRelationshipAttribute: (sourceName: string, targetName: string, key: string) => boolean;
+  deleteRelationshipAttribute: (sourceName: string, targetName: string, key: string, value: string) => boolean;
   
   // Document Actions
   readDocument: (title: string) => string | null;

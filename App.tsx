@@ -45,8 +45,7 @@ import SettingsModal from './components/SettingsModal';
 import HistoryPanel from './components/HistoryPanel';
 import HistoryItemPanel from './components/HistoryItemPanel';
 import { DocumentManagerPanel, DocumentEditorPanel } from './components/DocumentPanel';
-import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe, generateSelectionReport } from './utils';
-import { GoogleGenAI, Type } from '@google/genai';
+import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe, generateSelectionReport, callAI, AIConfig } from './utils';
 import { TextAnimator, ConflictResolutionModal, ContextMenu, CanvasContextMenu, CreateModelModal, SaveAsModal, OpenModelModal, HelpMenu, PatternGalleryModal, AboutModal, TAPESTRY_PATTERNS, TapestryBanner, SchemaUpdateModal, SelfTestModal, TestLog } from './components/ModalComponents';
 
 // Explicitly define coordinate type to fix type inference issues
@@ -87,11 +86,20 @@ export default function App() {
   
   // --- Settings State ---
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
-      toolsBarOpenByDefault: true
+      toolsBarOpenByDefault: true,
+      activeProvider: 'gemini',
+      aiConnections: {
+          gemini: { provider: 'gemini', apiKey: '', modelId: 'gemini-2.5-flash' },
+          openai: { provider: 'openai', apiKey: '', modelId: 'gpt-4o' },
+          anthropic: { provider: 'anthropic', apiKey: '', modelId: 'claude-3-5-sonnet-20240620' },
+          grok: { provider: 'grok', apiKey: '', modelId: 'grok-beta' },
+          ollama: { provider: 'ollama', apiKey: 'ollama', baseUrl: 'http://localhost:11434', modelId: 'llama3' },
+          custom: { provider: 'custom', apiKey: '', baseUrl: '', modelId: '' }
+      }
   });
   const [systemPromptConfig, setSystemPromptConfig] = useState<SystemPromptConfig>(DEFAULT_SYSTEM_PROMPT_CONFIG);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'ai' | 'tools'>('general');
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'ai_settings' | 'ai_prompts' | 'ai_tools' | 'prompts'>('general');
 
   // --- Documents State ---
   const [documents, setDocuments] = useState<TapestryDocument[]>([]);
@@ -192,13 +200,26 @@ export default function App() {
   const [testLogs, setTestLogs] = useState<TestLog[]>([]);
   const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'complete'>('idle');
 
+  // Calculate active configuration for AI calls
+  const aiConfig = useMemo<AIConfig>(() => {
+      const provider = globalSettings.activeProvider;
+      const conn = globalSettings.aiConnections[provider];
+      return {
+          provider,
+          apiKey: conn?.apiKey || '',
+          modelId: conn?.modelId || 'gemini-2.5-flash',
+          baseUrl: conn?.baseUrl
+      };
+  }, [globalSettings]);
+
   // Load Global Settings on Mount
   useEffect(() => {
       try {
           const savedSettings = localStorage.getItem(GLOBAL_SETTINGS_KEY);
           if (savedSettings) {
               const parsed = JSON.parse(savedSettings);
-              setGlobalSettings(parsed);
+              // Merge with defaults to ensure new fields exist
+              setGlobalSettings(prev => ({ ...prev, ...parsed }));
               setIsToolsPanelOpen(parsed.toolsBarOpenByDefault ?? true);
           }
       } catch (e) {
@@ -930,7 +951,6 @@ export default function App() {
       try {
           // Use provided context, or generate default full graph context
           const graphMarkdown = contextMarkdown || generateMarkdownFromGraph(elements, relationships);
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           const fullPrompt = `
           You are an expert in Mermaid.js diagram syntax.
           The user wants you to generate or update a Mermaid diagram based on the following knowledge graph data.
@@ -946,11 +966,7 @@ export default function App() {
           3. ONLY return the mermaid code block (enclosed in \`\`\`mermaid ... \`\`\`). Do not include extra conversational text.
           `;
           
-          const response = await ai.models.generateContent({
-              model: 'gemini-2.5-flash',
-              contents: fullPrompt
-          });
-          
+          const response = await callAI(aiConfig, fullPrompt);
           return response.text || "";
       } catch (e) {
           console.error("Mermaid Gen Error", e);
@@ -959,7 +975,7 @@ export default function App() {
       } finally {
           setIsMermaidGenerating(false);
       }
-  }, [elements, relationships]);
+  }, [elements, relationships, aiConfig]);
 
   // --- AI Actions Adapter ---
   const aiActions: ModelActions = useMemo(() => {
@@ -2049,7 +2065,7 @@ export default function App() {
                                 { label: 'History', state: isHistoryPanelOpen, toggle: () => setIsHistoryPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
                                 { label: 'Table', state: isTablePanelOpen, toggle: () => setIsTablePanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" /></svg> },
                                 { label: 'Matrix', state: isMatrixPanelOpen, toggle: () => setIsMatrixPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> },
-                                { label: 'Grid', state: isGridPanelOpen, toggle: () => setIsGridPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /></svg> },
+                                { label: 'Grid', state: isGridPanelOpen, toggle: () => setIsGridPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7H4v-7z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /></svg> },
                                 { label: 'Markdown', state: isMarkdownPanelOpen, toggle: () => setIsMarkdownPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg> },
                                 { label: 'JSON', state: isJSONPanelOpen, toggle: () => setIsJSONPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg> }
                             ].map((panel, idx) => (
@@ -2455,7 +2471,7 @@ export default function App() {
           currentModelId={currentModelId}
           modelActions={aiActions}
           onOpenPromptSettings={() => {
-              setSettingsInitialTab('ai');
+              setSettingsInitialTab('ai_prompts');
               setIsSettingsModalOpen(true);
           }}
           systemPromptConfig={systemPromptConfig}
@@ -2466,6 +2482,7 @@ export default function App() {
           onOpenHistory={() => setIsHistoryPanelOpen(true)}
           onOpenTool={handleOpenTool}
           initialInput={chatDraftMessage}
+          aiConfig={aiConfig}
       />
       
       <ScamperModal
@@ -2488,6 +2505,7 @@ export default function App() {
         
         onLogHistory={handleLogHistory}
         defaultTags={defaultTags}
+        aiConfig={aiConfig}
       />
 
       <TrizModal 
@@ -2505,6 +2523,7 @@ export default function App() {
         onOpenHistory={() => setIsHistoryPanelOpen(true)}
         onAnalyze={handleAnalyzeWithChat}
         customPrompt={getToolPrompt('triz', activeTrizTool)}
+        aiConfig={aiConfig}
       />
 
       <LssModal 
@@ -2522,6 +2541,7 @@ export default function App() {
         onOpenHistory={() => setIsHistoryPanelOpen(true)}
         onAnalyze={handleAnalyzeWithChat}
         customPrompt={getToolPrompt('lss', activeLssTool)}
+        aiConfig={aiConfig}
       />
 
       <TocModal 
@@ -2539,6 +2559,7 @@ export default function App() {
         onOpenHistory={() => setIsHistoryPanelOpen(true)}
         onAnalyze={handleAnalyzeWithChat}
         customPrompt={getToolPrompt('toc', activeTocTool)}
+        aiConfig={aiConfig}
       />
 
       <SsmModal 
@@ -2556,6 +2577,7 @@ export default function App() {
         onOpenHistory={() => setIsHistoryPanelOpen(true)}
         onAnalyze={handleAnalyzeWithChat}
         customPrompt={getToolPrompt('ssm', activeSsmTool)}
+        aiConfig={aiConfig}
       />
 
       <SwotModal 
@@ -2572,6 +2594,7 @@ export default function App() {
         onOpenHistory={() => setIsHistoryPanelOpen(true)}
         modelName={currentModelName}
         initialDoc={swotInitialDoc}
+        aiConfig={aiConfig}
       />
 
       <SettingsModal 
