@@ -1944,7 +1944,7 @@ export default function App() {
   const focusButtonTitle = () => { if (focusMode === 'narrow') return 'Switch to Wide Focus'; if (focusMode === 'wide') return 'Switch to Zoom Focus'; return 'Switch to Narrow Focus'; };
 
   return (
-    <div className="w-screen h-screen overflow-hidden flex relative">
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-gray-900 text-white">
       <input type="file" ref={importFileRef} onChange={handleImportInputChange} accept=".json" className="hidden" />
       
       {isPresenting && (
@@ -1983,393 +1983,385 @@ export default function App() {
       )}
 
       {currentModelId && !isPresenting && (
-          <div className="absolute top-4 left-4 z-[600] bg-gray-800 bg-opacity-80 p-2 rounded-lg flex items-center space-x-2">
+          <div className="flex-shrink-0 z-[2000] bg-gray-800 border-b border-gray-700 shadow-md transition-all duration-300 relative">
                 
-                {/* Main Menu Dropdown */}
-                <div className="relative" ref={mainMenuRef}>
-                    <button 
-                        onClick={() => setIsMainMenuOpen(!isMainMenuOpen)}
-                        className="flex items-center space-x-2 text-gray-300 hover:bg-gray-700 p-2 rounded-lg transition-colors outline-none"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M4 8c2-2 4-2 6 0s4 2 6 0" />
-                            <path d="M4 12c2-2 4-2 6 0s4 2 6 0" />
-                            <path d="M4 16c2-2 4-2 6 0s4 2 6 0" />
+                {/* Row 1: Main Toolbar */}
+                <div className="flex items-center p-2 gap-2 overflow-x-auto">
+                    {/* Main Menu Dropdown */}
+                    <div className="relative" ref={mainMenuRef}>
+                        <button 
+                            onClick={() => setIsMainMenuOpen(!isMainMenuOpen)}
+                            className="flex items-center space-x-2 text-gray-300 hover:bg-gray-700 p-2 rounded-lg transition-colors outline-none"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M4 8c2-2 4-2 6 0s4 2 6 0" />
+                                <path d="M4 12c2-2 4-2 6 0s4 2 6 0" />
+                                <path d="M4 16c2-2 4-2 6 0s4 2 6 0" />
+                            </svg>
+                            <span className="text-xl font-bold hidden sm:inline">Tapestry</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 text-gray-500 transition-transform ${isMainMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+
+                        {isMainMenuOpen && (
+                            <div className="absolute top-full left-0 mt-2 w-64 bg-gray-900 border border-gray-600 rounded-lg shadow-xl py-2 flex flex-col z-50 text-sm animate-fade-in-down max-h-[80vh] overflow-y-auto">
+                                {/* File Section */}
+                                <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">File</div>
+                                <button onClick={() => { handleNewModelClick(); setIsMainMenuOpen(false); }} className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3">
+                                    <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                    New Model...
+                                </button>
+                                <button onClick={() => { setIsSaveAsModalOpen(true); setIsMainMenuOpen(false); }} className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3">
+                                    <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                                    Save As...
+                                </button>
+                                <button onClick={() => { handleImportClick(); setIsMainMenuOpen(false); }} className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3">
+                                    <svg className="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                                    Open Model...
+                                </button>
+                                <button onClick={() => { handleDiskSave(); setIsMainMenuOpen(false); }} className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3">
+                                    <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                                    Save to Disk
+                                </button>
+                                
+                                <div className="border-t border-gray-700 my-2 mx-2"></div>
+                                
+                                {/* Tools Section */}
+                                <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Tools</div>
+                                {[
+                                    { id: 'schema', label: 'Schema', color: 'text-teal-400' },
+                                    { id: 'layout', label: 'Layout', color: 'text-orange-400' },
+                                    { id: 'analysis', label: 'Analysis', color: 'text-purple-400' },
+                                    { id: 'scamper', label: 'SCAMPER', color: 'text-cyan-400' },
+                                    { id: 'triz', label: 'TRIZ', color: 'text-indigo-400' },
+                                    { id: 'lss', label: 'Lean Six Sigma', color: 'text-blue-400' },
+                                    { id: 'toc', label: 'Theory of Constraints', color: 'text-amber-400' },
+                                    { id: 'ssm', label: 'Soft Systems', color: 'text-cyan-400' },
+                                    { id: 'swot', label: 'Strategic Analysis', color: 'text-lime-400' },
+                                    { id: 'explorer', label: 'Explorer', color: 'text-yellow-400' },
+                                    { id: 'tagcloud', label: 'Word Cloud', color: 'text-pink-400' },
+                                    { id: 'mermaid', label: 'Diagrams', color: 'text-cyan-400' },
+                                    { id: 'bulk', label: 'Bulk Edit', color: 'text-pink-400' },
+                                    { id: 'command', label: 'Command Bar', color: 'text-green-400' }
+                                ].map(tool => (
+                                    <button 
+                                        key={tool.id}
+                                        onClick={() => { toggleTool(tool.id); setIsToolsPanelOpen(true); setIsMainMenuOpen(false); }} 
+                                        className={`w-full text-left px-4 py-2 flex items-center gap-3 hover:bg-gray-800 transition-colors ${activeTool === tool.id ? 'bg-gray-800 text-white' : 'text-gray-300'}`}
+                                    >
+                                        <span className={`w-2 h-2 rounded-full bg-current ${tool.color}`}></span>
+                                        {tool.label}
+                                        {activeTool === tool.id && <span className="ml-auto text-xs text-blue-400 font-bold">ACTIVE</span>}
+                                    </button>
+                                ))}
+                                
+                                <div className="border-t border-gray-700 my-2 mx-2"></div>
+
+                                {/* Panels Section */}
+                                <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Panels</div>
+                                {[
+                                    { label: 'Report', state: isReportPanelOpen, toggle: () => setIsReportPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
+                                    { label: 'Tag Cloud', state: isConceptCloudOpen, toggle: () => setIsConceptCloudOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg> },
+                                    { label: 'Sunburst', state: isSunburstPanelOpen, toggle: () => { setIsSunburstPanelOpen(p => !p); if(isSunburstPanelOpen) setSunburstState(prev => ({...prev, active: false})); else setSunburstState(prev => ({...prev, active: true})); }, icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg> },
+                                    { label: 'Relationship Cloud', state: isInfluenceCloudOpen, toggle: () => setIsInfluenceCloudOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg> },
+                                    { label: 'Node Name Analysis', state: isTextAnalysisOpen, toggle: () => setIsTextAnalysisOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
+                                    { label: 'Full Text Analysis', state: isFullTextAnalysisOpen, toggle: () => setIsFullTextAnalysisOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg> },
+                                    { label: 'Diagrams', state: isMermaidPanelOpen, toggle: () => setIsMermaidPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg> },
+                                    { label: 'Story Mode', state: isPresentationPanelOpen, toggle: () => setIsPresentationPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> },
+                                    { label: 'Kanban', state: isKanbanPanelOpen, toggle: () => setIsKanbanPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg> },
+                                    { label: 'Documents', state: isDocumentPanelOpen, toggle: () => setIsDocumentPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg> },
+                                    { label: 'History', state: isHistoryPanelOpen, toggle: () => setIsHistoryPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
+                                    { label: 'Table', state: isTablePanelOpen, toggle: () => setIsTablePanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" /></svg> },
+                                    { label: 'Matrix', state: isMatrixPanelOpen, toggle: () => setIsMatrixPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> },
+                                    { label: 'Grid', state: isGridPanelOpen, toggle: () => setIsGridPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /></svg> },
+                                    { label: 'Markdown', state: isMarkdownPanelOpen, toggle: () => setIsMarkdownPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg> },
+                                    { label: 'JSON', state: isJSONPanelOpen, toggle: () => setIsJSONPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg> }
+                                ].map((panel, idx) => (
+                                    <button 
+                                        key={idx}
+                                        onClick={() => { panel.toggle(); setIsMainMenuOpen(false); }} 
+                                        className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center justify-between group"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="group-hover:text-blue-400">{panel.icon}</div>
+                                            {panel.label}
+                                        </div>
+                                        {panel.state && <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="border-l border-gray-600 h-6 mx-1"></div>
+                    
+                    {/* Standard Toolbar Buttons */}
+                    <button onClick={handleNewModelClick} title="New Model..." className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    </button>
+                    <button onClick={handleImportClick} title="Open Model..." className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                    </button>
+                    <button onClick={handleDiskSave} title="Save to Disk" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                    </button>
+                    <div className="border-l border-gray-600 h-6 mx-1"></div>
+                    
+                    {/* Copy / Paste */}
+                    <button onClick={handleCopy} title="Copy Selected (Report)" className="p-2 rounded-md hover:bg-gray-700 transition text-gray-400 hover:text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                         </svg>
-                        <span className="text-xl font-bold">Tapestry</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 text-gray-500 transition-transform ${isMainMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </button>
+                    <button onClick={handlePaste} title="Paste (Add to Model)" className="p-2 rounded-md hover:bg-gray-700 transition text-gray-400 hover:text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                         </svg>
                     </button>
 
-                    {isMainMenuOpen && (
-                        <div className="absolute top-full left-0 mt-2 w-64 bg-gray-900 border border-gray-600 rounded-lg shadow-xl py-2 flex flex-col z-50 text-sm animate-fade-in-down max-h-[80vh] overflow-y-auto">
-                            {/* File Section */}
-                            <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">File</div>
-                            <button onClick={() => { handleNewModelClick(); setIsMainMenuOpen(false); }} className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3">
-                                <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                                New Model...
-                            </button>
-                            <button onClick={() => { setIsSaveAsModalOpen(true); setIsMainMenuOpen(false); }} className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3">
-                                <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                                Save As...
-                            </button>
-                            <button onClick={() => { handleImportClick(); setIsMainMenuOpen(false); }} className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3">
-                                <svg className="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-                                Open Model...
-                            </button>
-                            <button onClick={() => { handleDiskSave(); setIsMainMenuOpen(false); }} className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center gap-3">
-                                <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                                Save to Disk
-                            </button>
-                            
-                            <div className="border-t border-gray-700 my-2 mx-2"></div>
-                            
-                            {/* Tools Section */}
-                            <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Tools</div>
-                            {[
-                                { id: 'schema', label: 'Schema', color: 'text-teal-400' },
-                                { id: 'layout', label: 'Layout', color: 'text-orange-400' },
-                                { id: 'analysis', label: 'Analysis', color: 'text-purple-400' },
-                                { id: 'scamper', label: 'SCAMPER', color: 'text-cyan-400' },
-                                { id: 'triz', label: 'TRIZ', color: 'text-indigo-400' },
-                                { id: 'lss', label: 'Lean Six Sigma', color: 'text-blue-400' },
-                                { id: 'toc', label: 'Theory of Constraints', color: 'text-amber-400' },
-                                { id: 'ssm', label: 'Soft Systems', color: 'text-cyan-400' },
-                                { id: 'swot', label: 'Strategic Analysis', color: 'text-lime-400' },
-                                { id: 'explorer', label: 'Explorer', color: 'text-yellow-400' },
-                                { id: 'tagcloud', label: 'Word Cloud', color: 'text-pink-400' },
-                                { id: 'mermaid', label: 'Diagrams', color: 'text-cyan-400' },
-                                { id: 'bulk', label: 'Bulk Edit', color: 'text-pink-400' },
-                                { id: 'command', label: 'Command Bar', color: 'text-green-400' }
-                            ].map(tool => (
-                                <button 
-                                    key={tool.id}
-                                    onClick={() => { toggleTool(tool.id); setIsToolsPanelOpen(true); setIsMainMenuOpen(false); }} 
-                                    className={`w-full text-left px-4 py-2 flex items-center gap-3 hover:bg-gray-800 transition-colors ${activeTool === tool.id ? 'bg-gray-800 text-white' : 'text-gray-300'}`}
-                                >
-                                    <span className={`w-2 h-2 rounded-full bg-current ${tool.color}`}></span>
-                                    {tool.label}
-                                    {activeTool === tool.id && <span className="ml-auto text-xs text-blue-400 font-bold">ACTIVE</span>}
-                                </button>
-                            ))}
-                            
-                            <div className="border-t border-gray-700 my-2 mx-2"></div>
-
-                            {/* Panels Section */}
-                            <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">Panels</div>
-                            {[
-                                { label: 'Report', state: isReportPanelOpen, toggle: () => setIsReportPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
-                                { label: 'Tag Cloud', state: isConceptCloudOpen, toggle: () => setIsConceptCloudOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg> },
-                                { label: 'Sunburst', state: isSunburstPanelOpen, toggle: () => { setIsSunburstPanelOpen(p => !p); if(isSunburstPanelOpen) setSunburstState(prev => ({...prev, active: false})); else setSunburstState(prev => ({...prev, active: true})); }, icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg> },
-                                { label: 'Relationship Cloud', state: isInfluenceCloudOpen, toggle: () => setIsInfluenceCloudOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg> },
-                                { label: 'Node Name Analysis', state: isTextAnalysisOpen, toggle: () => setIsTextAnalysisOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg> },
-                                { label: 'Full Text Analysis', state: isFullTextAnalysisOpen, toggle: () => setIsFullTextAnalysisOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg> },
-                                { label: 'Diagrams', state: isMermaidPanelOpen, toggle: () => setIsMermaidPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /></svg> },
-                                { label: 'Story Mode', state: isPresentationPanelOpen, toggle: () => setIsPresentationPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> },
-                                { label: 'Kanban', state: isKanbanPanelOpen, toggle: () => setIsKanbanPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg> },
-                                { label: 'Documents', state: isDocumentPanelOpen, toggle: () => setIsDocumentPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg> },
-                                { label: 'History', state: isHistoryPanelOpen, toggle: () => setIsHistoryPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
-                                { label: 'Table', state: isTablePanelOpen, toggle: () => setIsTablePanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" /></svg> },
-                                { label: 'Matrix', state: isMatrixPanelOpen, toggle: () => setIsMatrixPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> },
-                                { label: 'Grid', state: isGridPanelOpen, toggle: () => setIsGridPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /></svg> },
-                                { label: 'Markdown', state: isMarkdownPanelOpen, toggle: () => setIsMarkdownPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg> },
-                                { label: 'JSON', state: isJSONPanelOpen, toggle: () => setIsJSONPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg> }
-                            ].map((panel, idx) => (
-                                <button 
-                                    key={idx}
-                                    onClick={() => { panel.toggle(); setIsMainMenuOpen(false); }} 
-                                    className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-800 hover:text-white flex items-center justify-between group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="group-hover:text-blue-400">{panel.icon}</div>
-                                        {panel.label}
-                                    </div>
-                                    {panel.state && <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                <div className="border-l border-gray-600 h-6 mx-1"></div>
-                 
-                 {/* Standard Toolbar Buttons */}
-                 <button onClick={handleNewModelClick} title="New Model..." className="p-2 rounded-md hover:bg-gray-700 transition">
-                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                </button>
-                <button onClick={handleImportClick} title="Open Model..." className="p-2 rounded-md hover:bg-gray-700 transition">
-                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-                </button>
-                <button onClick={handleDiskSave} title="Save to Disk" className="p-2 rounded-md hover:bg-gray-700 transition">
-                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                </button>
-                <div className="border-l border-gray-600 h-6 mx-1"></div>
-                
-                {/* Copy / Paste */}
-                <button onClick={handleCopy} title="Copy Selected (Report)" className="p-2 rounded-md hover:bg-gray-700 transition text-gray-400 hover:text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                    </svg>
-                </button>
-                <button onClick={handlePaste} title="Paste (Add to Model)" className="p-2 rounded-md hover:bg-gray-700 transition text-gray-400 hover:text-white">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                </button>
-
-                <div className="border-l border-gray-600 h-6 mx-1"></div>
-                <button onClick={() => setIsToolsPanelOpen(p => !p)} title="Toggle Tools Panel" className={`p-2 rounded-md hover:bg-gray-700 transition ${isToolsPanelOpen ? 'bg-gray-700 text-white' : 'text-blue-400'}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.9 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-                    </svg>
-                </button>
-                <div className="border-l border-gray-600 h-6 mx-1"></div>
-                <button onClick={() => setIsFilterPanelOpen(prev => !prev)} title="Filter by Tag" className="p-2 rounded-md hover:bg-gray-700 transition">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h14a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
-                </button>
-                <button onClick={handleToggleFocusMode} title={focusButtonTitle()} className="p-2 rounded-md hover:bg-gray-700 transition">
-                    {focusMode === 'narrow' && (<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="3" /></svg>)}
-                    {focusMode === 'wide' && (<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" /></svg>)}
-                    {focusMode === 'zoom' && (<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" /><path strokeLinecap="round" strokeLinejoin="round" d="M2 6V2h4 M22 6V2h-4 M2 18v4h4 M22 18v4h-4" /></svg>)}
-                </button>
-                
-                <button onClick={() => setIsMermaidPanelOpen(prev => !prev)} title="Diagrams" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-                    </svg>
-                </button>
-
-                <button onClick={() => setIsDocumentPanelOpen(prev => !prev)} title="Documents" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                    </svg>
-                </button>
-
-                <button onClick={() => setIsKanbanPanelOpen(prev => !prev)} title="Kanban Board" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
-                    </svg>
-                </button>
-
-                <button onClick={() => setIsPresentationPanelOpen(prev => !prev)} title="Story Mode" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                </button>
-
-                <button onClick={() => setIsTablePanelOpen(prev => !prev)} title="Table View" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
-                    </svg>
-                </button>
-                <button onClick={() => setIsMatrixPanelOpen(prev => !prev)} title="Matrix View" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                    </svg>
-                </button>
-                <button onClick={() => setIsGridPanelOpen(prev => !prev)} title="Attribute Grid View" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" />
-                    </svg>
-                </button>
-                <button onClick={() => setIsMarkdownPanelOpen(prev => !prev)} title="Markdown View" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
-                </button>
-                <button onClick={() => setIsJSONPanelOpen(prev => !prev)} title="JSON View" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                    </svg>
-                </button>
-                <button onClick={() => setIsReportPanelOpen(prev => !prev)} title="Report View" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                </button>
-                <button onClick={() => setIsHistoryPanelOpen(prev => !prev)} title="History Log" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </button>
-                <button onClick={() => setIsChatPanelOpen(prev => !prev)} title="AI Assistant" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                    </svg>
-                </button>
-                <button onClick={() => { setSettingsInitialTab('general'); setIsSettingsModalOpen(true); }} title="Settings" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400 hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                </button>
-                <button onClick={handleZoomToFit} title="Zoom to Fit" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
-                    </svg>
-                </button>
-                <div className="relative" ref={helpMenuRef}>
-                <button onClick={() => setIsHelpMenuOpen(p => !p)} title="Help" className="p-2 rounded-md hover:bg-gray-700 transition">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </button>
-                {isHelpMenuOpen && (
-                    <HelpMenu 
-                        onClose={() => setIsHelpMenuOpen(false)} 
-                        onAbout={() => setIsAboutModalOpen(true)}
-                        onPatternGallery={() => setIsPatternGalleryModalOpen(true)}
-                        onSelfTest={runSelfTest}
-                        onUserGuide={() => setIsUserGuideModalOpen(true)}
-                    />
-                )}
-                </div>
-                <div className="border-l border-gray-600 h-6 mx-2"></div>
-                <span className="text-gray-400 text-sm font-semibold pr-2">Current Model: {currentModelName}</span>
-          </div>
-      )}
-      
-      {currentModelId && !isPresenting && (
-        <div className={`absolute left-4 z-[500] max-w-[90vw] pointer-events-none transition-all duration-500 ease-in-out ${isToolsPanelOpen ? 'top-20 opacity-100' : 'top-4 opacity-0'}`}>
-            <div className="flex flex-wrap items-start gap-2 pointer-events-auto">
-                
-                {/* Big Spanner Toggle */}
-                <button 
-                    onClick={() => setIsToolsPanelOpen(false)}
-                    className="bg-gray-800 hover:bg-gray-700 border border-gray-600 shadow-lg rounded-lg w-20 flex flex-col items-center justify-center transition-colors h-20 flex-shrink-0 z-20 gap-1"
-                    title="Close Tools Panel"
-                >
-                     <div className="relative w-8 h-8">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-8 h-8 text-blue-400 transform -rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                             <path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.9 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                    <div className="border-l border-gray-600 h-6 mx-1"></div>
+                    <button onClick={() => setIsFilterPanelOpen(prev => !prev)} title="Filter by Tag" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4a1 1 0 011-1h14a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
                         </svg>
-                     </div>
-                     <span className="text--[10px] text-gray-400 font-bold tracking-wider">TOOLS</span>
-                </button>
+                    </button>
+                    <button onClick={handleToggleFocusMode} title={focusButtonTitle()} className="p-2 rounded-md hover:bg-gray-700 transition">
+                        {focusMode === 'narrow' && (<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="3" /></svg>)}
+                        {focusMode === 'wide' && (<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" /></svg>)}
+                        {focusMode === 'zoom' && (<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" /><path strokeLinecap="round" strokeLinejoin="round" d="M2 6V2h4 M22 6V2h-4 M2 18v4h4 M22 18v4h-4" /></svg>)}
+                    </button>
+                    
+                    <button onClick={() => setIsMermaidPanelOpen(prev => !prev)} title="Diagrams" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+                        </svg>
+                    </button>
 
-                <SchemaToolbar
-                    schemes={colorSchemes}
-                    activeSchemeId={activeSchemeId}
-                    onSchemeChange={setActiveSchemeId}
-                    activeColorScheme={activeColorScheme}
-                    onDefaultRelationshipChange={handleUpdateDefaultRelationship}
-                    defaultTags={defaultTags}
-                    onDefaultTagsChange={setDefaultTags}
-                    elements={elements}
-                    isCollapsed={activeTool !== 'schema'}
-                    onToggle={() => toggleTool('schema')}
-                    onUpdateSchemes={(newSchemes) => setColorSchemes(newSchemes)}
-                />
-                <LayoutToolbar
-                    linkDistance={layoutParams.linkDistance}
-                    repulsion={layoutParams.repulsion}
-                    onLinkDistanceChange={(val) => setLayoutParams(p => ({...p, linkDistance: val}))}
-                    onRepulsionChange={(val) => setLayoutParams(p => ({...p, repulsion: val}))}
-                    onJiggle={() => setJiggleTrigger(prev => prev + 1)}
-                    onZoomToFit={handleZoomToFit}
-                    isPhysicsActive={isPhysicsModeActive}
-                    onStartAutoLayout={handleStartPhysicsLayout}
-                    onAcceptAutoLayout={handleAcceptLayout}
-                    onRejectAutoLayout={handleRejectLayout}
-                    onExpand={() => handleScaleLayout(1.1)}
-                    onContract={() => handleScaleLayout(0.9)}
-                    isCollapsed={activeTool !== 'layout'}
-                    onToggle={() => toggleTool('layout')}
-                />
-                <AnalysisToolbar 
-                    elements={elements} 
-                    relationships={relationships}
-                    onBulkTag={handleBulkTagAction}
-                    onHighlight={handleAnalysisHighlight}
-                    onFilter={handleAnalysisFilter}
-                    isCollapsed={activeTool !== 'analysis'}
-                    onToggle={() => toggleTool('analysis')}
-                    isSimulationMode={isSimulationMode}
-                    onToggleSimulation={() => setIsSimulationMode(p => !p)}
-                    onResetSimulation={() => setSimulationState({})}
-                />
-                <ScamperToolbar
-                    selectedElementId={selectedElementId}
-                    onScamper={(operator, letter) => {
-                        setScamperInitialDoc(null);
-                        setScamperTrigger({ operator, letter });
-                        setIsScamperModalOpen(true);
-                    }}
-                    isCollapsed={activeTool !== 'scamper'}
-                    onToggle={() => toggleTool('scamper')}
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
-                />
-                <TrizToolbar
-                    activeTool={activeTrizTool}
-                    onSelectTool={handleTrizToolSelect}
-                    isCollapsed={activeTool !== 'triz'}
-                    onToggle={() => toggleTool('triz')}
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
-                />
-                <LssToolbar
-                    activeTool={activeLssTool}
-                    onSelectTool={handleLssToolSelect}
-                    isCollapsed={activeTool !== 'lss'}
-                    onToggle={() => toggleTool('lss')}
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
-                />
-                <TocToolbar
-                    activeTool={activeTocTool}
-                    onSelectTool={handleTocToolSelect}
-                    isCollapsed={activeTool !== 'toc'}
-                    onToggle={() => toggleTool('toc')}
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
-                />
-                <SsmToolbar
-                    activeTool={activeSsmTool}
-                    onSelectTool={handleSsmToolSelect}
-                    isCollapsed={activeTool !== 'ssm'}
-                    onToggle={() => toggleTool('ssm')}
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
-                />
-                <SwotToolbar 
-                    activeTool={activeSwotTool}
-                    onSelectTool={handleSwotToolSelect}
-                    isCollapsed={activeTool !== 'swot'}
-                    onToggle={() => toggleTool('swot')}
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
-                />
-                <ExplorerToolbar
-                    onSelectTool={handleExplorerToolSelect}
-                    isCollapsed={activeTool !== 'explorer'}
-                    onToggle={() => toggleTool('explorer')}
-                />
-                <TagCloudToolbar
-                    onSelectTool={handleTagCloudToolSelect}
-                    isCollapsed={activeTool !== 'tagcloud'}
-                    onToggle={() => toggleTool('tagcloud')}
-                />
-                <MermaidToolbar
-                    onSelectTool={handleMermaidToolSelect}
-                    isCollapsed={activeTool !== 'mermaid'}
-                    onToggle={() => toggleTool('mermaid')}
-                />
-                <BulkEditToolbar
-                    activeColorScheme={activeColorScheme}
-                    tagsToAdd={bulkTagsToAdd}
-                    tagsToRemove={bulkTagsToRemove}
-                    onTagsToAddChange={setBulkTagsToAdd}
-                    onTagsToRemoveChange={setBulkTagsToRemove}
-                    isActive={isBulkEditActive}
-                    onToggleActive={() => setIsBulkEditActive(p => !p)}
-                    isCollapsed={activeTool !== 'bulk'}
-                    onToggle={() => toggleTool('bulk')}
-                />
-                <CommandBar 
-                    onExecute={handleCommandExecution} 
-                    isCollapsed={activeTool !== 'command'}
-                    onToggle={() => toggleTool('command')}
-                    onOpenHistory={handleOpenCommandHistory}
-                />
-            </div>
-        </div>
+                    <button onClick={() => setIsDocumentPanelOpen(prev => !prev)} title="Documents" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                        </svg>
+                    </button>
+
+                    <button onClick={() => setIsKanbanPanelOpen(prev => !prev)} title="Kanban Board" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                        </svg>
+                    </button>
+
+                    <button onClick={() => setIsPresentationPanelOpen(prev => !prev)} title="Story Mode" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                    </button>
+
+                    <button onClick={() => setIsTablePanelOpen(prev => !prev)} title="Table View" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
+                        </svg>
+                    </button>
+                    <button onClick={() => setIsMatrixPanelOpen(prev => !prev)} title="Matrix View" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                        </svg>
+                    </button>
+                    <button onClick={() => setIsGridPanelOpen(prev => !prev)} title="Attribute Grid View" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" />
+                        </svg>
+                    </button>
+                    <button onClick={() => setIsMarkdownPanelOpen(prev => !prev)} title="Markdown View" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                    </button>
+                    <button onClick={() => setIsJSONPanelOpen(prev => !prev)} title="JSON View" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                        </svg>
+                    </button>
+                    <button onClick={() => setIsReportPanelOpen(prev => !prev)} title="Report View" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </button>
+                    <button onClick={() => setIsHistoryPanelOpen(prev => !prev)} title="History Log" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+                    <button onClick={() => setIsChatPanelOpen(prev => !prev)} title="AI Assistant" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        </svg>
+                    </button>
+                    
+                    <div className="border-l border-gray-600 h-6 mx-1"></div>
+
+                    <button onClick={() => setIsToolsPanelOpen(p => !p)} title="Toggle Tools Panel" className={`p-2 rounded-md hover:bg-gray-700 transition ${isToolsPanelOpen ? 'bg-gray-700 text-white' : 'text-blue-400'}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.9 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                        </svg>
+                    </button>
+
+                    <button onClick={() => { setSettingsInitialTab('general'); setIsSettingsModalOpen(true); }} title="Settings" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400 hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </button>
+                    <button onClick={handleZoomToFit} title="Zoom to Fit" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+                        </svg>
+                    </button>
+                    <div className="relative" ref={helpMenuRef}>
+                    <button onClick={() => setIsHelpMenuOpen(p => !p)} title="Help" className="p-2 rounded-md hover:bg-gray-700 transition">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.546-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+                    {isHelpMenuOpen && (
+                        <HelpMenu 
+                            onClose={() => setIsHelpMenuOpen(false)} 
+                            onAbout={() => setIsAboutModalOpen(true)}
+                            onPatternGallery={() => setIsPatternGalleryModalOpen(true)}
+                            onSelfTest={runSelfTest}
+                            onUserGuide={() => setIsUserGuideModalOpen(true)}
+                        />
+                    )}
+                    </div>
+                    <div className="border-l border-gray-600 h-6 mx-2"></div>
+                    <span className="text-gray-400 text-sm font-semibold pr-2 whitespace-nowrap">Current Model: {currentModelName}</span>
+                </div>
+
+                {/* Row 2: Tools Bar (Collapsible) */}
+                {isToolsPanelOpen && (
+                    <div className="bg-gray-900 border-b border-gray-700 p-2 animate-fade-in relative z-40">
+                        <div className="flex flex-wrap items-start gap-2">
+                            <SchemaToolbar
+                                schemes={colorSchemes}
+                                activeSchemeId={activeSchemeId}
+                                onSchemeChange={setActiveSchemeId}
+                                activeColorScheme={activeColorScheme}
+                                onDefaultRelationshipChange={handleUpdateDefaultRelationship}
+                                defaultTags={defaultTags}
+                                onDefaultTagsChange={setDefaultTags}
+                                elements={elements}
+                                isCollapsed={activeTool !== 'schema'}
+                                onToggle={() => toggleTool('schema')}
+                                onUpdateSchemes={(newSchemes) => setColorSchemes(newSchemes)}
+                            />
+                            <LayoutToolbar
+                                linkDistance={layoutParams.linkDistance}
+                                repulsion={layoutParams.repulsion}
+                                onLinkDistanceChange={(val) => setLayoutParams(p => ({...p, linkDistance: val}))}
+                                onRepulsionChange={(val) => setLayoutParams(p => ({...p, repulsion: val}))}
+                                onJiggle={() => setJiggleTrigger(prev => prev + 1)}
+                                onZoomToFit={handleZoomToFit}
+                                isPhysicsActive={isPhysicsModeActive}
+                                onStartAutoLayout={handleStartPhysicsLayout}
+                                onAcceptAutoLayout={handleAcceptLayout}
+                                onRejectAutoLayout={handleRejectLayout}
+                                onExpand={() => handleScaleLayout(1.1)}
+                                onContract={() => handleScaleLayout(0.9)}
+                                isCollapsed={activeTool !== 'layout'}
+                                onToggle={() => toggleTool('layout')}
+                            />
+                            <AnalysisToolbar 
+                                elements={elements} 
+                                relationships={relationships}
+                                onBulkTag={handleBulkTagAction}
+                                onHighlight={handleAnalysisHighlight}
+                                onFilter={handleAnalysisFilter}
+                                isCollapsed={activeTool !== 'analysis'}
+                                onToggle={() => toggleTool('analysis')}
+                                isSimulationMode={isSimulationMode}
+                                onToggleSimulation={() => setIsSimulationMode(p => !p)}
+                                onResetSimulation={() => setSimulationState({})}
+                            />
+                            <ScamperToolbar
+                                selectedElementId={selectedElementId}
+                                onScamper={(operator, letter) => {
+                                    setScamperInitialDoc(null);
+                                    setScamperTrigger({ operator, letter });
+                                    setIsScamperModalOpen(true);
+                                }}
+                                isCollapsed={activeTool !== 'scamper'}
+                                onToggle={() => toggleTool('scamper')}
+                                onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
+                            />
+                            <TrizToolbar
+                                activeTool={activeTrizTool}
+                                onSelectTool={handleTrizToolSelect}
+                                isCollapsed={activeTool !== 'triz'}
+                                onToggle={() => toggleTool('triz')}
+                                onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
+                            />
+                            <LssToolbar
+                                activeTool={activeLssTool}
+                                onSelectTool={handleLssToolSelect}
+                                isCollapsed={activeTool !== 'lss'}
+                                onToggle={() => toggleTool('lss')}
+                                onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
+                            />
+                            <TocToolbar
+                                activeTool={activeTocTool}
+                                onSelectTool={handleTocToolSelect}
+                                isCollapsed={activeTool !== 'toc'}
+                                onToggle={() => toggleTool('toc')}
+                                onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
+                            />
+                            <SsmToolbar
+                                activeTool={activeSsmTool}
+                                onSelectTool={handleSsmToolSelect}
+                                isCollapsed={activeTool !== 'ssm'}
+                                onToggle={() => toggleTool('ssm')}
+                                onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
+                            />
+                            <SwotToolbar 
+                                activeTool={activeSwotTool}
+                                onSelectTool={handleSwotToolSelect}
+                                isCollapsed={activeTool !== 'swot'}
+                                onToggle={() => toggleTool('swot')}
+                                onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }}
+                            />
+                            <ExplorerToolbar
+                                onSelectTool={handleExplorerToolSelect}
+                                isCollapsed={activeTool !== 'explorer'}
+                                onToggle={() => toggleTool('explorer')}
+                            />
+                            <TagCloudToolbar
+                                onSelectTool={handleTagCloudToolSelect}
+                                isCollapsed={activeTool !== 'tagcloud'}
+                                onToggle={() => toggleTool('tagcloud')}
+                            />
+                            <MermaidToolbar
+                                onSelectTool={handleMermaidToolSelect}
+                                isCollapsed={activeTool !== 'mermaid'}
+                                onToggle={() => toggleTool('mermaid')}
+                            />
+                            <BulkEditToolbar
+                                activeColorScheme={activeColorScheme}
+                                tagsToAdd={bulkTagsToAdd}
+                                tagsToRemove={bulkTagsToRemove}
+                                onTagsToAddChange={setBulkTagsToAdd}
+                                onTagsToRemoveChange={setBulkTagsToRemove}
+                                isActive={isBulkEditActive}
+                                onToggleActive={() => setIsBulkEditActive(p => !p)}
+                                isCollapsed={activeTool !== 'bulk'}
+                                onToggle={() => toggleTool('bulk')}
+                            />
+                            <CommandBar 
+                                onExecute={handleCommandExecution} 
+                                isCollapsed={activeTool !== 'command'}
+                                onToggle={() => toggleTool('command')}
+                                onOpenHistory={handleOpenCommandHistory}
+                            />
+                        </div>
+                    </div>
+                )}
+          </div>
       )}
 
       {isFilterPanelOpen && currentModelId && !isPresenting && (
@@ -2384,90 +2376,119 @@ export default function App() {
         />
       )}
       
+      {/* Main Content Area */}
       {currentModelId && !isPresenting && (
-        <RightPanelContainer 
-            panels={panelDefinitions} 
-            layouts={panelLayouts}
-            onLayoutChange={setPanelLayouts}
-            activeDockedId={activeDockedPanelId}
-            onActiveDockedIdChange={setActiveDockedPanelId}
-            globalZIndex={panelZIndex}
-            onGlobalZIndexChange={setPanelZIndex}
-        />
-      )}
+        <div className="flex-grow relative overflow-hidden flex flex-col">
+            <RightPanelContainer 
+                panels={panelDefinitions} 
+                layouts={panelLayouts}
+                onLayoutChange={setPanelLayouts}
+                activeDockedId={activeDockedPanelId}
+                onActiveDockedIdChange={setActiveDockedPanelId}
+                globalZIndex={panelZIndex}
+                onGlobalZIndexChange={setPanelZIndex}
+            />
 
-      {currentModelId && !isPresenting && ((panelState.view === 'addRelationship' && addRelationshipSourceElement) || selectedRelationship || selectedElement) && (
-        <div 
-            ref={panelRef}
-            className={`z-[70] flex flex-col pointer-events-none ${detailsPanelPosition ? 'fixed shadow-2xl rounded-lg' : 'absolute top-24'}`}
-            style={detailsPanelPosition ? { left: detailsPanelPosition.x, top: detailsPanelPosition.y, maxHeight: 'calc(100vh - 2rem)' } : { right: isRightPanelOpen ? '620px' : '16px', maxHeight: 'calc(100vh - 8rem)' }}
-        >
-            <div className="pointer-events-auto flex flex-col h-auto max-h-full shadow-2xl rounded-lg bg-gray-800 border border-gray-700 min-h-0">
-                {/* Drag Header */}
+            {((panelState.view === 'addRelationship' && addRelationshipSourceElement) || selectedRelationship || selectedElement) && (
                 <div 
-                    className="h-6 bg-gray-700 rounded-t-lg flex items-center justify-center cursor-move border-b border-gray-600 group relative flex-shrink-0"
-                    onMouseDown={handlePanelDragStart}
+                    ref={panelRef}
+                    className={`z-[70] flex flex-col pointer-events-none ${detailsPanelPosition ? 'fixed shadow-2xl rounded-lg' : 'absolute top-4'}`}
+                    style={detailsPanelPosition ? { left: detailsPanelPosition.x, top: detailsPanelPosition.y, maxHeight: 'calc(100vh - 2rem)' } : { right: isRightPanelOpen ? '620px' : '16px', maxHeight: 'calc(100vh - 4rem)' }}
                 >
-                    <div className="w-10 h-1 bg-gray-500 rounded-full group-hover:bg-gray-400 transition-colors"></div>
-                    <button 
-                        onClick={handleResetPanelPosition}
-                        className="absolute right-2 text-gray-400 hover:text-white"
-                        title={detailsPanelPosition ? "Dock Panel" : "Unpin/Float Panel"}
-                    >
-                        {detailsPanelPosition ? (
-                            // Dock Icon
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M16 12V4H8v8L6 14v2h5v6l1 2 1-2v-6h5v-2l-2-2z" />
-                            </svg>
-                        ) : (
-                            // Unpin Icon (Slanted pin)
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 transform rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 12V4H8v8L6 14v2h5v6l1 2 1-2v-6h5v-2l-2-2z" />
-                            </svg>
-                        )}
-                    </button>
-                </div>
+                    <div className="pointer-events-auto flex flex-col h-auto max-h-full shadow-2xl rounded-lg bg-gray-800 border border-gray-700 min-h-0">
+                        {/* Drag Header */}
+                        <div 
+                            className="h-6 bg-gray-700 rounded-t-lg flex items-center justify-center cursor-move border-b border-gray-600 group relative flex-shrink-0"
+                            onMouseDown={handlePanelDragStart}
+                        >
+                            <div className="w-10 h-1 bg-gray-500 rounded-full group-hover:bg-gray-400 transition-colors"></div>
+                            <button 
+                                onClick={handleResetPanelPosition}
+                                className="absolute right-2 text-gray-400 hover:text-white"
+                                title={detailsPanelPosition ? "Dock Panel" : "Unpin/Float Panel"}
+                            >
+                                {detailsPanelPosition ? (
+                                    // Dock Icon
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M16 12V4H8v8L6 14v2h5v6l1 2 1-2v-6h5v-2l-2-2z" />
+                                    </svg>
+                                ) : (
+                                    // Unpin Icon (Slanted pin)
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 transform rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 12V4H8v8L6 14v2h5v6l1 2 1-2v-6h5v-2l-2-2z" />
+                                    </svg>
+                                )}
+                            </button>
+                        </div>
 
-                {/* Panel Content */}
-                <div className="rounded-b-lg overflow-hidden flex flex-col min-h-0 flex-grow">
-                    {panelState.view === 'addRelationship' && addRelationshipSourceElement ? (
-                        <AddRelationshipPanel
-                        sourceElement={addRelationshipSourceElement}
-                        targetElementId={panelState.targetElementId}
-                        isNewTarget={panelState.isNewTarget}
-                        allElements={elements}
-                        onCreate={handleAddRelationship}
-                        onUpdateElement={handleUpdateElement}
-                        onCancel={handleCancelAddRelationship}
-                        suggestedLabels={activeRelationshipLabels}
-                        defaultLabel={activeColorScheme?.defaultRelationshipLabel}
-                        colorSchemes={colorSchemes}
-                        activeSchemeId={activeSchemeId}
-                        />
-                    ) : selectedRelationship ? (
-                        <RelationshipDetailsPanel
-                            relationship={selectedRelationship}
-                            elements={elements}
-                            onUpdate={handleUpdateRelationship}
-                            onDelete={handleDeleteRelationship}
-                            suggestedLabels={activeRelationshipLabels}
-                        />
-                    ) : selectedElement ? (
-                        <ElementDetailsPanel
-                            element={selectedElement}
-                            allElements={elements}
-                            relationships={relationships}
-                            onUpdate={handleUpdateElement}
-                            onDelete={handleDeleteElement}
-                            onClose={() => setSelectedElementId(null)}
-                            colorSchemes={colorSchemes}
-                            activeSchemeId={activeSchemeId}
-                        />
-                    ) : null}
+                        {/* Panel Content */}
+                        <div className="rounded-b-lg overflow-hidden flex flex-col min-h-0 flex-grow">
+                            {panelState.view === 'addRelationship' && addRelationshipSourceElement ? (
+                                <AddRelationshipPanel
+                                sourceElement={addRelationshipSourceElement}
+                                targetElementId={panelState.targetElementId}
+                                isNewTarget={panelState.isNewTarget}
+                                allElements={elements}
+                                onCreate={handleAddRelationship}
+                                onUpdateElement={handleUpdateElement}
+                                onCancel={handleCancelAddRelationship}
+                                suggestedLabels={activeRelationshipLabels}
+                                defaultLabel={activeColorScheme?.defaultRelationshipLabel}
+                                colorSchemes={colorSchemes}
+                                activeSchemeId={activeSchemeId}
+                                />
+                            ) : selectedRelationship ? (
+                                <RelationshipDetailsPanel
+                                    relationship={selectedRelationship}
+                                    elements={elements}
+                                    onUpdate={handleUpdateRelationship}
+                                    onDelete={handleDeleteRelationship}
+                                    suggestedLabels={activeRelationshipLabels}
+                                />
+                            ) : selectedElement ? (
+                                <ElementDetailsPanel
+                                    element={selectedElement}
+                                    allElements={elements}
+                                    relationships={relationships}
+                                    onUpdate={handleUpdateElement}
+                                    onDelete={handleDeleteElement}
+                                    onClose={() => setSelectedElementId(null)}
+                                    colorSchemes={colorSchemes}
+                                    activeSchemeId={activeSchemeId}
+                                />
+                            ) : null}
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
+
+            <GraphCanvas
+                ref={graphCanvasRef}
+                elements={filteredElements}
+                relationships={filteredRelationships}
+                onNodeClick={handleNodeClick}
+                onLinkClick={handleLinkClick}
+                onCanvasClick={handleCanvasClick}
+                onCanvasDoubleClick={handleAddElement}
+                onNodeContextMenu={handleNodeContextMenu}
+                onCanvasContextMenu={handleCanvasContextMenu}
+                onNodeConnect={handleNodeConnect}
+                onNodeConnectToNew={handleNodeConnectToNew}
+                activeColorScheme={activeColorScheme}
+                selectedElementId={selectedElementId}
+                multiSelection={multiSelection}
+                selectedRelationshipId={selectedRelationshipId}
+                focusMode={focusMode}
+                setElements={setElements}
+                isPhysicsModeActive={isPhysicsModeActive}
+                layoutParams={layoutParams}
+                onJiggleTrigger={jiggleTrigger}
+                isBulkEditActive={isBulkEditActive}
+                simulationState={simulationState}
+                analysisHighlights={analysisHighlights}
+            />
         </div>
-    )}
+      )}
 
       <ChatPanel
           className={(!isChatPanelOpen || !currentModelId || isPresenting) ? 'hidden' : ''}
@@ -2639,34 +2660,8 @@ export default function App() {
           />
       )}
 
-      {currentModelId ? (
-        <GraphCanvas
-          ref={graphCanvasRef}
-          elements={filteredElements}
-          relationships={filteredRelationships}
-          onNodeClick={handleNodeClick}
-          onLinkClick={handleLinkClick}
-          onCanvasClick={handleCanvasClick}
-          onCanvasDoubleClick={handleAddElement}
-          onNodeContextMenu={handleNodeContextMenu}
-          onCanvasContextMenu={handleCanvasContextMenu}
-          onNodeConnect={handleNodeConnect}
-          onNodeConnectToNew={handleNodeConnectToNew}
-          activeColorScheme={activeColorScheme}
-          selectedElementId={selectedElementId}
-          multiSelection={multiSelection}
-          selectedRelationshipId={selectedRelationshipId}
-          focusMode={focusMode}
-          setElements={setElements}
-          isPhysicsModeActive={isPhysicsModeActive}
-          layoutParams={layoutParams}
-          onJiggleTrigger={jiggleTrigger}
-          isBulkEditActive={isBulkEditActive}
-          simulationState={simulationState}
-          analysisHighlights={analysisHighlights}
-        />
-      ) : (
-        <div className="w-full h-full flex-col items-center justify-center bg-gray-900 text-white space-y-10 p-8 flex relative">
+      {!currentModelId && !isPresenting && (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white space-y-10 p-8 relative">
              <div className="text-center space-y-2">
                 <div className="flex items-center justify-center gap-4">
                     <TapestryBanner />

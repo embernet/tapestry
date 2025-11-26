@@ -590,7 +590,7 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
 
   if (activeConfig) {
       return (
-        <div className="fixed inset-0 pointer-events-none z-50">
+        <div className="fixed inset-0 pointer-events-none z-[3000]">
             <div 
                 className="absolute bg-gray-900 rounded-lg shadow-2xl border border-blue-500/30 text-white flex flex-col overflow-hidden pointer-events-auto"
                 style={{ width: `${size.width}px`, height: `${size.height}px`, left: position.x, top: position.y }}
@@ -816,7 +816,7 @@ const SwotModal: React.FC<SwotModalProps> = ({ isOpen, activeTool, elements, rel
   const toolInfo = LEGACY_TOOL_INFO[activeTool as keyof typeof LEGACY_TOOL_INFO];
   
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-[3000] p-4">
       <div className={`bg-gray-900 rounded-lg w-full max-w-6xl shadow-2xl border ${toolInfo?.border || 'border-gray-600'} text-white flex flex-col max-h-[90vh]`}>
         
         {/* Header */}

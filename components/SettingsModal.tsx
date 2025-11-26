@@ -220,7 +220,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const defaultUrl = PROVIDER_DEFAULTS[globalSettings.activeProvider]?.url || '';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-[3000] p-4">
       <div ref={modalRef} className="bg-gray-800 rounded-lg w-full max-w-4xl shadow-xl border border-gray-600 text-white flex flex-col max-h-[90vh]">
         
         {/* Header & Tabs */}
