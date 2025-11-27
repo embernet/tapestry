@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram } from './types';
 import { DEFAULT_COLOR_SCHEMES, LINK_DISTANCE, DEFAULT_SYSTEM_PROMPT_CONFIG, TAGLINES, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
@@ -708,7 +709,7 @@ export default function App() {
           await new Promise(r => setTimeout(r, 50));
       };
 
-      await testTool('scamper', 'SCAMPER', 'Generating ideas for', () => setIsScamperModalOpen(true), () => setIsScamperModalOpen(false));
+      await testTool('scamper', 'SCAMPER', 'Select Node', () => setIsScamperModalOpen(true), () => setIsScamperModalOpen(false));
       await testTool('triz', 'TRIZ', 'Contradiction Matrix', () => { setActiveTrizTool('contradiction'); setIsTrizModalOpen(true); }, () => setIsTrizModalOpen(false));
       await testTool('lss', 'LSS', 'Project Charter', () => { setActiveLssTool('charter'); setIsLssModalOpen(true); }, () => setIsLssModalOpen(false));
       await testTool('toc', 'TOC', 'Current Reality Tree', () => { setActiveTocTool('crt'); setIsTocModalOpen(true); }, () => setIsTocModalOpen(false));

@@ -54,6 +54,41 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // --- Position & Drag State ---
+  const [position, setPosition] = useState({ x: 20, y: 100 }); // Default Left positioning
+  const [isDragging, setIsDragging] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+      setIsDragging(true);
+      dragOffset.current = {
+          x: e.clientX - position.x,
+          y: e.clientY - position.y
+      };
+  };
+
+  useEffect(() => {
+      const handleMouseMove = (e: MouseEvent) => {
+          if (isDragging) {
+              const newY = Math.max(0, e.clientY - dragOffset.current.y);
+              setPosition({
+                  x: e.clientX - dragOffset.current.x,
+                  y: newY
+              });
+          }
+      };
+      const handleMouseUp = () => setIsDragging(false);
+
+      if (isDragging) {
+          document.addEventListener('mousemove', handleMouseMove);
+          document.addEventListener('mouseup', handleMouseUp);
+      }
+      return () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+      };
+  }, [isDragging]);
+
   useEffect(() => {
       if (initialInput && isOpen) {
           setInput(initialInput);
@@ -285,10 +320,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           const decision = actionDecisions[index];
           let result: any;
 
+          // Default to accepted if decision is undefined or 'pending' (implied acceptance when clicking Apply)
           if (decision === 'rejected') {
               result = { skipped: true, message: "User rejected this action." };
           } else {
-              // Default to accepted if pending (when Apply All is clicked) or explicitly accepted
               try {
                   switch (call.name) {
                       case 'addElement':
@@ -357,6 +392,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           result = { success: false, message: "Unknown function" };
                   }
               } catch (e) {
+                  console.error("Error executing function:", call.name, e);
                   result = { success: false, message: `Error executing ${call.name}: ${e}` };
               }
           }
@@ -421,13 +457,23 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const getActionDetails = (fc: FunctionCall) => {
       const args = fc.args as any;
       const details = [];
+      
+      // Note: Primary identifiers (Name, Target, Source) are now displayed in the Title (getActionTitle).
+      // We include supplementary details here.
+
       if (args.label) details.push(`Label: ${args.label}`);
+      if (args.direction) details.push(`Dir: ${args.direction}`);
       if (args.tags) details.push(`Tags: ${args.tags.join(', ')}`);
       if (args.notes) details.push(`Notes: ${args.notes.substring(0, 30)}...`);
-      if (args.key && args.value) details.push(`${args.key} = ${args.value}`);
-      if (args.title) details.push(`Title: ${args.title}`);
+      
+      // For setElementAttribute/setRelationshipAttribute, the Title shows Key, here we show Value.
+      if (args.value && (fc.name.includes('Attribute'))) details.push(`Value: ${args.value}`);
+      
       if (args.content) details.push(`Content Length: ${args.content.length}`);
       if (fc.name === 'openTool') return '';
+      
+      if (args.rationale) details.push(`Rationale: ${args.rationale}`);
+      
       return details.join(' | ');
   }
 
@@ -573,9 +619,26 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
       setIsLoading(true);
       
-      // Execute accepted calls
+      // Execute accepted calls and collect results
       const functionResponses = executeFunctionCalls(msg.functionCalls);
       
+      // Log successful actions to History
+      if (onLogHistory) {
+          const successes = functionResponses.filter(r => (r.response as any).result?.success);
+          if (successes.length > 0) {
+              const content = successes.map(r => {
+                  const resultMsg = (r.response as any).result?.message || "Success";
+                  return `- ${resultMsg}`;
+              }).join('\n');
+
+              onLogHistory(
+                  'AI Chat Action',
+                  `**Applied Changes:**\n\n${content}`,
+                  `Applied ${successes.length} changes`
+              );
+          }
+      }
+
       // Send responses back to model
       try {
           const currentHistory = buildApiHistory(messages.slice(0, msgIndex)); // History before this message
@@ -621,18 +684,29 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   return (
-    <div className={`fixed top-20 right-4 w-96 bottom-4 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl flex flex-col z-30 ${className} ${isOpen ? '' : 'hidden'}`}>
+    <div
+        style={{
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+            height: `calc(100vh - ${position.y + 20}px)`, // Fit vertical space, keeping 20px margin from bottom
+            maxHeight: 'none'
+        }}
+        className={`fixed w-96 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl flex flex-col z-[200] ${className} ${isOpen ? '' : 'hidden'}`}
+    >
         {/* Header */}
-        <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800 rounded-t-lg">
+        <div
+            onMouseDown={handleMouseDown}
+            className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800 rounded-t-lg cursor-move select-none"
+        >
             <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                 <h2 className="text-lg font-bold text-white">AI Assistant</h2>
             </div>
             <div className="flex items-center gap-2">
-                <button onClick={onOpenPromptSettings} className="text-gray-400 hover:text-white p-1" title="Settings">
+                <button onMouseDown={(e) => e.stopPropagation()} onClick={onOpenPromptSettings} className="text-gray-400 hover:text-white p-1" title="Settings">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
                 </button>
-                <button onClick={onClose} className="text-gray-400 hover:text-white p-1">
+                <button onMouseDown={(e) => e.stopPropagation()} onClick={onClose} className="text-gray-400 hover:text-white p-1">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
@@ -662,7 +736,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                             />
                                         )}
                                         <div className={`flex-grow ${actionDecisions[i] === 'rejected' ? 'opacity-50 line-through' : ''}`}>
-                                            <span className="font-bold text-blue-400">{fc.name}</span>
+                                            <span className="font-bold text-blue-400">{getActionTitle(fc)}</span>
                                             <span className="text-gray-400 ml-1">{getActionDetails(fc)}</span>
                                         </div>
                                     </div>
