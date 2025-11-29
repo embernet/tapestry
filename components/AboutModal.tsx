@@ -5,9 +5,10 @@ import { CreatorInfo } from './CreatorInfo';
 
 interface ModalProps {
   onClose: () => void;
+  isDarkMode?: boolean;
 }
 
-export const AboutModal: React.FC<ModalProps> = ({ onClose }) => {
+export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true }) => {
     const ref = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const handleClick = (e: MouseEvent) => { if(ref.current && !ref.current.contains(e.target as Node)) onClose(); }
@@ -15,12 +16,18 @@ export const AboutModal: React.FC<ModalProps> = ({ onClose }) => {
         return () => document.removeEventListener('mousedown', handleClick);
     }, [onClose]);
 
+    const bgClass = isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
+    const textClass = isDarkMode ? 'text-gray-300' : 'text-gray-700';
+    const headerClass = isDarkMode ? 'text-white' : 'text-gray-900';
+    const licenseBg = isDarkMode ? 'bg-gray-900 border-gray-700 text-gray-500' : 'bg-gray-50 border-gray-200 text-gray-600';
+    const licenseHeader = isDarkMode ? 'text-gray-400' : 'text-gray-800';
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-4">
-            <div ref={ref} className="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] shadow-2xl border border-gray-700 flex flex-col relative overflow-hidden">
+            <div ref={ref} className={`${bgClass} rounded-lg max-w-2xl w-full max-h-[90vh] shadow-2xl border flex flex-col relative overflow-hidden`}>
                 
                 {/* Close X Button */}
-                <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white z-10">
+                <button onClick={onClose} className={`absolute top-4 right-4 ${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-black'} z-10`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -33,23 +40,23 @@ export const AboutModal: React.FC<ModalProps> = ({ onClose }) => {
                             <TapestryAnimator />
                         </div>
                         <div>
-                            <h2 className="text-4xl font-bold text-white tracking-tight">Tapestry</h2>
+                            <h2 className={`text-4xl font-bold ${headerClass} tracking-tight`}>Tapestry</h2>
                             <p className="text-blue-400 text-xs font-bold uppercase tracking-[0.2em] mt-1">Visual Knowledge Graph</p>
                         </div>
                     </div>
 
                     {/* Description */}
-                    <p className="text-gray-300 text-lg mb-8 leading-relaxed">
+                    <p className={`${textClass} text-lg mb-8 leading-relaxed`}>
                         Tapestry is a tool for creating and exploring knowledge graphs. It helps you understand the relationships between ideas, people, organisations, and actions to find ways to improve situations and plan what to do next. It is a space for reflection, communication, and innovation.
                     </p>
 
-                    <div className="border-t border-gray-700 my-6"></div>
+                    <div className={`border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} my-6`}></div>
 
-                    <CreatorInfo className="mb-8" />
+                    <CreatorInfo className="mb-8" isDarkMode={isDarkMode} />
 
                     {/* License */}
-                    <div className="bg-gray-900 p-4 rounded border border-gray-700 text-xs text-gray-500 font-mono leading-relaxed">
-                        <p className="font-bold text-gray-400 mb-2">MIT License</p>
+                    <div className={`${licenseBg} p-4 rounded border text-xs font-mono leading-relaxed`}>
+                        <p className={`font-bold ${licenseHeader} mb-2`}>MIT License</p>
                         <p className="mb-2">Copyright (c) 2025 Mark Burnett</p>
                         <p className="mb-4">
                             Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:

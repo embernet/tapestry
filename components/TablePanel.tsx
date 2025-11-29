@@ -14,6 +14,7 @@ interface TablePanelProps {
   onClose: () => void;
   onNodeClick?: (id: string) => void;
   selectedElementId?: string | null;
+  isDarkMode: boolean;
 }
 
 type SortKey = 'name' | 'tags' | 'notes' | 'relations';
@@ -28,7 +29,8 @@ const TablePanel: React.FC<TablePanelProps> = ({
   onDeleteRelationship,
   onClose,
   onNodeClick,
-  selectedElementId
+  selectedElementId,
+  isDarkMode
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [newElementName, setNewElementName] = useState('');
@@ -95,156 +97,131 @@ const TablePanel: React.FC<TablePanelProps> = ({
     }
   };
 
-  const handleAddNew = () => {
+  const handleAddSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
       if (newElementName.trim()) {
           onAddElement(newElementName.trim());
           setNewElementName('');
       }
   };
 
-  const renderSortIcon = (key: SortKey) => {
-      if (sortConfig.key !== key) return <span className="ml-1 text-gray-600">⇅</span>;
-      return sortConfig.direction === 'asc' ? <span className="ml-1 text-blue-400">↑</span> : <span className="ml-1 text-blue-400">↓</span>;
-  };
+  const activeRelElement = useMemo(() => elements.find(e => e.id === activeRelModalElementId), [elements, activeRelModalElementId]);
+
+  // Theme Classes
+  const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const headerBgClass = isDarkMode ? 'bg-gray-900' : 'bg-gray-50';
+  const borderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  const headerTextClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+  const hoverBgClass = isDarkMode ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50';
+  const inputBgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const inputBorderClass = isDarkMode ? 'border-gray-600' : 'border-gray-300';
+  const inputFocusRing = 'focus:ring-blue-500';
+  const selectedRowBg = isDarkMode ? 'bg-blue-900/20' : 'bg-blue-50';
+  const inputTextClass = isDarkMode ? 'text-white' : 'text-gray-900';
 
   return (
-    <div className="w-full h-full flex flex-col bg-gray-800">
-      {activeRelModalElementId && (
-          <RelationshipManagerModal
-            element={elements.find(e => e.id === activeRelModalElementId)!}
-            relationships={relationships}
-            allElements={elements}
-            onAdd={onAddRelationship}
-            onDelete={onDeleteRelationship}
-            onClose={() => setActiveRelModalElementId(null)}
-          />
-      )}
-
-      <div className="p-4 flex-shrink-0 flex justify-between items-center border-b border-gray-700">
-        <h2 className="text-xl font-bold text-white">Table View</h2>
-        <div className="flex items-center gap-2">
-             <input
-                type="text"
-                placeholder="Search elements..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="bg-gray-700 border border-gray-600 rounded px-3 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 w-48"
-            />
-            <div className="border-l border-gray-600 h-6 mx-1"></div>
-            <button onClick={onClose} className="text-gray-400 hover:text-white">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
+    <div className={`w-full h-full flex flex-col ${bgClass} ${textClass}`}>
+        <div className={`p-4 border-b ${borderClass} ${headerBgClass} flex justify-between items-center`}>
+            <h2 className="text-xl font-bold">Table View</h2>
+            <div className="flex gap-4">
+                <input 
+                    type="text" 
+                    placeholder="Search..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={`${inputBgClass} border ${inputBorderClass} rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 ${inputFocusRing} ${inputTextClass}`}
+                />
+                <button onClick={onClose} className={`${headerTextClass} hover:text-blue-500`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
         </div>
-      </div>
 
-      <div className="flex-grow overflow-auto p-4">
-          <table className="w-full text-left border-collapse">
-              <thead className="text-xs text-gray-400 uppercase bg-gray-700 sticky top-0 z-10 shadow-sm select-none">
-                  <tr>
-                      <th className="px-4 py-3 rounded-tl-lg w-1/4 cursor-pointer hover:bg-gray-600 transition-colors" onClick={() => handleSort('name')}>
-                          Name {renderSortIcon('name')}
-                      </th>
-                      <th className="px-4 py-3 w-1/5 cursor-pointer hover:bg-gray-600 transition-colors" onClick={() => handleSort('tags')}>
-                          Tags {renderSortIcon('tags')}
-                      </th>
-                      <th className="px-4 py-3 w-1/3 cursor-pointer hover:bg-gray-600 transition-colors" onClick={() => handleSort('notes')}>
-                          Notes {renderSortIcon('notes')}
-                      </th>
-                      <th className="px-4 py-3 text-center w-24 cursor-pointer hover:bg-gray-600 transition-colors" onClick={() => handleSort('relations')}>
-                          Relations {renderSortIcon('relations')}
-                      </th>
-                      <th className="px-4 py-3 text-center rounded-tr-lg w-16">Action</th>
-                  </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-700 text-sm">
-                  {sortedElements.map(el => {
-                      const relCount = relationships.filter(r => r.source === el.id || r.target === el.id).length;
-                      const isSelected = selectedElementId === el.id;
-                      return (
-                        <tr 
-                            key={el.id} 
-                            onClick={() => onNodeClick && onNodeClick(el.id)}
-                            className={`hover:bg-gray-700 transition-colors group cursor-pointer ${isSelected ? 'bg-blue-900/30' : ''}`}
-                        >
-                            <td className="px-2 py-2 align-top">
+        <div className="flex-grow overflow-auto">
+            <table className="w-full text-left border-collapse">
+                <thead className={`${headerBgClass} ${headerTextClass} text-xs uppercase sticky top-0 z-10`}>
+                    <tr>
+                        <th className={`p-3 border-b ${borderClass} cursor-pointer hover:text-blue-500`} onClick={() => handleSort('name')}>Name {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                        <th className={`p-3 border-b ${borderClass} cursor-pointer hover:text-blue-500`} onClick={() => handleSort('tags')}>Tags {sortConfig.key === 'tags' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                        <th className={`p-3 border-b ${borderClass} cursor-pointer hover:text-blue-500`} onClick={() => handleSort('relations')}>Rels {sortConfig.key === 'relations' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                        <th className={`p-3 border-b ${borderClass} cursor-pointer hover:text-blue-500`} onClick={() => handleSort('notes')}>Notes {sortConfig.key === 'notes' && (sortConfig.direction === 'asc' ? '↑' : '↓')}</th>
+                        <th className={`p-3 border-b ${borderClass} text-right`}>Actions</th>
+                    </tr>
+                </thead>
+                <tbody className="text-sm">
+                    {sortedElements.map(el => (
+                        <tr key={el.id} className={`border-b ${borderClass} ${hoverBgClass} ${selectedElementId === el.id ? selectedRowBg : ''}`}>
+                            <td className="p-3">
                                 <input 
                                     type="text" 
                                     defaultValue={el.name}
                                     onBlur={(e) => handleNameChange(el.id, e.target.value)}
-                                    onClick={(e) => e.stopPropagation()} // Prevent triggering row click when focusing input
-                                    className="w-full bg-transparent border border-transparent hover:border-gray-600 focus:border-blue-500 rounded px-2 py-1 text-white focus:outline-none font-semibold"
+                                    className={`bg-transparent border border-transparent ${isDarkMode ? 'hover:border-gray-600' : 'hover:border-gray-300'} focus:border-blue-500 rounded px-1 w-full outline-none transition-colors ${inputTextClass}`}
                                 />
                             </td>
-                            <td className="px-2 py-2 align-top">
+                            <td className="p-3">
                                 <input 
                                     type="text" 
                                     defaultValue={el.tags.join(', ')}
                                     onBlur={(e) => handleTagsChange(el.id, e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    placeholder="tag1, tag2"
-                                    className="w-full bg-transparent border border-transparent hover:border-gray-600 focus:border-blue-500 rounded px-2 py-1 text-gray-300 focus:outline-none text-xs"
+                                    className={`bg-transparent border border-transparent ${isDarkMode ? 'hover:border-gray-600' : 'hover:border-gray-300'} focus:border-blue-500 rounded px-1 w-full outline-none transition-colors ${inputTextClass}`}
                                 />
                             </td>
-                            <td className="px-2 py-2 align-top">
-                                <textarea 
-                                    defaultValue={el.notes}
-                                    onBlur={(e) => handleNotesChange(el.id, e.target.value)}
-                                    onClick={(e) => e.stopPropagation()}
-                                    rows={1}
-                                    className="w-full bg-transparent border border-transparent hover:border-gray-600 focus:border-blue-500 rounded px-2 py-1 text-gray-400 focus:outline-none text-xs resize-none focus:h-20 transition-all overflow-hidden focus:overflow-auto"
-                                    placeholder="Add notes..."
-                                    style={{ minHeight: '30px' }}
-                                />
-                            </td>
-                            <td className="px-2 py-2 align-top text-center">
+                            <td className="p-3">
                                 <button 
-                                    onClick={(e) => { e.stopPropagation(); setActiveRelModalElementId(el.id); }}
-                                    className="bg-gray-700 hover:bg-blue-600 text-gray-300 hover:text-white px-2 py-1 rounded text-xs transition-colors min-w-[2rem]"
+                                    onClick={() => setActiveRelModalElementId(el.id)}
+                                    className="text-blue-500 hover:underline"
                                 >
-                                    {relCount}
+                                    {relationships.filter(r => r.source === el.id || r.target === el.id).length}
                                 </button>
                             </td>
-                            <td className="px-2 py-2 align-top text-center">
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); onDeleteElement(el.id); }}
-                                    className="text-gray-600 hover:text-red-400 p-1 rounded transition opacity-0 group-hover:opacity-100"
-                                    title="Delete Element"
-                                >
+                            <td className="p-3">
+                                <input 
+                                    type="text" 
+                                    defaultValue={el.notes}
+                                    onBlur={(e) => handleNotesChange(el.id, e.target.value)}
+                                    className={`bg-transparent border border-transparent ${isDarkMode ? 'hover:border-gray-600' : 'hover:border-gray-300'} focus:border-blue-500 rounded px-1 w-full outline-none truncate transition-colors ${inputTextClass}`}
+                                />
+                            </td>
+                            <td className="p-3 text-right">
+                                <button onClick={() => onDeleteElement(el.id)} className="text-red-400 hover:text-red-300 p-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                         <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                                     </svg>
                                 </button>
                             </td>
                         </tr>
-                      );
-                  })}
-                  {/* Add Row */}
-                  <tr className="bg-gray-700 bg-opacity-30">
-                      <td className="px-2 py-2">
-                           <input 
-                                    type="text" 
-                                    value={newElementName}
-                                    onChange={(e) => setNewElementName(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAddNew()}
-                                    placeholder="+ New Element Name"
-                                    className="w-full bg-transparent border border-dashed border-gray-500 focus:border-green-500 rounded px-2 py-1 text-white focus:outline-none placeholder-gray-500"
-                                />
-                      </td>
-                      <td colSpan={4} className="px-2 py-2">
-                          <button 
-                            onClick={handleAddNew}
-                            disabled={!newElementName.trim()}
-                            className="text-xs text-green-400 hover:text-green-300 uppercase font-bold tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                              Add
-                          </button>
-                      </td>
-                  </tr>
-              </tbody>
-          </table>
-      </div>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+
+        <form onSubmit={handleAddSubmit} className={`p-3 ${headerBgClass} border-t ${borderClass} flex gap-2`}>
+            <input 
+                type="text" 
+                value={newElementName}
+                onChange={(e) => setNewElementName(e.target.value)}
+                placeholder="New Element Name..."
+                className={`flex-grow ${inputBgClass} border ${inputBorderClass} rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-green-500 ${inputTextClass}`}
+            />
+            <button type="submit" disabled={!newElementName.trim()} className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded disabled:opacity-50 transition-colors">
+                Add
+            </button>
+        </form>
+
+        {activeRelElement && (
+            <RelationshipManagerModal 
+                element={activeRelElement}
+                relationships={relationships}
+                allElements={elements}
+                onAdd={onAddRelationship}
+                onDelete={onDeleteRelationship}
+                onClose={() => setActiveRelModalElementId(null)}
+            />
+        )}
     </div>
   );
 };

@@ -16,6 +16,7 @@ interface SchemaToolbarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   onUpdateSchemes: (newSchemes: ColorScheme[]) => void;
+  isDarkMode: boolean;
 }
 
 const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
@@ -30,6 +31,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
   isCollapsed,
   onToggle,
   onUpdateSchemes,
+  isDarkMode
 }) => {
   const [tagInput, setTagInput] = useState('');
   const [isEditMode, setIsEditMode] = useState(false);
@@ -239,31 +241,41 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
       }
   };
 
+  // Classes
+  const bgClass = isDarkMode ? 'bg-gray-800 bg-opacity-95 border-gray-600' : 'bg-white bg-opacity-95 border-gray-200';
+  const buttonBgClass = isDarkMode ? 'bg-gray-700 hover:bg-gray-600 border-gray-600 text-teal-400' : 'bg-white hover:bg-gray-50 border-gray-200 text-teal-600';
+  const labelClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  const selectBgClass = isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800';
+  const inputBgClass = isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800';
+  const editPanelBg = isDarkMode ? 'bg-gray-900/95 border-gray-600' : 'bg-white/95 border-gray-200 shadow-lg';
+  const editSubBg = isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200';
+  const editInputBg = isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800';
+
   return (
     <div className="flex flex-col gap-2 pointer-events-none transition-all duration-300">
         <input type="file" ref={fileInputRef} onChange={handleImportFile} accept=".json" className="hidden" />
         
-        <div className="bg-gray-800 bg-opacity-95 rounded-lg border border-gray-600 shadow-lg pointer-events-auto overflow-hidden flex flex-col">
+        <div className={`rounded-lg border shadow-lg pointer-events-auto overflow-hidden flex flex-col ${bgClass}`}>
             
             {/* Top Bar */}
             <div className="flex items-stretch h-20">
                 {/* Collapse Toggle */}
                 <button 
                     onClick={onToggle}
-                    className="bg-gray-700 hover:bg-gray-600 border-r border-gray-600 w-20 flex flex-col items-center justify-center transition-colors h-full gap-1 flex-shrink-0"
+                    className={`border-r w-20 flex flex-col items-center justify-center transition-colors h-full gap-1 flex-shrink-0 ${buttonBgClass}`}
                     title={isCollapsed ? "Expand Schema Settings" : "Collapse Schema Settings"}
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-teal-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
-                    <span className="text-xs font-bold tracking-wider">SCHEMA</span>
+                    <span className={`text-xs font-bold tracking-wider ${isDarkMode ? 'text-white' : 'text-gray-600'}`}>SCHEMA</span>
                 </button>
 
                 {!isCollapsed && (
                     <div className="flex items-center gap-3 p-3 flex-grow overflow-hidden">
                         {/* Schema Selector */}
                         <div className="flex flex-col justify-center h-full">
-                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Active Schema</label>
+                            <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${labelClass}`}>Active Schema</label>
                             <div className="flex gap-2">
                                 <select
                                     value={activeSchemeId || ''}
@@ -271,13 +283,13 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                                         onSchemeChange(e.target.value);
                                         setEditingSchemeId(e.target.value);
                                     }}
-                                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[140px]"
+                                    className={`border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[140px] ${selectBgClass}`}
                                 >
                                     {schemes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
                                 <button 
                                     onClick={() => setIsEditMode(!isEditMode)}
-                                    className={`px-2 py-1 rounded text-xs border transition-colors ${isEditMode ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600'}`}
+                                    className={`px-2 py-1 rounded text-xs border transition-colors ${isEditMode ? 'bg-blue-600 border-blue-500 text-white' : isDarkMode ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200'}`}
                                     title="Edit Schema Definitions"
                                 >
                                     Edit
@@ -285,26 +297,26 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                             </div>
                         </div>
 
-                        <div className="w-px h-12 bg-gray-600 mx-1"></div>
+                        <div className={`w-px h-12 mx-1 ${isDarkMode ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
 
                         {/* Default Relationship Selector */}
                         <div className="flex flex-col justify-center h-full">
-                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Default Relation</label>
+                            <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${labelClass}`}>Default Relation</label>
                             <select
                                 value={currentDefaultRel}
                                 onChange={(e) => onDefaultRelationshipChange(e.target.value)}
-                                className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px]"
+                                className={`border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-[120px] ${selectBgClass}`}
                             >
                                 <option value="">-- None --</option>
                                 {relationshipLabels.map(l => <option key={l} value={l}>{l}</option>)}
                             </select>
                         </div>
 
-                        <div className="w-px h-12 bg-gray-600 mx-1"></div>
+                        <div className={`w-px h-12 mx-1 ${isDarkMode ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
 
                         {/* Default Tags Section */}
                         <div className="flex flex-col justify-center h-full">
-                            <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">New Element Tags</label>
+                            <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${labelClass}`}>New Element Tags</label>
                             <div className="flex items-center gap-2">
                                 <input 
                                     type="text" 
@@ -312,7 +324,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                                     onChange={handleTagInputChange}
                                     onKeyDown={handleTagInputKeyDown}
                                     placeholder="Add default tag..."
-                                    className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 w-32"
+                                    className={`border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 w-32 ${inputBgClass}`}
                                 />
                                 {/* Active Default Tags Display */}
                                 <div className="flex gap-1 overflow-x-auto max-w-[180px] scrollbar-thin scrollbar-thumb-gray-600 items-center h-7 px-1">
@@ -322,7 +334,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                                             <button onClick={() => removeTag(tag)} className="hover:text-blue-200 font-bold ml-0.5">×</button>
                                         </span>
                                     )) : (
-                                        <span className="text-xs text-gray-500 italic">No tags selected</span>
+                                        <span className={`text-xs italic ${labelClass}`}>No tags selected</span>
                                     )}
                                 </div>
                             </div>
@@ -333,31 +345,31 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
 
             {/* Expanded Edit Panel */}
             {!isCollapsed && isEditMode && editingScheme && (
-                <div className="border-t border-gray-600 bg-gray-900/95 p-4 max-h-[600px] overflow-y-auto animate-fade-in flex flex-col gap-4 w-[800px]">
+                <div className={`border-t p-4 max-h-[600px] overflow-y-auto animate-fade-in flex flex-col gap-4 w-[800px] ${editPanelBg}`}>
                     
                     {/* AI Info Bar */}
                     <div className="bg-blue-900/30 border border-blue-500/30 p-3 rounded flex gap-3 items-start">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        <p className="text-sm text-blue-200 leading-tight">
+                        <p className={`text-sm leading-tight ${isDarkMode ? 'text-blue-200' : 'text-blue-800'}`}>
                             Element and relationship descriptions are provided to the AI. This helps it understand the model context better and allows it to create content that adheres to your chosen schema.
                         </p>
                     </div>
 
                     {/* Schema Meta Controls */}
-                    <div className="flex flex-col gap-3 bg-gray-800 p-3 rounded border border-gray-700">
+                    <div className={`flex flex-col gap-3 p-3 rounded border ${editSubBg}`}>
                         <div className="flex gap-2 items-end">
                             <div className="flex-grow">
-                                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Edit Schema Name</label>
+                                <label className={`text-xs font-bold uppercase block mb-1 ${labelClass}`}>Edit Schema Name</label>
                                 <input 
                                     type="text" 
                                     value={editingScheme.name} 
                                     onChange={(e) => updateScheme(editingScheme.id, { name: e.target.value })}
-                                    className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:ring-1 focus:ring-teal-500 font-bold"
+                                    className={`w-full border rounded px-3 py-2 focus:outline-none focus:ring-1 focus:ring-teal-500 font-bold ${editInputBg}`}
                                 />
                             </div>
                             <button 
                                 onClick={handleExportSchema}
-                                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded text-gray-300 hover:text-white transition-colors h-10"
+                                className={`px-3 py-2 border rounded transition-colors h-10 ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 border-gray-600 text-gray-300 hover:text-white' : 'bg-white hover:bg-gray-100 border-gray-300 text-gray-600'}`}
                                 title="Export Schema JSON"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -366,7 +378,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                             </button>
                             <button 
                                 onClick={handleImportClick}
-                                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded text-gray-300 hover:text-white transition-colors h-10"
+                                className={`px-3 py-2 border rounded transition-colors h-10 ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 border-gray-600 text-gray-300 hover:text-white' : 'bg-white hover:bg-gray-100 border-gray-300 text-gray-600'}`}
                                 title="Import Schema JSON"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -377,10 +389,10 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                                 Delete Schema
                             </button>
                         </div>
-                        <div className="flex justify-between border-t border-gray-700 pt-2">
+                        <div className={`flex justify-between border-t pt-2 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
                              <button 
                                 onClick={handleLoadMissingDefaults} 
-                                className="px-3 py-1.5 text-xs text-blue-400 hover:text-blue-300 hover:bg-gray-700 rounded transition-colors flex items-center gap-1"
+                                className={`px-3 py-1.5 text-xs text-blue-400 hover:text-blue-300 rounded transition-colors flex items-center gap-1 ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -389,7 +401,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                             </button>
                             <button 
                                 onClick={handleCreateScheme} 
-                                className="px-3 py-1.5 text-xs text-green-400 hover:text-green-300 hover:bg-gray-700 rounded transition-colors"
+                                className={`px-3 py-1.5 text-xs text-green-400 hover:text-green-300 rounded transition-colors ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
                             >
                                 + Create New Custom Schema
                             </button>
@@ -399,12 +411,12 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                     <div className="grid grid-cols-2 gap-6">
                         {/* Tags Editor */}
                         <div className="flex flex-col gap-2">
-                            <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wide border-b border-gray-700 pb-2 mb-2">
+                            <h3 className={`text-sm font-bold uppercase tracking-wide border-b pb-2 mb-2 ${isDarkMode ? 'text-gray-300 border-gray-700' : 'text-gray-700 border-gray-300'}`}>
                                 Tag Definitions
                             </h3>
                             <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
                                 {Object.entries(editingScheme.tagColors).map(([tag, color]) => (
-                                    <div key={tag} className="grid grid-cols-[30px_1fr_1.5fr_30px] gap-2 items-center bg-gray-800 p-2 rounded border border-gray-700">
+                                    <div key={tag} className={`grid grid-cols-[30px_1fr_1.5fr_30px] gap-2 items-center p-2 rounded border ${editSubBg}`}>
                                         <input 
                                             type="color" 
                                             value={color} 
@@ -412,13 +424,13 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                                             className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0"
                                             title="Tag Color"
                                         />
-                                        <div className="font-bold text-sm text-white truncate" title={tag}>{tag}</div>
+                                        <div className={`font-bold text-sm truncate ${isDarkMode ? 'text-white' : 'text-gray-800'}`} title={tag}>{tag}</div>
                                         <input 
                                             type="text"
                                             value={editingScheme.tagDescriptions?.[tag] || ''}
                                             onChange={(e) => updateScheme(editingScheme.id, { tagDescriptions: { ...editingScheme.tagDescriptions, [tag]: e.target.value } })}
                                             placeholder="Description for AI..."
-                                            className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-gray-300 focus:outline-none"
+                                            className={`border rounded px-2 py-1 text-xs focus:outline-none ${editInputBg}`}
                                         />
                                         <button onClick={() => handleDeleteTag(tag)} className="text-gray-500 hover:text-red-400 flex justify-center">
                                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
@@ -428,21 +440,21 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                             </div>
                             
                             {/* Add Tag Row */}
-                            <div className="grid grid-cols-[30px_1fr_1.5fr_30px] gap-2 items-center bg-gray-800/50 p-2 rounded border border-dashed border-gray-600 mt-2">
+                            <div className={`grid grid-cols-[30px_1fr_1.5fr_30px] gap-2 items-center p-2 rounded border border-dashed mt-2 ${isDarkMode ? 'bg-gray-800/50 border-gray-600' : 'bg-gray-50 border-gray-300'}`}>
                                 <input type="color" value={newTagColor} onChange={e => setNewTagColor(e.target.value)} className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0" />
                                 <input 
                                     type="text" 
                                     value={newTagName} 
                                     onChange={e => setNewTagName(e.target.value)} 
                                     placeholder="New Tag Name" 
-                                    className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none"
+                                    className={`border rounded px-2 py-1 text-xs focus:outline-none ${editInputBg}`}
                                 />
                                 <input 
                                     type="text" 
                                     value={newTagDesc} 
                                     onChange={e => setNewTagDesc(e.target.value)} 
                                     placeholder="Description..." 
-                                    className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none"
+                                    className={`border rounded px-2 py-1 text-xs focus:outline-none ${editInputBg}`}
                                     onKeyDown={e => e.key === 'Enter' && handleAddTag()}
                                 />
                                 <button onClick={handleAddTag} disabled={!newTagName} className="text-green-500 hover:text-green-400 disabled:opacity-50 font-bold text-lg leading-none">
@@ -453,13 +465,13 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
 
                         {/* Relationships Editor */}
                         <div className="flex flex-col gap-2">
-                            <h3 className="text-sm font-bold text-gray-300 uppercase tracking-wide border-b border-gray-700 pb-2 mb-2">
+                            <h3 className={`text-sm font-bold uppercase tracking-wide border-b pb-2 mb-2 ${isDarkMode ? 'text-gray-300 border-gray-700' : 'text-gray-700 border-gray-300'}`}>
                                 Relationship Definitions
                             </h3>
                             <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
                                 {editingScheme.relationshipDefinitions?.map((def, idx) => (
-                                    <div key={idx} className="grid grid-cols-[1fr_1.5fr_30px] gap-2 items-center bg-gray-800 p-2 rounded border border-gray-700">
-                                        <div className="font-bold text-sm text-white truncate pl-2" title={def.label}>{def.label}</div>
+                                    <div key={idx} className={`grid grid-cols-[1fr_1.5fr_30px] gap-2 items-center p-2 rounded border ${editSubBg}`}>
+                                        <div className={`font-bold text-sm truncate pl-2 ${isDarkMode ? 'text-white' : 'text-gray-800'}`} title={def.label}>{def.label}</div>
                                         <input 
                                             type="text"
                                             value={def.description || ''}
@@ -469,30 +481,30 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                                                 updateScheme(editingScheme.id, { relationshipDefinitions: updated });
                                             }}
                                             placeholder="Description for AI..."
-                                            className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-gray-300 focus:outline-none"
+                                            className={`border rounded px-2 py-1 text-xs focus:outline-none ${editInputBg}`}
                                         />
                                         <button onClick={() => handleDeleteRel(idx)} className="text-gray-500 hover:text-red-400 flex justify-center">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L10 11.414l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                                         </button>
                                     </div>
                                 ))}
                             </div>
 
                             {/* Add Relation Row */}
-                            <div className="grid grid-cols-[1fr_1.5fr_30px] gap-2 items-center bg-gray-800/50 p-2 rounded border border-dashed border-gray-600 mt-2">
+                            <div className={`grid grid-cols-[1fr_1.5fr_30px] gap-2 items-center p-2 rounded border border-dashed mt-2 ${isDarkMode ? 'bg-gray-800/50 border-gray-600' : 'bg-gray-50 border-gray-300'}`}>
                                 <input 
                                     type="text" 
                                     value={newRelLabel} 
                                     onChange={e => setNewRelLabel(e.target.value)} 
                                     placeholder="New Relation Label" 
-                                    className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none"
+                                    className={`border rounded px-2 py-1 text-xs focus:outline-none ${editInputBg}`}
                                 />
                                 <input 
                                     type="text" 
                                     value={newRelDesc} 
                                     onChange={e => setNewRelDesc(e.target.value)} 
                                     placeholder="Description..." 
-                                    className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none"
+                                    className={`border rounded px-2 py-1 text-xs focus:outline-none ${editInputBg}`}
                                     onKeyDown={e => e.key === 'Enter' && handleAddRel()}
                                 />
                                 <button onClick={handleAddRel} disabled={!newRelLabel} className="text-green-500 hover:text-green-400 disabled:opacity-50 font-bold text-lg leading-none">
@@ -519,7 +531,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                             className={`text-[10px] px-2.5 py-1 rounded-full border shadow-sm transition-all flex items-center gap-1.5 ${
                                 isActive 
                                 ? 'brightness-110 font-bold ring-1 ring-white scale-105' 
-                                : 'opacity-80 hover:opacity-100 bg-gray-800 border-gray-600 text-gray-300 hover:scale-105'
+                                : isDarkMode ? 'opacity-80 hover:opacity-100 bg-gray-800 border-gray-600 text-gray-300 hover:scale-105' : 'opacity-80 hover:opacity-100 bg-white border-gray-300 text-gray-600 hover:bg-gray-100'
                             }`}
                             style={{ 
                                 backgroundColor: isActive ? color : undefined,
@@ -529,7 +541,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                             }}
                         >
                             <span>{tag}</span>
-                            <span className={`text-[9px] px-1.5 rounded-full ${isActive ? 'bg-black bg-opacity-20' : 'bg-gray-700 text-gray-400'}`}>
+                            <span className={`text-[9px] px-1.5 rounded-full ${isActive ? 'bg-black bg-opacity-20' : isDarkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'}`}>
                                 {count}
                             </span>
                         </button>

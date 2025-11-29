@@ -8,6 +8,7 @@ interface SsmToolbarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   onOpenSettings: () => void;
+  isDarkMode: boolean;
 }
 
 const SSM_TOOLS = [
@@ -62,8 +63,18 @@ const SsmToolbar: React.FC<SsmToolbarProps> = ({
   activeTool,
   isCollapsed,
   onToggle,
-  onOpenSettings
+  onOpenSettings,
+  isDarkMode
 }) => {
+
+  const bgClass = isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-200';
+  const dropdownBg = isDarkMode ? 'bg-gray-900 border-gray-600' : 'bg-white border-gray-200';
+  const headerBg = isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200';
+  const itemHover = isDarkMode ? 'hover:bg-gray-800 border-gray-700' : 'hover:bg-gray-50 border-gray-100';
+  const textMain = isDarkMode ? 'text-gray-300' : 'text-gray-600';
+  const textHeader = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  const textItem = isDarkMode ? 'text-gray-200 group-hover:text-white' : 'text-gray-800 group-hover:text-black';
+  const textDesc = isDarkMode ? 'text-gray-400 group-hover:text-gray-300' : 'text-gray-500 group-hover:text-gray-700';
 
   return (
     <div className="relative pointer-events-auto">
@@ -71,7 +82,7 @@ const SsmToolbar: React.FC<SsmToolbarProps> = ({
       <div className="relative">
         <button 
             onClick={onToggle}
-            className={`h-20 w-20 bg-gray-800 hover:bg-gray-700 border border-gray-600 shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${!isCollapsed ? 'ring-2 ring-cyan-500 bg-gray-700' : ''}`}
+            className={`h-20 w-20 border shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${bgClass} ${!isCollapsed ? 'ring-2 ring-cyan-500' : ''}`}
             title={isCollapsed ? "Expand SSM Tools" : "Close SSM Tools"}
         >
             <div className="relative w-8 h-8 flex items-center justify-center text-cyan-400">
@@ -79,12 +90,12 @@ const SsmToolbar: React.FC<SsmToolbarProps> = ({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
             </div>
-            <span className="text-xs font-bold tracking-wider text-gray-300">SSM</span>
+            <span className={`text-xs font-bold tracking-wider ${textMain}`}>SSM</span>
         </button>
         
         <button 
             onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
-            className="absolute top-0 right-0 p-1 text-gray-500 hover:text-white bg-gray-800/50 rounded-bl hover:bg-gray-600 transition-colors"
+            className={`absolute top-0 right-0 p-1 transition-colors rounded-bl ${isDarkMode ? 'text-gray-500 hover:text-white bg-gray-800/50 hover:bg-gray-600' : 'text-gray-400 hover:text-gray-900 bg-gray-100/50 hover:bg-gray-200'}`}
             title="SSM Settings"
         >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -95,8 +106,8 @@ const SsmToolbar: React.FC<SsmToolbarProps> = ({
       </div>
 
       {!isCollapsed && (
-        <div className="absolute top-full left-0 mt-2 w-72 bg-gray-900 border border-gray-600 rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600">
-             <div className="p-2 bg-gray-800 border-b border-gray-700 text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center">
+        <div className={`absolute top-full left-0 mt-2 w-72 border rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600 ${dropdownBg}`}>
+             <div className={`p-2 border-b text-[10px] font-bold uppercase tracking-wider text-center ${headerBg} ${textHeader}`}>
                  Soft Systems Methodology
              </div>
              
@@ -104,14 +115,14 @@ const SsmToolbar: React.FC<SsmToolbarProps> = ({
                  <button
                     key={tool.id}
                     onClick={() => onSelectTool(tool.id)}
-                    className={`flex items-start text-left p-3 border-b border-gray-700 last:border-0 hover:bg-gray-800 transition-colors group`}
+                    className={`flex items-start text-left p-3 border-b last:border-0 transition-colors group ${itemHover}`}
                  >
                      <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110" style={{ color: tool.color }}>
                          {tool.icon}
                      </div>
                      <div>
-                         <div className="font-bold text-gray-200 text-sm mb-0.5 group-hover:text-white">{tool.name}</div>
-                         <p className="text-xs text-gray-400 leading-tight group-hover:text-gray-300">
+                         <div className={`font-bold text-sm mb-0.5 ${textItem}`}>{tool.name}</div>
+                         <p className={`text-xs leading-tight ${textDesc}`}>
                              {tool.desc}
                          </p>
                      </div>

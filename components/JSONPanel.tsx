@@ -7,9 +7,10 @@ interface JSONPanelProps {
   onApply: (data: any) => void;
   onClose: () => void;
   modelName: string;
+  isDarkMode: boolean;
 }
 
-const JSONPanel: React.FC<JSONPanelProps> = ({ initialData, onApply, onClose, modelName }) => {
+const JSONPanel: React.FC<JSONPanelProps> = ({ initialData, onApply, onClose, modelName, isDarkMode }) => {
   const [text, setText] = useState('');
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -41,7 +42,6 @@ const JSONPanel: React.FC<JSONPanelProps> = ({ initialData, onApply, onClose, mo
 
   const handleOpen = async () => {
     // Try File System Access API first for better UX (start in Documents)
-    // BUT ONLY IF NOT IN IFRAME (security restriction)
     if (!isInIframe() && 'showOpenFilePicker' in window) {
         try {
             const pickerOptions = {
@@ -90,9 +90,12 @@ const JSONPanel: React.FC<JSONPanelProps> = ({ initialData, onApply, onClose, mo
     reader.readAsText(file);
   };
 
+  const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const textareaBg = isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-gray-50 border-gray-300 text-gray-900';
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className={`w-full h-full flex flex-col ${bgClass}`}>
        <input
         type="file"
         ref={importFileRef}
@@ -102,8 +105,8 @@ const JSONPanel: React.FC<JSONPanelProps> = ({ initialData, onApply, onClose, mo
       />
 
       <div className="p-6 flex-shrink-0 flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-white">JSON View</h2>
-        <button onClick={onClose} className="text-gray-400 hover:text-white">
+        <h2 className={`text-2xl font-bold ${textClass}`}>JSON View</h2>
+        <button onClick={onClose} className={`text-gray-400 hover:${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -114,7 +117,7 @@ const JSONPanel: React.FC<JSONPanelProps> = ({ initialData, onApply, onClose, mo
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            className="w-full h-full flex-grow bg-gray-900 border border-gray-600 rounded-md p-4 text-white font-mono text-xs resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full h-full flex-grow border rounded-md p-4 font-mono text-xs resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${textareaBg}`}
             spellCheck={false}
           />
       </div>

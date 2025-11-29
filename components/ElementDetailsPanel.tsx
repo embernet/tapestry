@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme } from '../types';
 import ElementEditor from './ElementEditor';
@@ -13,11 +12,12 @@ interface ElementDetailsPanelProps {
   onClose: () => void;
   colorSchemes: ColorScheme[];
   activeSchemeId: string | null;
+  isDarkMode: boolean;
 }
 
 const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({ 
     element, allElements, relationships, onUpdate, onDelete, onClose, 
-    colorSchemes, activeSchemeId 
+    colorSchemes, activeSchemeId, isDarkMode 
 }) => {
   const [formData, setFormData] = useState<Partial<Element>>({});
   const [isCopied, setIsCopied] = useState(false);
@@ -84,17 +84,24 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({
     return null;
   }
 
+  const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const borderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const subTextClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+  const inputBgClass = isDarkMode ? 'bg-gray-700' : 'bg-gray-100';
+  const inputBorderClass = isDarkMode ? 'border-gray-600' : 'border-gray-300';
+
   return (
-    <div className="bg-gray-800 border border-gray-700 w-96 flex flex-col h-full min-h-0" onKeyDown={handleKeyDown}>
+    <div className={`${bgClass} border ${borderClass} w-96 flex flex-col h-full min-h-0 transition-colors`} onKeyDown={handleKeyDown}>
       {/* Fixed Header Section */}
-      <div className="p-6 pb-0 flex-shrink-0 bg-gray-800 z-10">
+      <div className={`p-6 pb-0 flex-shrink-0 ${bgClass} z-10 transition-colors`}>
         <div className="flex justify-between items-start mb-4">
-          <h2 className="text-2xl font-bold text-white">Element Details</h2>
+          <h2 className={`text-2xl font-bold ${textClass}`}>Element Details</h2>
           <div className="flex space-x-2">
             <button 
               onClick={handleCopyMarkdown}
               title={isCopied ? "Copied!" : "Copy as Markdown"}
-              className="text-gray-400 hover:text-white hover:bg-gray-700 p-1 rounded transition"
+              className={`${subTextClass} hover:text-blue-500 hover:bg-gray-100 p-1 rounded transition`}
             >
               {isCopied ? (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -109,7 +116,7 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({
             <button 
               onClick={onClose}
               title="Close"
-              className="text-gray-400 hover:text-white hover:bg-gray-700 p-1 rounded transition"
+              className={`${subTextClass} hover:text-red-500 hover:bg-gray-100 p-1 rounded transition`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -120,7 +127,7 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({
 
         {/* Name Field moved here to be fixed above scroll area */}
         <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-400 mb-1">Name</label>
+            <label className={`block text-sm font-medium ${subTextClass} mb-1`}>Name</label>
             <input
                 ref={nameInputRef}
                 type="text"
@@ -128,7 +135,7 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({
                 value={formData.name || ''}
                 onChange={(e) => handleDataChange({ name: e.target.value })}
                 onBlur={handleBlur}
-                className="block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                className={`block w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold`}
             />
         </div>
       </div>
@@ -142,19 +149,20 @@ const ElementDetailsPanel: React.FC<ElementDetailsPanelProps> = ({
             colorSchemes={colorSchemes}
             activeSchemeId={activeSchemeId}
             hideName={true} // Name is handled in the fixed header
+            isDarkMode={isDarkMode}
           />
-          <div className="text-xs text-gray-500 pt-4 space-y-1 mt-4 border-t border-gray-700">
+          <div className={`text-xs ${subTextClass} pt-4 space-y-1 mt-4 border-t ${borderClass}`}>
               <p>Created: {formatDate(element.createdAt)}</p>
               <p>Last Edited: {formatDate(element.updatedAt)}</p>
           </div>
       </div>
       
       {/* Footer Section */}
-      <div className="flex-shrink-0 p-6 pt-4 border-t border-gray-700 flex justify-between items-center bg-gray-800">
-          <p className="text-xs text-gray-500">Changes saved automatically.</p>
+      <div className={`flex-shrink-0 p-6 pt-4 border-t ${borderClass} flex justify-between items-center ${bgClass} transition-colors`}>
+          <p className={`text-xs ${subTextClass}`}>Changes saved automatically.</p>
           <button
             onClick={handleDelete}
-            className="text-sm text-red-400 hover:text-red-300 hover:bg-red-900 bg-opacity-50 px-3 py-1 rounded-md transition"
+            className="text-sm text-red-400 hover:text-red-600 hover:bg-red-50 px-3 py-1 rounded-md transition"
           >
             Delete Element
           </button>

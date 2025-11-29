@@ -7,18 +7,24 @@ interface HelpMenuProps {
   onPatternGallery: () => void;
   onSelfTest: () => void;
   onUserGuide: () => void;
+  isDarkMode: boolean;
 }
 
-export const HelpMenu: React.FC<HelpMenuProps> = ({ onClose, onAbout, onPatternGallery, onSelfTest, onUserGuide }) => {
+export const HelpMenu: React.FC<HelpMenuProps> = ({ onClose, onAbout, onPatternGallery, onSelfTest, onUserGuide, isDarkMode }) => {
+     const bgClass = isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
+     const textClass = isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-700 hover:text-black';
+     const hoverClass = isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100';
+     const dividerClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+
      return (
-        <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50 border border-gray-700">
-            <button onClick={() => { onUserGuide(); onClose(); }} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white font-bold text-blue-400">User Guide</button>
-            <div className="border-t border-gray-700 my-1"></div>
-            <button onClick={() => { onPatternGallery(); onClose(); }} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Pattern Gallery</button>
-            <button onClick={() => { onSelfTest(); onClose(); }} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white border-b border-gray-700">Run Self Test</button>
-            <button onClick={() => { onAbout(); onClose(); }} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">About Tapestry</button>
-            <div className="border-t border-gray-700 my-1"></div>
-            <a href="https://github.com/embernet/tapestry" target="_blank" rel="noopener noreferrer" className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white">Documentation</a>
+        <div className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 z-50 border ${bgClass}`}>
+            <button onClick={() => { onUserGuide(); onClose(); }} className={`block w-full text-left px-4 py-2 text-sm font-bold text-blue-400 ${hoverClass} ${isDarkMode ? 'hover:text-white' : ''}`}>User Guide</button>
+            <div className={`border-t ${dividerClass} my-1`}></div>
+            <button onClick={() => { onPatternGallery(); onClose(); }} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Pattern Gallery</button>
+            <button onClick={() => { onSelfTest(); onClose(); }} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass} border-b ${dividerClass}`}>Run Self Test</button>
+            <button onClick={() => { onAbout(); onClose(); }} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>About Tapestry</button>
+            <div className={`border-t ${dividerClass} my-1`}></div>
+            <a href="https://github.com/embernet/tapestry" target="_blank" rel="noopener noreferrer" className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Documentation</a>
         </div>
      );
 };

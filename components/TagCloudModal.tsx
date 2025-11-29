@@ -7,6 +7,7 @@ interface TagCloudPanelProps {
   elements: Element[];
   relationships: Relationship[];
   onNodeSelect: (elementId: string) => void;
+  isDarkMode: boolean;
 }
 
 type ViewState = 
@@ -36,9 +37,12 @@ const STOP_WORDS = new Set([
 ]);
 
 const COLORS = ['text-blue-400', 'text-green-400', 'text-yellow-400', 'text-pink-400', 'text-purple-400', 'text-cyan-400', 'text-orange-400', 'text-red-400', 'text-teal-400'];
+const DARK_COLORS = ['text-blue-600', 'text-green-600', 'text-yellow-600', 'text-pink-600', 'text-purple-600', 'text-cyan-600', 'text-orange-600', 'text-red-600', 'text-teal-600'];
 
-const shuffleAndEnrich = (items: Omit<CloudItem, 'color' | 'rotation'>[]): CloudItem[] => {
+const shuffleAndEnrich = (items: Omit<CloudItem, 'color' | 'rotation'>[], isDarkMode: boolean): CloudItem[] => {
     const newArr = [...items];
+    const palette = isDarkMode ? COLORS : DARK_COLORS;
+    
     // Fisher-Yates Shuffle
     for (let i = newArr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -47,12 +51,12 @@ const shuffleAndEnrich = (items: Omit<CloudItem, 'color' | 'rotation'>[]): Cloud
     // Add display properties
     return newArr.map(item => ({
         ...item,
-        color: COLORS[Math.floor(Math.random() * COLORS.length)],
+        color: palette[Math.floor(Math.random() * palette.length)],
         rotation: Math.floor(Math.random() * 16) - 8 // -8 to +8 degrees
     }));
 };
 
-export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, relationships, onNodeSelect }) => {
+export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, relationships, onNodeSelect, isDarkMode }) => {
     const [viewStack, setViewStack] = useState<ViewState[]>([]);
     
     useEffect(() => {
@@ -76,10 +80,10 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
         const max = Math.max(...Array.from(counts.values()), 1);
         
         const rawItems = Array.from(counts.entries()).map(([text, value]) => ({ text, value }));
-        const items = shuffleAndEnrich(rawItems);
+        const items = shuffleAndEnrich(rawItems, isDarkMode);
         
         return { items, max };
-    }, [elements]);
+    }, [elements, isDarkMode]);
 
     // Stats for Words in Node Names
     const wordStats = useMemo(() => {
@@ -101,10 +105,10 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
             .slice(0, 150)
             .map(([text, value]) => ({ text, value }));
 
-        const items = shuffleAndEnrich(rawItems);
+        const items = shuffleAndEnrich(rawItems, isDarkMode);
 
         return { items, max };
-    }, [elements]);
+    }, [elements, isDarkMode]);
 
     // Stats for Full Text
     const fullTextStats = useMemo(() => {
@@ -132,10 +136,10 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
             .slice(0, 150)
             .map(([text, value]) => ({ text, value }));
 
-        const items = shuffleAndEnrich(rawItems);
+        const items = shuffleAndEnrich(rawItems, isDarkMode);
 
         return { items, max };
-    }, [elements]);
+    }, [elements, isDarkMode]);
 
     // Stats for Elements (Nodes by Degree)
     const nodeStats = useMemo(() => {
@@ -158,10 +162,10 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
             rawItems = rawItems.filter(i => i.value > 0);
         }
 
-        const items = shuffleAndEnrich(rawItems);
+        const items = shuffleAndEnrich(rawItems, isDarkMode);
 
         return { items, max };
-    }, [elements, relationships]);
+    }, [elements, relationships, isDarkMode]);
 
     // Sub-view: Elements by Tag
     const elementsByTag = useMemo(() => {
@@ -182,8 +186,8 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
             value: degreeMap.get(e.id) || 0
         }));
 
-        return { items: shuffleAndEnrich(rawItems), max };
-    }, [elements, relationships, currentView]);
+        return { items: shuffleAndEnrich(rawItems, isDarkMode), max };
+    }, [elements, relationships, currentView, isDarkMode]);
 
     // Sub-view: Elements by Word
     const elementsByWord = useMemo(() => {
@@ -213,8 +217,8 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
             value: degreeMap.get(e.id) || 0
         }));
 
-        return { items: shuffleAndEnrich(rawItems), max };
-    }, [elements, relationships, currentView, mode]);
+        return { items: shuffleAndEnrich(rawItems, isDarkMode), max };
+    }, [elements, relationships, currentView, mode, isDarkMode]);
 
 
     const handleTagClick = (tag: string) => {
@@ -262,35 +266,44 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
         return '';
     };
 
+    // Theme Classes
+    const bgClass = isDarkMode ? 'bg-gray-900' : 'bg-white';
+    const headerBgClass = isDarkMode ? 'bg-gray-900/90' : 'bg-white/90';
+    const borderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+    const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+    const subTextClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+    const iconHoverClass = isDarkMode ? 'hover:bg-gray-700 text-gray-300' : 'hover:bg-gray-100 text-gray-600';
+    const patternFill = isDarkMode ? "#fff" : "#000";
+
     return (
-        <div className="w-full h-full bg-gray-900 flex flex-col relative overflow-hidden">
+        <div className={`w-full h-full flex flex-col relative overflow-hidden ${bgClass}`}>
             
             {/* Decorative Background */}
             <div className="absolute inset-0 opacity-5 pointer-events-none">
                 <svg width="100%" height="100%">
                     <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                        <circle cx="2" cy="2" r="1" fill="#fff" />
+                        <circle cx="2" cy="2" r="1" fill={patternFill} />
                     </pattern>
                     <rect width="100%" height="100%" fill="url(#grid)" />
                 </svg>
             </div>
 
             {/* Header */}
-            <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900/90 backdrop-blur z-10">
+            <div className={`p-4 border-b ${borderClass} flex justify-between items-center ${headerBgClass} backdrop-blur z-10`}>
                 <div className="flex items-center gap-3">
                     {viewStack.length > 1 && (
                         <button 
                             onClick={handleBack}
-                            className="p-1.5 rounded-full hover:bg-gray-700 text-gray-300 transition"
+                            className={`p-1.5 rounded-full ${iconHoverClass} transition`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                         </button>
                     )}
                     <div>
-                        <h2 className="text-xl font-bold text-white tracking-tight">
+                        <h2 className={`text-xl font-bold ${textClass} tracking-tight`}>
                             {getHeaderTitle()}
                         </h2>
-                        <p className="text-gray-400 text-xs">
+                        <p className={`${subTextClass} text-xs`}>
                             {getHeaderDesc()}
                         </p>
                     </div>
@@ -339,7 +352,7 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
                         <button
                             key={item.id}
                             onClick={() => handleNodeClick(item.id!)}
-                            className={`hover:text-white hover:underline transition-all ${item.color} font-medium leading-tight text-center p-1 opacity-90 hover:opacity-100`}
+                            className={`hover:underline transition-all ${item.color} ${isDarkMode ? 'hover:text-white' : 'hover:text-black'} font-medium leading-tight text-center p-1 opacity-90 hover:opacity-100`}
                             style={{ 
                                 fontSize: getFontSize(item.value, nodeStats.max, 12, 56),
                                 transform: `rotate(${item.rotation}deg)`
@@ -356,7 +369,7 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
                         <button
                             key={item.id}
                             onClick={() => handleNodeClick(item.id!)}
-                            className={`hover:text-white hover:underline transition-all text-gray-300 font-medium leading-tight text-center p-1`}
+                            className={`${isDarkMode ? 'hover:text-white text-gray-300' : 'hover:text-black text-gray-600'} hover:underline transition-all font-medium leading-tight text-center p-1`}
                             style={{ 
                                 fontSize: getFontSize(item.value, (currentView.type === 'elements_by_tag' ? elementsByTag : elementsByWord).max, 14, 40),
                                 transform: `rotate(${item.rotation}deg)`
@@ -370,19 +383,19 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
 
                 {/* Empty States */}
                 {currentView.type === 'all_tags' && tagStats.items.length === 0 && (
-                    <div className="text-gray-500 text-sm italic">No tags found in this model.</div>
+                    <div className={`${subTextClass} text-sm italic`}>No tags found in this model.</div>
                 )}
                 
                 {currentView.type === 'all_nodes' && nodeStats.items.length === 0 && (
-                    <div className="text-gray-500 text-sm italic">No elements found in this model.</div>
+                    <div className={`${subTextClass} text-sm italic`}>No elements found in this model.</div>
                 )}
 
                 {(currentView.type === 'all_words' && wordStats.items.length === 0) && (
-                    <div className="text-gray-500 text-sm italic">No significant text found in node names.</div>
+                    <div className={`${subTextClass} text-sm italic`}>No significant text found in node names.</div>
                 )}
 
                 {(currentView.type === 'all_full_text' && fullTextStats.items.length === 0) && (
-                    <div className="text-gray-500 text-sm italic">No significant text found in fields.</div>
+                    <div className={`${subTextClass} text-sm italic`}>No significant text found in fields.</div>
                 )}
             </div>
         </div>

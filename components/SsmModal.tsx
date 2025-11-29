@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship, SsmToolType, ModelActions, TapestryDocument, TapestryFolder } from '../types';
-import { generateMarkdownFromGraph } from '../utils';
+import { generateMarkdownFromGraph, AIConfig } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
@@ -22,6 +21,7 @@ interface SsmModalProps {
   onUpdateDocument: (docId: string, updates: Partial<TapestryDocument>) => void;
   customPrompt?: string;
   activeModel?: string;
+  aiConfig: AIConfig;
 }
 
 const RichPicturePanel: React.FC<{ onGenerate: (topic: string) => void, isLoading: boolean, initialParams?: any }> = ({ onGenerate, isLoading, initialParams }) => {
@@ -118,7 +118,7 @@ const ComparisonPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> 
     );
 };
 
-const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel }) => {
+const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel, aiConfig }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -327,7 +327,7 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-[3000] p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
       <div className={`bg-gray-900 rounded-lg w-full max-w-4xl shadow-2xl border ${toolInfo.border} text-white flex flex-col max-h-[90vh]`}>
         
         {/* Header */}

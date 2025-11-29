@@ -8,6 +8,7 @@ interface LssToolbarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   onOpenSettings: () => void;
+  isDarkMode: boolean;
 }
 
 const DEFINE_TOOLS = [
@@ -131,8 +132,18 @@ const LssToolbar: React.FC<LssToolbarProps> = ({
   activeTool,
   isCollapsed,
   onToggle,
-  onOpenSettings
+  onOpenSettings,
+  isDarkMode
 }) => {
+
+  const bgClass = isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-200';
+  const dropdownBg = isDarkMode ? 'bg-gray-900 border-gray-600' : 'bg-white border-gray-200';
+  const headerBg = isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200';
+  const itemHover = isDarkMode ? 'hover:bg-gray-800 border-gray-700' : 'hover:bg-gray-50 border-gray-100';
+  const textMain = isDarkMode ? 'text-gray-300' : 'text-gray-600';
+  const textHeader = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  const textItem = isDarkMode ? 'text-gray-200 group-hover:text-white' : 'text-gray-800 group-hover:text-black';
+  const textDesc = isDarkMode ? 'text-gray-400 group-hover:text-gray-300' : 'text-gray-500 group-hover:text-gray-700';
 
   return (
     <div className="relative pointer-events-auto">
@@ -140,7 +151,7 @@ const LssToolbar: React.FC<LssToolbarProps> = ({
         <div className="relative">
             <button 
                 onClick={onToggle}
-                className={`h-20 w-20 bg-gray-800 hover:bg-gray-700 border border-gray-600 shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${!isCollapsed ? 'ring-2 ring-blue-500 bg-gray-700' : ''}`}
+                className={`h-20 w-20 border shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${bgClass} ${!isCollapsed ? 'ring-2 ring-blue-500' : ''}`}
                 title={isCollapsed ? "Expand Lean Six Sigma Tools" : "Close Lean Six Sigma Tools"}
             >
                 <div className="relative w-8 h-8 flex items-center justify-center text-blue-400">
@@ -148,12 +159,12 @@ const LssToolbar: React.FC<LssToolbarProps> = ({
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                     </svg>
                 </div>
-                <span className="text-xs font-bold tracking-wider text-gray-300">LSS</span>
+                <span className={`text-xs font-bold tracking-wider ${textMain}`}>LSS</span>
             </button>
             
             <button 
                 onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
-                className="absolute top-0 right-0 p-1 text-gray-500 hover:text-white bg-gray-800/50 rounded-bl hover:bg-gray-600 transition-colors"
+                className={`absolute top-0 right-0 p-1 transition-colors rounded-bl ${isDarkMode ? 'text-gray-500 hover:text-white bg-gray-800/50 hover:bg-gray-600' : 'text-gray-400 hover:text-gray-900 bg-gray-100/50 hover:bg-gray-200'}`}
                 title="LSS Settings"
             >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -164,24 +175,24 @@ const LssToolbar: React.FC<LssToolbarProps> = ({
         </div>
 
         {!isCollapsed && (
-            <div className="absolute top-full left-0 mt-2 w-72 bg-gray-900 border border-gray-600 rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600">
+            <div className={`absolute top-full left-0 mt-2 w-72 border rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600 ${dropdownBg}`}>
                  
                  {/* Define Phase Header */}
-                 <div className="p-2 bg-gray-800 border-b border-gray-700 text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center">
+                 <div className={`p-2 border-b text-[10px] font-bold uppercase tracking-wider text-center ${headerBg} ${textHeader}`}>
                      Define & Measure
                  </div>
                  {DEFINE_TOOLS.map(tool => (
                      <button
                         key={tool.id}
                         onClick={() => onSelectTool(tool.id)}
-                        className={`flex items-start text-left p-3 border-b border-gray-700 last:border-0 hover:bg-gray-800 transition-colors group`}
+                        className={`flex items-start text-left p-3 border-b last:border-0 transition-colors group ${itemHover}`}
                      >
                          <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110" style={{ color: tool.color }}>
                              {tool.icon}
                          </div>
                          <div>
-                             <div className="font-bold text-gray-200 text-sm mb-0.5 group-hover:text-white">{tool.name}</div>
-                             <p className="text-xs text-gray-400 leading-tight group-hover:text-gray-300">
+                             <div className={`font-bold text-sm mb-0.5 ${textItem}`}>{tool.name}</div>
+                             <p className={`text-xs leading-tight ${textDesc}`}>
                                  {tool.desc}
                              </p>
                          </div>
@@ -189,21 +200,21 @@ const LssToolbar: React.FC<LssToolbarProps> = ({
                  ))}
 
                  {/* Improve Phase Header */}
-                 <div className="p-2 bg-gray-800 border-b border-gray-700 border-t text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center">
+                 <div className={`p-2 border-b border-t text-[10px] font-bold uppercase tracking-wider text-center ${headerBg} ${textHeader}`}>
                      Analyze, Improve, Control
                  </div>
                  {IMPROVEMENT_TOOLS.map(tool => (
                      <button
                         key={tool.id}
                         onClick={() => onSelectTool(tool.id)}
-                        className={`flex items-start text-left p-3 border-b border-gray-700 last:border-0 hover:bg-gray-800 transition-colors group`}
+                        className={`flex items-start text-left p-3 border-b last:border-0 transition-colors group ${itemHover}`}
                      >
                          <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110" style={{ color: tool.color }}>
                              {tool.icon}
                          </div>
                          <div>
-                             <div className="font-bold text-gray-200 text-sm mb-0.5 group-hover:text-white">{tool.name}</div>
-                             <p className="text-xs text-gray-400 leading-tight group-hover:text-gray-300">
+                             <div className={`font-bold text-sm mb-0.5 ${textItem}`}>{tool.name}</div>
+                             <p className={`text-xs leading-tight ${textDesc}`}>
                                  {tool.desc}
                              </p>
                          </div>

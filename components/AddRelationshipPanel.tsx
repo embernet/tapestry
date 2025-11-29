@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Element, Relationship, RelationshipDirection, ColorScheme } from '../types';
 import ElementEditor from './ElementEditor';
@@ -18,6 +17,7 @@ interface AddRelationshipPanelProps {
   defaultLabel?: string;
   colorSchemes: ColorScheme[];
   activeSchemeId: string | null;
+  isDarkMode: boolean;
 }
 
 const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
@@ -32,6 +32,7 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   defaultLabel = '',
   colorSchemes,
   activeSchemeId,
+  isDarkMode
 }) => {
   const [selectedTargetId, setSelectedTargetId] = useState<string>(targetElementId || 'NEW_ELEMENT');
   const [elementEditorData, setElementEditorData] = useState<Partial<Element>>({
@@ -119,33 +120,40 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
       setLabel(l);
   };
 
+  const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const borderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const subTextClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+  const inputBgClass = isDarkMode ? 'bg-gray-700' : 'bg-gray-100';
+  const inputBorderClass = isDarkMode ? 'border-gray-600' : 'border-gray-300';
+
   return (
-    <div className="bg-gray-800 border border-gray-700 w-96 flex flex-col h-full min-h-0" onKeyDown={handleKeyDown}>
+    <div className={`${bgClass} border ${borderClass} w-96 flex flex-col h-full min-h-0 transition-colors`} onKeyDown={handleKeyDown}>
         {/* Header */}
-        <div className="p-6 pb-4 flex-shrink-0 bg-gray-800 z-10 border-b border-gray-700">
-            <h2 className="text-2xl font-bold text-white">Add Relationship</h2>
+        <div className={`p-6 pb-4 flex-shrink-0 ${bgClass} z-10 border-b ${borderClass}`}>
+            <h2 className={`text-2xl font-bold ${textClass}`}>Add Relationship</h2>
         </div>
 
         {/* Scrollable Content */}
         <div className="flex-grow space-y-4 overflow-y-auto px-6 py-4 custom-scrollbar">
           <div>
-            <label className="block text-sm font-medium text-gray-400">Source Element</label>
-            <div className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-gray-300 cursor-not-allowed">
+            <label className={`block text-sm font-medium ${subTextClass}`}>Source Element</label>
+            <div className={`mt-1 block w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} cursor-not-allowed`}>
               {sourceElement.name}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-400">Target Element</label>
+            <label className={`block text-sm font-medium ${subTextClass}`}>Target Element</label>
             {isNewTarget ? (
-               <div className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white font-semibold">
+               <div className={`mt-1 block w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} font-semibold`}>
                  New Element (Creating...)
                </div>
             ) : (
                 <select
                 value={selectedTargetId}
                 onChange={(e) => setSelectedTargetId(e.target.value)}
-                className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`mt-1 block w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
                 >
                 <option value="NEW_ELEMENT">+ Create New Element</option>
                 {availableTargets.map(element => (
@@ -165,24 +173,25 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
                     colorSchemes={colorSchemes}
                     activeSchemeId={activeSchemeId}
                     // In Add Relationship, we want the name input inside the editor block
-                    hideName={false} 
+                    hideName={false}
+                    isDarkMode={isDarkMode} 
                  />
              </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-400">Relationship Label</label>
+            <label className={`block text-sm font-medium ${subTextClass}`}>Relationship Label</label>
             <input
               ref={labelInputRef}
               type="text"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="e.g., causes, depends on"
-              className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`mt-1 block w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
             />
             {suggestedLabels.length > 0 && (
                 <div className="mt-2">
-                    <p className="text-xs text-gray-500 mb-1">Schema Relationships:</p>
+                    <p className={`text-xs ${subTextClass} mb-1`}>Schema Relationships:</p>
                     <div className="flex flex-wrap gap-1">
                         {suggestedLabels.map(l => {
                             const isSelected = label === l;
@@ -194,7 +203,7 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
                                     className={`text-xs px-2 py-1 rounded-full border transition-colors ${
                                         isSelected 
                                         ? 'bg-blue-600 border-blue-500 text-white' 
-                                        : 'bg-gray-800 border-gray-600 text-gray-400 hover:bg-gray-700'
+                                        : `${isDarkMode ? 'bg-gray-800 border-gray-600 text-gray-400 hover:bg-gray-700' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`
                                     }`}
                                 >
                                     {l}
@@ -207,11 +216,11 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
           </div>
           
            <div>
-            <label className="block text-sm font-medium text-gray-400">Direction</label>
+            <label className={`block text-sm font-medium ${subTextClass}`}>Direction</label>
             <select
               value={direction}
               onChange={(e) => setDirection(e.target.value as RelationshipDirection)}
-              className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`mt-1 block w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
             >
               <option value={RelationshipDirection.To}>Forward (→)</option>
               <option value={RelationshipDirection.From}>Reverse (←)</option>
@@ -221,7 +230,7 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-6 pt-4 border-t border-gray-700 flex-shrink-0 flex justify-end space-x-4 bg-gray-800 rounded-b-lg">
+        <div className={`p-6 pt-4 border-t ${borderClass} flex-shrink-0 flex justify-end space-x-4 ${bgClass} rounded-b-lg`}>
           <button onClick={onCancel} className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Cancel</button>
           <button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Add Relationship</button>
         </div>

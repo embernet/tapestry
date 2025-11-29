@@ -12,6 +12,7 @@ interface BulkEditToolbarProps {
   onToggleActive: () => void;
   isCollapsed: boolean;
   onToggle: () => void;
+  isDarkMode: boolean;
 }
 
 const BulkEditToolbar: React.FC<BulkEditToolbarProps> = ({
@@ -24,6 +25,7 @@ const BulkEditToolbar: React.FC<BulkEditToolbarProps> = ({
   onToggleActive,
   isCollapsed,
   onToggle,
+  isDarkMode
 }) => {
   const [addInput, setAddInput] = useState('');
   const [removeInput, setRemoveInput] = useState('');
@@ -105,61 +107,81 @@ const BulkEditToolbar: React.FC<BulkEditToolbarProps> = ({
 
   const schemaTags = activeColorScheme ? Object.keys(activeColorScheme.tagColors) : [];
 
+  // Theme Classes
+  const bgClass = isDarkMode ? 'bg-gray-800 bg-opacity-90 border-gray-600' : 'bg-white bg-opacity-95 border-gray-200';
+  const toggleBtnClass = isDarkMode ? 'bg-gray-700 hover:bg-gray-600 border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-200';
+  const contentBg = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const inputBg = isDarkMode ? 'bg-gray-900 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300';
+  const textMain = isDarkMode ? 'text-gray-300' : 'text-gray-600';
+  const textStatus = isDarkMode ? 'text-gray-500' : 'text-gray-400';
+  const dividerColor = isDarkMode ? 'bg-gray-600' : 'bg-gray-300';
+  const iconColor = isDarkMode ? 'text-pink-400' : 'text-pink-500';
+  
+  const inactiveBtnClass = isDarkMode 
+    ? 'bg-gray-700 border-gray-500 text-gray-400 hover:bg-gray-600 hover:text-white hover:border-white'
+    : 'bg-gray-50 border-gray-300 text-gray-400 hover:bg-gray-100 hover:text-gray-600 hover:border-gray-400';
+
+  const activeBtnClass = isDarkMode
+    ? 'bg-pink-600 border-white scale-110 text-white animate-pulse'
+    : 'bg-pink-500 border-pink-600 scale-110 text-white animate-pulse shadow-md';
+
+  const pillClass = isDarkMode
+    ? 'bg-gray-800 text-gray-300 border-gray-600 hover:opacity-100 opacity-80'
+    : 'bg-gray-50 text-gray-700 border-gray-300 hover:opacity-100 opacity-90 shadow-sm hover:bg-white';
+
   return (
     <div className="flex flex-col gap-2 pointer-events-none transition-all duration-300">
-      <div className="flex items-stretch gap-0 bg-gray-800 bg-opacity-90 rounded-lg border border-gray-600 shadow-lg pointer-events-auto overflow-hidden">
+      <div className={`flex items-stretch gap-0 rounded-lg border shadow-lg pointer-events-auto overflow-hidden ${bgClass}`}>
         {/* Collapse Toggle */}
         <button 
             onClick={onToggle}
-            className="bg-gray-700 hover:bg-gray-600 border-r border-gray-600 w-20 flex flex-col items-center justify-center transition-colors h-20 flex-shrink-0 gap-1"
+            className={`border-r w-20 flex flex-col items-center justify-center transition-colors h-20 flex-shrink-0 gap-1 ${toggleBtnClass}`}
             title={isCollapsed ? "Expand Bulk Editor" : "Collapse Bulk Editor"}
         >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-pink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-8 w-8 ${iconColor}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 11l2 2m-2-2l2 -2m-2 2l-2 2m2-2l-2 -2" />
             </svg>
-            <span className="text-xs font-bold tracking-wider">BULK</span>
+            <span className={`text-xs font-bold tracking-wider ${textMain}`}>BULK</span>
         </button>
 
         {!isCollapsed && (
-            <div className="flex items-center gap-4 p-3 animate-fade-in bg-gray-800 h-20">
+            <div className={`flex items-center gap-4 p-3 animate-fade-in h-20 ${contentBg}`}>
                 
                 {/* Inputs Area */}
                 <div className="flex flex-col justify-center h-full w-64 space-y-2">
                     <div className="flex items-center">
-                        <label className="w-24 text-[10px] text-green-400 font-bold uppercase tracking-wider text-right mr-2">Add Tags:</label>
+                        <label className="w-24 text-[10px] text-green-500 font-bold uppercase tracking-wider text-right mr-2">Add Tags:</label>
                         <input 
                             type="text" 
                             value={addInput}
                             onChange={handleAddInputChange}
                             onFocus={() => setFocusedField('add')}
                             placeholder="Tags to add..."
-                            className={`bg-gray-900 border rounded px-2 py-1 text-xs text-white focus:outline-none w-full ${focusedField === 'add' ? 'border-green-500 ring-1 ring-green-500' : 'border-gray-600'}`}
+                            className={`border rounded px-2 py-1 text-xs focus:outline-none w-full ${inputBg} ${focusedField === 'add' ? 'border-green-500 ring-1 ring-green-500' : ''}`}
                         />
                     </div>
                     <div className="flex items-center">
-                        <label className="w-24 text-[10px] text-red-400 font-bold uppercase tracking-wider text-right mr-2">Remove Tags:</label>
+                        <label className="w-24 text-[10px] text-red-500 font-bold uppercase tracking-wider text-right mr-2">Remove Tags:</label>
                         <input 
                             type="text" 
                             value={removeInput}
                             onChange={handleRemoveInputChange}
                             onFocus={() => setFocusedField('remove')}
                             placeholder="Tags to remove..."
-                            className={`bg-gray-900 border rounded px-2 py-1 text-xs text-white focus:outline-none w-full ${focusedField === 'remove' ? 'border-red-500 ring-1 ring-red-500' : 'border-gray-600'}`}
+                            className={`border rounded px-2 py-1 text-xs focus:outline-none w-full ${inputBg} ${focusedField === 'remove' ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                         />
                     </div>
                 </div>
 
-                <div className="w-px h-12 bg-gray-600 mx-1"></div>
+                <div className={`w-px h-12 mx-1 ${dividerColor}`}></div>
 
                 {/* Activation Button */}
                 <div className="flex flex-col items-center justify-center w-24">
                     <button
                         onClick={onToggleActive}
                         className={`w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all shadow-lg mb-1 ${
-                            isActive 
-                            ? 'bg-pink-600 border-white scale-110 text-white animate-pulse' 
-                            : 'bg-gray-700 border-gray-500 text-gray-400 hover:bg-gray-600 hover:text-white hover:border-white'
+                            isActive ? activeBtnClass : inactiveBtnClass
                         }`}
                         title={isActive ? "Bulk Mode Active: Click elements to apply changes" : "Activate Bulk Mode"}
                     >
@@ -167,17 +189,17 @@ const BulkEditToolbar: React.FC<BulkEditToolbarProps> = ({
                             <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
                     </button>
-                    <span className={`text-[9px] font-bold uppercase tracking-wider ${isActive ? 'text-pink-400' : 'text-gray-500'}`}>
+                    <span className={`text-[9px] font-bold uppercase tracking-wider ${isActive ? (isDarkMode ? 'text-pink-500' : 'text-pink-600') : textStatus}`}>
                         {isActive ? 'ACTIVE' : 'INACTIVE'}
                     </span>
                 </div>
                 
                 {/* Status Text */}
-                <div className="flex flex-col justify-center h-full w-32 text-[10px] font-bold uppercase tracking-wider text-center leading-tight border-l border-gray-600 pl-4">
+                <div className={`flex flex-col justify-center h-full w-32 text-[10px] font-bold uppercase tracking-wider text-center leading-tight border-l pl-4 ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}>
                     {isActive ? (
-                        <span className="text-green-400 animate-pulse">Click nodes to add/remove tags</span>
+                        <span className="text-green-500 animate-pulse">Click nodes to add/remove tags</span>
                     ) : (
-                        <span className="text-gray-500">Set tags and activate to apply</span>
+                        <span className={textStatus}>Set tags and activate to apply</span>
                     )}
                 </div>
 
@@ -197,7 +219,7 @@ const BulkEditToolbar: React.FC<BulkEditToolbarProps> = ({
                         <button
                             key={tag}
                             onClick={() => toggleTag(tag)}
-                            className={`text-[10px] px-2.5 py-1 rounded-full border shadow-sm transition-all flex items-center gap-1.5 opacity-80 hover:opacity-100 bg-gray-800 text-gray-300 hover:scale-105 border-gray-600`}
+                            className={`text-[10px] px-2.5 py-1 rounded-full border shadow-sm transition-all flex items-center gap-1.5 ${pillClass}`}
                             style={{ 
                                 borderLeftWidth: '4px',
                                 borderLeftColor: color || undefined
@@ -205,8 +227,8 @@ const BulkEditToolbar: React.FC<BulkEditToolbarProps> = ({
                             title={`Click to ${focusedField} this tag`}
                         >
                             <span>{tag}</span>
-                            {inAdd && <span className="text-green-400 font-bold text-[9px]">+</span>}
-                            {inRemove && <span className="text-red-400 font-bold text-[9px]">-</span>}
+                            {inAdd && <span className="text-green-500 font-bold text-[9px]">+</span>}
+                            {inRemove && <span className="text-red-500 font-bold text-[9px]">-</span>}
                         </button>
                     );
                 })}

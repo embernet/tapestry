@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { ScamperSuggestion, Element, Relationship, ModelActions, TapestryDocument, TapestryFolder, RelationshipDirection } from '../types';
-import { generateUUID } from '../utils';
+import { generateUUID, callAI } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
 
@@ -103,7 +103,7 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
               if (sourceEl) {
                   setSourceNodeId(sourceEl.id);
                   setSourceNodeName(sourceEl.name);
-                  setOperator(triggerOp);
+                  setOperator({ name: triggerOp.operator, letter: triggerOp.letter });
                   setDocTitle(`${sourceEl.name} - SCAMPER ${triggerOp.operator} - ${new Date().toLocaleDateString()}`);
                   setGeneratedDocId(null);
                   handleScamperGenerate(triggerOp.operator, triggerOp.letter, sourceEl);
@@ -128,8 +128,6 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
       if (!isAppend) setSuggestions([]);
 
       try {
-        const ai = new GoogleGenAI({ apiKey: aiConfig.apiKey || process.env.API_KEY });
-        
         const customPrompt = DEFAULT_TOOL_PROMPTS[`scamper:${opLetter}`] || DEFAULT_TOOL_PROMPTS['scamper'];
         
         let exclusionText = "";
@@ -144,26 +142,27 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
         ${exclusionText}
         For each idea, provide a name, a short description/rationale, and a short relationship label that connects the original concept to the new idea (e.g. "can be replaced by", "combined with", "adapted to").`;
         
-        const response = await ai.models.generateContent({ 
-            model: aiConfig.modelId || activeModel || 'gemini-2.5-flash', 
-            contents: prompt, 
-            config: { 
-                responseMimeType: "application/json", 
-                responseSchema: { 
-                    type: Type.ARRAY, 
-                    items: { 
-                        type: Type.OBJECT, 
-                        properties: { 
-                            name: { type: Type.STRING, description: "The name of the new idea node." }, 
-                            description: { type: Type.STRING, description: "Rationale or explanation." }, 
-                            relationshipLabel: { type: Type.STRING, description: "Label for the link from original node to this new node." } 
-                        } 
-                    } 
+        const responseSchema = { 
+            type: Type.ARRAY, 
+            items: { 
+                type: Type.OBJECT, 
+                properties: { 
+                    name: { type: Type.STRING, description: "The name of the new idea node." }, 
+                    description: { type: Type.STRING, description: "Rationale or explanation." }, 
+                    relationshipLabel: { type: Type.STRING, description: "Label for the link from original node to this new node." } 
                 } 
             } 
-        });
+        };
+
+        const aiResponse = await callAI(
+            aiConfig,
+            prompt,
+            undefined,
+            undefined,
+            responseSchema
+        );
         
-        const results = JSON.parse(response.text || "[]");
+        const results = JSON.parse(aiResponse.text || "[]");
         const newSuggestions: ScamperSuggestion[] = results.map((r: any) => ({ 
             id: generateUUID(), 
             name: r.name, 
@@ -322,7 +321,7 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-[3000] p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-[1000] p-4">
       <div className="bg-gray-800 rounded-lg w-full max-w-3xl shadow-2xl border border-gray-600 text-white flex flex-col max-h-[90vh]">
         
         {/* Header */}
@@ -409,10 +408,13 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
                 </div>
                 
                 <div className="p-4 border-t border-gray-800 bg-gray-800/50 flex justify-end">
-                     <button onClick={handleSaveToDocuments} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded text-sm font-bold shadow-lg transition flex items-center gap-2">
-                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6h5a2 2 0 012 2v7a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2h5v5.586l-1.293-1.293zM9 4a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" /></svg>
-                         Save to Documents
-                     </button>
+                    <button 
+                        onClick={handleSaveToDocuments} 
+                        disabled={!operator}
+                        className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        Save Report to Documents
+                    </button>
                 </div>
             </div>
         </div>

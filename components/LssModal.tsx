@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship, LssToolType, ModelActions, TapestryDocument, TapestryFolder } from '../types';
-import { generateMarkdownFromGraph } from '../utils';
+import { generateMarkdownFromGraph, AIConfig } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
@@ -22,6 +21,7 @@ interface LssModalProps {
   initialParams?: any;
   customPrompt?: string;
   activeModel?: string;
+  aiConfig: AIConfig;
 }
 
 // ... (Keep Sub Components CharterPanel, SipocPanel, VocPanel, CtqPanel, StakeholderPanel, DmaicPanel, FiveWhysPanel, FishbonePanel, FmeaPanel, VsmPanel identical) ...
@@ -296,7 +296,7 @@ const VsmPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> = ({ on
     );
 };
 
-const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, documents, folders, onUpdateDocument, initialParams, customPrompt, activeModel }) => {
+const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, documents, folders, onUpdateDocument, initialParams, customPrompt, activeModel, aiConfig }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -560,7 +560,7 @@ const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relat
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-[3000] p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
       <div className={`bg-gray-900 rounded-lg w-full max-w-6xl shadow-2xl border ${toolInfo.border} text-white flex flex-col max-h-[90vh]`}>
         
         {/* Header */}

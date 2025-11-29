@@ -6,6 +6,7 @@ interface ExplorerToolbarProps {
   onSelectTool: (tool: ExplorerToolType) => void;
   isCollapsed: boolean;
   onToggle: () => void;
+  isDarkMode: boolean;
 }
 
 const EXPLORER_TOOLS = [
@@ -32,19 +33,6 @@ const EXPLORER_TOOLS = [
     color: '#fb923c' // Orange
   },
   { 
-    id: 'selective_expansion' as ExplorerToolType, 
-    name: 'Selective Expansion', 
-    desc: 'Interactive exploration. Click nodes to expand or collapse their neighbors.',
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01" />
-      </svg>
-    ),
-    color: '#c084fc' // Purple
-  },
-  { 
     id: 'tags' as ExplorerToolType, 
     name: 'Tag Distribution', 
     desc: 'Analyze the frequency and spread of tags across nodes.',
@@ -58,7 +46,7 @@ const EXPLORER_TOOLS = [
   { 
     id: 'relationships' as ExplorerToolType, 
     name: 'Relationship Types', 
-    desc: 'Breakdown of connection types and directionality.',
+    desc: 'Analyze the types and frequency of connections.',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -72,7 +60,17 @@ const ExplorerToolbar: React.FC<ExplorerToolbarProps> = ({
   onSelectTool,
   isCollapsed,
   onToggle,
+  isDarkMode
 }) => {
+
+  const bgClass = isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-200';
+  const dropdownBg = isDarkMode ? 'bg-gray-900 border-gray-600' : 'bg-white border-gray-200';
+  const headerBg = isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200';
+  const itemHover = isDarkMode ? 'hover:bg-gray-800 border-gray-700' : 'hover:bg-gray-50 border-gray-100';
+  const textMain = isDarkMode ? 'text-gray-300' : 'text-gray-600';
+  const textHeader = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  const textItem = isDarkMode ? 'text-gray-200 group-hover:text-white' : 'text-gray-800 group-hover:text-black';
+  const textDesc = isDarkMode ? 'text-gray-400 group-hover:text-gray-300' : 'text-gray-500 group-hover:text-gray-700';
 
   return (
     <div className="relative pointer-events-auto">
@@ -80,36 +78,36 @@ const ExplorerToolbar: React.FC<ExplorerToolbarProps> = ({
       <div className="relative">
         <button 
             onClick={onToggle}
-            className={`h-20 w-20 bg-gray-800 hover:bg-gray-700 border border-gray-600 shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${!isCollapsed ? 'ring-2 ring-yellow-500 bg-gray-700' : ''}`}
-            title={isCollapsed ? "Expand Explorer" : "Close Explorer"}
+            className={`h-20 w-20 border shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${bgClass} ${!isCollapsed ? 'ring-2 ring-yellow-500' : ''}`}
+            title={isCollapsed ? "Expand Explorer Tools" : "Close Explorer Tools"}
         >
             <div className="relative w-8 h-8 flex items-center justify-center text-yellow-400">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
             </div>
-            <span className="text-[10px] font-bold tracking-wider text-gray-300">EXPLORER</span>
+            <span className={`text-xs font-bold tracking-wider ${textMain}`}>EXPLORE</span>
         </button>
       </div>
 
       {!isCollapsed && (
-        <div className="absolute top-full left-0 mt-2 w-72 bg-gray-900 border border-gray-600 rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600">
-             <div className="p-2 bg-gray-800 border-b border-gray-700 text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center">
-                 Visual Explorer
+        <div className={`absolute top-full left-0 mt-2 w-72 border rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600 ${dropdownBg}`}>
+             <div className={`p-2 border-b text-[10px] font-bold uppercase tracking-wider text-center ${headerBg} ${textHeader}`}>
+                 Graph Explorer Tools
              </div>
              
              {EXPLORER_TOOLS.map(tool => (
                  <button
                     key={tool.id}
                     onClick={() => onSelectTool(tool.id)}
-                    className={`flex items-start text-left p-3 border-b border-gray-700 last:border-0 hover:bg-gray-800 transition-colors group`}
+                    className={`flex items-start text-left p-3 border-b last:border-0 transition-colors group ${itemHover}`}
                  >
                      <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110" style={{ color: tool.color }}>
                          {tool.icon}
                      </div>
                      <div>
-                         <div className="font-bold text-gray-200 text-sm mb-0.5 group-hover:text-white">{tool.name}</div>
-                         <p className="text-xs text-gray-400 leading-tight group-hover:text-gray-300">
+                         <div className={`font-bold text-sm mb-0.5 ${textItem}`}>{tool.name}</div>
+                         <p className={`text-xs leading-tight ${textDesc}`}>
                              {tool.desc}
                          </p>
                      </div>

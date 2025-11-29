@@ -1,7 +1,6 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship, TocToolType, ModelActions, TapestryDocument, TapestryFolder } from '../types';
-import { generateMarkdownFromGraph } from '../utils';
+import { generateMarkdownFromGraph, AIConfig } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
@@ -22,6 +21,7 @@ interface TocModalProps {
   onUpdateDocument: (docId: string, updates: Partial<TapestryDocument>) => void;
   customPrompt?: string;
   activeModel?: string;
+  aiConfig: AIConfig;
 }
 
 // ... (Keep Sub Components CrtPanel, EcPanel, FrtPanel, TtPanel identical) ...
@@ -139,7 +139,7 @@ const TtPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> = ({ onG
     );
 };
 
-const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel }) => {
+const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel, aiConfig }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -176,7 +176,7 @@ const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relat
 
       try {
           const graphMarkdown = generateMarkdownFromGraph(elements, relationships);
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+          const ai = new GoogleGenAI({ apiKey: aiConfig.apiKey || process.env.API_KEY });
           
           const systemPromptBase = customPrompt || DEFAULT_TOOL_PROMPTS['toc'];
           let systemInstruction = `${systemPromptBase}
@@ -355,7 +355,7 @@ const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relat
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-[3000] p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 p-4">
       <div className={`bg-gray-900 rounded-lg w-full max-w-4xl shadow-2xl border ${toolInfo.border} text-white flex flex-col max-h-[90vh]`}>
         
         {/* Header */}

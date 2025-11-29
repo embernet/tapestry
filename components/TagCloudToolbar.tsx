@@ -6,6 +6,7 @@ interface TagCloudToolbarProps {
   onSelectTool: (tool: TagCloudToolType) => void;
   isCollapsed: boolean;
   onToggle: () => void;
+  isDarkMode: boolean;
 }
 
 const WORD_CLOUD_TOOLS = [
@@ -59,7 +60,17 @@ const TagCloudToolbar: React.FC<TagCloudToolbarProps> = ({
   onSelectTool,
   isCollapsed,
   onToggle,
+  isDarkMode
 }) => {
+
+  const bgClass = isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-200';
+  const dropdownBg = isDarkMode ? 'bg-gray-900 border-gray-600' : 'bg-white border-gray-200';
+  const headerBg = isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200';
+  const itemHover = isDarkMode ? 'hover:bg-gray-800 border-gray-700' : 'hover:bg-gray-50 border-gray-100';
+  const textMain = isDarkMode ? 'text-gray-300' : 'text-gray-600';
+  const textHeader = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  const textItem = isDarkMode ? 'text-gray-200 group-hover:text-white' : 'text-gray-800 group-hover:text-black';
+  const textDesc = isDarkMode ? 'text-gray-400 group-hover:text-gray-300' : 'text-gray-500 group-hover:text-gray-700';
 
   return (
     <div className="relative pointer-events-auto">
@@ -67,7 +78,7 @@ const TagCloudToolbar: React.FC<TagCloudToolbarProps> = ({
       <div className="relative">
         <button 
             onClick={onToggle}
-            className={`h-20 w-20 bg-gray-800 hover:bg-gray-700 border border-gray-600 shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${!isCollapsed ? 'ring-2 ring-pink-500 bg-gray-700' : ''}`}
+            className={`h-20 w-20 border shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${bgClass} ${!isCollapsed ? 'ring-2 ring-pink-500' : ''}`}
             title={isCollapsed ? "Expand Word Cloud" : "Close Word Cloud"}
         >
             <div className="relative w-8 h-8 flex items-center justify-center text-pink-400">
@@ -86,15 +97,15 @@ const TagCloudToolbar: React.FC<TagCloudToolbarProps> = ({
                     <rect x="15" y="14" width="7" height="2" rx="1" fill="currentColor" fillOpacity="0.7"/>
                 </svg>
             </div>
-            <div className="text-[9px] font-bold tracking-wider text-gray-300 leading-none text-center">
+            <div className={`text-[9px] font-bold tracking-wider leading-none text-center ${textMain}`}>
                 WORD<br/>CLOUD
             </div>
         </button>
       </div>
 
       {!isCollapsed && (
-        <div className="absolute top-full left-0 mt-2 w-72 bg-gray-900 border border-gray-600 rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600">
-             <div className="p-2 bg-gray-800 border-b border-gray-700 text-[10px] font-bold uppercase tracking-wider text-gray-400 text-center">
+        <div className={`absolute top-full left-0 mt-2 w-72 border rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600 ${dropdownBg}`}>
+             <div className={`p-2 border-b text-[10px] font-bold uppercase tracking-wider text-center ${headerBg} ${textHeader}`}>
                  Word Cloud Tools
              </div>
              
@@ -102,14 +113,14 @@ const TagCloudToolbar: React.FC<TagCloudToolbarProps> = ({
                  <button
                     key={tool.id}
                     onClick={() => onSelectTool(tool.id)}
-                    className={`flex items-start text-left p-3 border-b border-gray-700 last:border-0 hover:bg-gray-800 transition-colors group`}
+                    className={`flex items-start text-left p-3 border-b last:border-0 transition-colors group ${itemHover}`}
                  >
                      <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110" style={{ color: tool.color }}>
                          {tool.icon}
                      </div>
                      <div>
-                         <div className="font-bold text-gray-200 text-sm mb-0.5 group-hover:text-white">{tool.name}</div>
-                         <p className="text-xs text-gray-400 leading-tight group-hover:text-gray-300">
+                         <div className={`font-bold text-sm mb-0.5 ${textItem}`}>{tool.name}</div>
+                         <p className={`text-xs leading-tight ${textDesc}`}>
                              {tool.desc}
                          </p>
                      </div>

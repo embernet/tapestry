@@ -9,9 +9,10 @@ interface GridPanelProps {
   activeColorScheme: ColorScheme | undefined;
   onClose: () => void;
   onNodeClick?: (elementId: string) => void;
+  isDarkMode: boolean;
 }
 
-const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onClose, onNodeClick }) => {
+const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onClose, onNodeClick, isDarkMode }) => {
   const [xAxisKey, setXAxisKey] = useState<string>('');
   const [yAxisKey, setYAxisKey] = useState<string>('');
   const [isSimulating, setIsSimulating] = useState(false);
@@ -122,8 +123,8 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
               canvas.height = dimensions.height;
               const ctx = canvas.getContext("2d");
               if (ctx) {
-                  // Fill background (otherwise it's transparent)
-                  ctx.fillStyle = "#111827"; // matches bg-gray-900
+                  // Fill background
+                  ctx.fillStyle = isDarkMode ? "#1f2937" : "#ffffff";
                   ctx.fillRect(0, 0, canvas.width, canvas.height);
                   ctx.drawImage(img, 0, 0);
                   
@@ -180,12 +181,16 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
       e.attributes[yAxisKey] !== undefined
     );
 
+    const axisColor = isDarkMode ? '#9ca3af' : '#4b5563'; // gray-400 : gray-600
+    const labelColor = isDarkMode ? '#e5e7eb' : '#1f2937'; // gray-200 : gray-800
+    const gridColor = isDarkMode ? '#4b5563' : '#e5e7eb'; // gray-600 : gray-200
+
     if (data.length === 0) {
         g.append('text')
          .attr('x', width / 2)
          .attr('y', height / 2)
          .attr('text-anchor', 'middle')
-         .attr('fill', '#9ca3af')
+         .attr('fill', axisColor)
          .text('No elements found with both selected attributes.');
         return;
     }
@@ -238,24 +243,27 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
     }
 
     // --- Axes ---
-    g.append('g')
+    const xAxis = g.append('g')
      .attr('transform', `translate(0,${height})`)
-     .call(d3.axisBottom(xScale))
-     .selectAll('text')
+     .call(d3.axisBottom(xScale));
+     
+    xAxis.selectAll('text')
      .attr('transform', 'rotate(-15)')
      .style('text-anchor', 'end')
-     .attr('fill', '#9ca3af');
+     .attr('fill', axisColor);
+    xAxis.selectAll('path, line').attr('stroke', axisColor);
 
-    g.append('g')
-     .call(d3.axisLeft(yScale))
-     .selectAll('text')
-     .attr('fill', '#9ca3af');
+    const yAxis = g.append('g')
+     .call(d3.axisLeft(yScale));
+     
+    yAxis.selectAll('text').attr('fill', axisColor);
+    yAxis.selectAll('path, line').attr('stroke', axisColor);
      
     // Axis Labels
     g.append('text')
      .attr('x', width / 2)
      .attr('y', height + 45)
-     .attr('fill', 'white')
+     .attr('fill', labelColor)
      .attr('text-anchor', 'middle')
      .attr('font-weight', 'bold')
      .text(xAxisKey);
@@ -264,24 +272,26 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
      .attr('transform', 'rotate(-90)')
      .attr('x', -height / 2)
      .attr('y', -60)
-     .attr('fill', 'white')
+     .attr('fill', labelColor)
      .attr('text-anchor', 'middle')
      .attr('font-weight', 'bold')
      .text(yAxisKey);
 
     // --- Grid Lines ---
-    g.append('g')
+    const xGrid = g.append('g')
         .attr('class', 'grid')
         .attr('transform', `translate(0,${height})`)
         .call(d3.axisBottom(xScale).tickSize(-height).tickFormat(() => '').ticks(10))
         .attr('stroke-opacity', 0.1)
-        .attr('color', '#4b5563');
+    
+    xGrid.selectAll('path, line').attr('stroke', gridColor);
 
-    g.append('g')
+    const yGrid = g.append('g')
         .attr('class', 'grid')
         .call(d3.axisLeft(yScale).tickSize(-width).tickFormat(() => '').ticks(10))
-        .attr('stroke-opacity', 0.1)
-        .attr('color', '#4b5563');
+        .attr('stroke-opacity', 0.1);
+        
+    yGrid.selectAll('path, line').attr('stroke', gridColor);
 
 
     // --- Data Points & Label Simulation ---
@@ -351,7 +361,7 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
         .join('line')
         .attr('class', 'label-link')
         .attr('id', d => (d as any).id)
-        .attr('stroke', '#4b5563')
+        .attr('stroke', axisColor)
         .attr('stroke-width', 1)
         .attr('opacity', 0.6)
         .style('pointer-events', 'none') // Make lines unclickable/undraggable
@@ -371,7 +381,7 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
      .attr('cy', d => d.fy!)
      .attr('r', dotSize)
      .attr('fill', d => d.color)
-     .attr('stroke', '#1f2937')
+     .attr('stroke', isDarkMode ? '#1f2937' : '#fff')
      .attr('stroke-width', 1.5)
      .style('cursor', 'pointer')
      .on('click', (e, d) => {
@@ -386,10 +396,10 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
         .attr('class', 'label-text')
         .attr('id', d => d.id)
         .attr('text-anchor', 'middle')
-        .attr('fill', '#e5e7eb')
+        .attr('fill', labelColor)
         .style('font-size', `${fontSize}px`)
         .style('cursor', 'grab')
-        .style('text-shadow', '1px 1px 2px #000')
+        .style('text-shadow', isDarkMode ? '1px 1px 2px #000' : '1px 1px 2px #fff')
         // Set position
         .attr('x', d => d.x)
         .attr('y', d => d.y)
@@ -480,46 +490,55 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
         simulation.restart();
     }
         
-  }, [dimensions, elements, xAxisKey, yAxisKey, activeColorScheme, fontSize, dotSize, isSimulating, onNodeClick]); 
+  }, [dimensions, elements, xAxisKey, yAxisKey, activeColorScheme, fontSize, dotSize, isSimulating, onNodeClick, isDarkMode]); 
+
+  // Theme Classes
+  const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const headerBgClass = isDarkMode ? 'bg-gray-900' : 'bg-gray-100';
+  const borderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  const subTextClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+  const selectBgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const canvasBgClass = isDarkMode ? 'bg-gray-900' : 'bg-white';
 
   return (
-    <div className={isFullscreen ? "fixed inset-0 z-50 flex flex-col bg-gray-800" : "w-full h-full flex flex-col bg-gray-800"}>
-      <div className="p-4 flex-shrink-0 flex justify-between items-center border-b border-gray-700 bg-gray-900">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+    <div className={isFullscreen ? `fixed inset-0 z-50 flex flex-col ${bgClass}` : `w-full h-full flex flex-col ${bgClass}`}>
+      <div className={`p-4 flex-shrink-0 flex justify-between items-center border-b ${borderClass} ${headerBgClass}`}>
+        <h2 className={`text-xl font-bold ${textClass} flex items-center gap-2`}>
             Attribute Grid
-            <span className="text-xs font-normal text-gray-500 bg-gray-800 px-2 py-0.5 rounded border border-gray-700">
+            <span className={`text-xs font-normal ${subTextClass} ${selectBgClass} px-2 py-0.5 rounded border ${borderClass}`}>
                 {elements.length} items
             </span>
         </h2>
         
         <div className="flex items-center gap-2">
             {/* Size Controls */}
-            <div className="flex flex-col px-2 border-r border-gray-700 mr-2">
+            <div className={`flex flex-col px-2 border-r ${borderClass} mr-2`}>
                <div className="flex items-center gap-2 mb-1">
-                   <span className="text-[10px] text-gray-500 w-8">TEXT</span>
+                   <span className={`text-[10px] ${subTextClass} w-8`}>TEXT</span>
                    <input 
                       type="range" min="8" max="24" 
                       value={fontSize} 
                       onChange={e => setFontSize(Number(e.target.value))}
-                      className="w-16 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                      className="w-16 h-1 bg-gray-500 rounded-lg appearance-none cursor-pointer"
                    />
                </div>
                <div className="flex items-center gap-2">
-                   <span className="text-[10px] text-gray-500 w-8">DOT</span>
+                   <span className={`text-[10px] ${subTextClass} w-8`}>DOT</span>
                    <input 
                       type="range" min="2" max="20" 
                       value={dotSize} 
                       onChange={e => setDotSize(Number(e.target.value))}
-                      className="w-16 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                      className="w-16 h-1 bg-gray-500 rounded-lg appearance-none cursor-pointer"
                    />
                </div>
             </div>
 
-            <div className="flex bg-gray-800 rounded border border-gray-600 p-0.5">
+            <div className={`flex ${selectBgClass} rounded border ${borderClass} p-0.5`}>
                  <button 
                     onClick={() => setIsSimulating(!isSimulating)}
                     title={isSimulating ? "Physics ON (Auto-Arrange)" : "Physics OFF (Static)"}
-                    className={`p-1.5 rounded transition-colors ${isSimulating ? 'text-green-400 hover:bg-gray-700' : 'text-gray-400 hover:bg-gray-700 hover:text-white'}`}
+                    className={`p-1.5 rounded transition-colors ${isSimulating ? 'text-green-500 hover:bg-gray-200 dark:hover:bg-gray-700' : `${subTextClass} hover:bg-gray-200 dark:hover:bg-gray-700`}`}
                  >
                     {isSimulating ? (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -531,11 +550,11 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
                         </svg>
                     )}
                  </button>
-                 <div className="w-px bg-gray-600 my-1"></div>
+                 <div className="w-px bg-gray-400 my-1"></div>
                  <button 
                     onClick={handleCopyImage}
                     title="Copy Chart as Image"
-                    className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                    className={`p-1.5 rounded ${subTextClass} hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors`}
                  >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -545,17 +564,17 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
                  <button 
                     onClick={handleCopyCSV}
                     title="Copy Data as CSV"
-                    className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                    className={`p-1.5 rounded ${subTextClass} hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors`}
                  >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
                  </button>
-                 <div className="w-px bg-gray-600 my-1"></div>
+                 <div className="w-px bg-gray-400 my-1"></div>
                  <button 
                     onClick={() => setIsFullscreen(!isFullscreen)}
                     title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-                    className="p-1.5 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                    className={`p-1.5 rounded ${subTextClass} hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors`}
                  >
                      {isFullscreen ? (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -569,7 +588,7 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
                  </button>
             </div>
             
-            <button onClick={onClose} className="text-gray-400 hover:text-white p-2">
+            <button onClick={onClose} className={`${subTextClass} hover:text-blue-500 p-2`}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -577,24 +596,24 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
         </div>
       </div>
       
-      <div className="p-4 flex gap-4 bg-gray-900 border-b border-gray-700 flex-shrink-0">
+      <div className={`p-4 flex gap-4 ${canvasBgClass} border-b ${borderClass} flex-shrink-0`}>
           <div className="flex flex-col gap-1 flex-grow">
-              <label className="text-xs font-bold text-gray-400 uppercase">X Axis Attribute</label>
+              <label className={`text-xs font-bold ${subTextClass} uppercase`}>X Axis Attribute</label>
               <select 
                 value={xAxisKey} 
                 onChange={e => setXAxisKey(e.target.value)}
-                className="bg-gray-800 text-white text-sm rounded border border-gray-600 p-1.5 focus:ring-1 focus:ring-blue-500 outline-none"
+                className={`${selectBgClass} ${textClass} text-sm rounded border ${borderClass} p-1.5 focus:ring-1 focus:ring-blue-500 outline-none`}
               >
                   <option value="">-- Select Attribute --</option>
                   {availableAttributes.map(k => <option key={k} value={k}>{k}</option>)}
               </select>
           </div>
           <div className="flex flex-col gap-1 flex-grow">
-              <label className="text-xs font-bold text-gray-400 uppercase">Y Axis Attribute</label>
+              <label className={`text-xs font-bold ${subTextClass} uppercase`}>Y Axis Attribute</label>
               <select 
                 value={yAxisKey} 
                 onChange={e => setYAxisKey(e.target.value)}
-                className="bg-gray-800 text-white text-sm rounded border border-gray-600 p-1.5 focus:ring-1 focus:ring-blue-500 outline-none"
+                className={`${selectBgClass} ${textClass} text-sm rounded border ${borderClass} p-1.5 focus:ring-1 focus:ring-blue-500 outline-none`}
               >
                   <option value="">-- Select Attribute --</option>
                   {availableAttributes.map(k => <option key={k} value={k}>{k}</option>)}
@@ -602,13 +621,13 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
           </div>
       </div>
 
-      <div className="flex-grow relative bg-gray-900 overflow-hidden select-none" ref={containerRef}>
+      <div className={`flex-grow relative ${canvasBgClass} overflow-hidden select-none`} ref={containerRef}>
         {!xAxisKey || !yAxisKey ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500 p-8 text-center">
+            <div className={`absolute inset-0 flex flex-col items-center justify-center ${subTextClass} p-8 text-center`}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4 opacity-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <p className="text-lg font-medium text-gray-400">Configure Axes</p>
+                <p className="text-lg font-medium">Configure Axes</p>
                 <p className="text-sm mt-1">Select custom attributes for X and Y axes to generate the scatter plot.</p>
             </div>
         ) : (

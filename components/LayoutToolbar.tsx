@@ -16,6 +16,7 @@ interface LayoutToolbarProps {
   onContract: () => void;
   isCollapsed: boolean;
   onToggle: () => void;
+  isDarkMode: boolean;
 }
 
 const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
@@ -33,6 +34,7 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
   onContract,
   isCollapsed,
   onToggle,
+  isDarkMode
 }) => {
   
   const handleInteractionStart = () => {
@@ -41,32 +43,41 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
       }
   };
 
+  const bgClass = isDarkMode ? 'bg-gray-800 bg-opacity-90 border-gray-600' : 'bg-white bg-opacity-95 border-gray-200';
+  const buttonBgClass = isDarkMode ? 'bg-gray-700 hover:bg-gray-600 border-gray-600 text-orange-400' : 'bg-white hover:bg-gray-50 border-gray-200 text-orange-600';
+  const controlBgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const actionButtonBg = isDarkMode ? 'bg-gray-700 hover:bg-blue-600 hover:text-white border-gray-600' : 'bg-white hover:bg-blue-500 hover:text-white border-gray-200';
+  const staticControlBg = isDarkMode ? 'bg-gray-900/80 border-gray-600' : 'bg-gray-50/80 border-gray-200';
+  const iconButtonBg = isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' : 'bg-white hover:bg-gray-100 text-gray-700 border-gray-300';
+  const labelClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  const valueClass = isDarkMode ? 'text-gray-500' : 'text-gray-400';
+
   return (
     <div className="flex flex-col gap-2 pointer-events-none transition-all duration-300">
-        <div className="flex items-stretch gap-0 bg-gray-800 bg-opacity-90 rounded-lg border border-gray-600 shadow-lg pointer-events-auto overflow-hidden">
+        <div className={`flex items-stretch gap-0 rounded-lg border shadow-lg pointer-events-auto overflow-hidden ${bgClass}`}>
             {/* Collapse Toggle */}
             <button 
                 onClick={onToggle}
-                className="bg-gray-700 hover:bg-gray-600 border-r border-gray-600 w-20 flex flex-col items-center justify-center transition-colors h-20 gap-1 flex-shrink-0"
+                className={`border-r w-20 flex flex-col items-center justify-center transition-colors h-20 gap-1 flex-shrink-0 ${buttonBgClass}`}
                 title={isCollapsed ? "Expand Layout Controls" : "Collapse Layout Controls"}
             >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-orange-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                 </svg>
-                <span className="text-xs font-bold tracking-wider">LAYOUT</span>
+                <span className={`text-xs font-bold tracking-wider ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>LAYOUT</span>
             </button>
 
             {!isCollapsed && (
-                <div className="flex items-center gap-0 p-0 animate-fade-in bg-gray-800 h-20 overflow-hidden rounded-r-lg">
+                <div className={`flex items-center gap-0 p-0 animate-fade-in h-20 overflow-hidden rounded-r-lg ${controlBgClass}`}>
                     
                     {/* Physics Section */}
-                    <div className="flex items-center gap-3 px-3 h-full bg-gray-800">
+                    <div className="flex items-center gap-3 px-3 h-full">
                          {/* Auto Layout Control */}
                         <div className="flex flex-col justify-center items-center min-w-[50px]">
                             {!isPhysicsActive ? (
                                 <button 
                                     onClick={onStartAutoLayout} 
-                                    className="flex flex-col items-center justify-center bg-gray-700 hover:bg-blue-600 hover:text-white text-blue-400 p-1 rounded border border-gray-600 transition-colors h-10 w-10 shadow-sm" 
+                                    className={`flex flex-col items-center justify-center p-1 rounded border transition-colors h-10 w-10 shadow-sm ${actionButtonBg} ${isDarkMode ? 'text-blue-400' : 'text-blue-500'}`} 
                                     title="Start Auto-Layout Simulation"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -95,16 +106,16 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
                                     </button>
                                 </div>
                             )}
-                            <span className="text-[9px] font-bold mt-1 text-gray-400 uppercase tracking-wide">SIMULATE</span>
+                            <span className={`text-[9px] font-bold mt-1 uppercase tracking-wide ${labelClass}`}>SIMULATE</span>
                         </div>
 
-                        <div className="w-px h-12 bg-gray-600 mx-1"></div>
+                        <div className={`w-px h-12 mx-1 ${isDarkMode ? 'bg-gray-600' : 'bg-gray-300'}`}></div>
 
                         {/* Link Distance Slider */}
                         <div className="flex flex-col w-24 justify-center h-full">
                             <div className="flex justify-between items-center mb-1">
-                                <label className="text-[9px] text-gray-400 font-bold uppercase tracking-wider leading-none">Spread</label>
-                                <span className="text-[10px] text-gray-500 font-mono leading-none">{linkDistance}</span>
+                                <label className={`text-[9px] font-bold uppercase tracking-wider leading-none ${labelClass}`}>Spread</label>
+                                <span className={`text-[10px] font-mono leading-none ${valueClass}`}>{linkDistance}</span>
                             </div>
                             <input 
                                 type="range" 
@@ -114,7 +125,7 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
                                 value={linkDistance} 
                                 onPointerDown={handleInteractionStart}
                                 onChange={(e) => onLinkDistanceChange(Number(e.target.value))}
-                                className="h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                className={`h-1.5 rounded-lg appearance-none cursor-pointer accent-blue-500 ${isDarkMode ? 'bg-gray-600' : 'bg-gray-300'}`}
                                 title="Target link distance"
                             />
                         </div>
@@ -122,8 +133,8 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
                         {/* Repulsion Slider */}
                         <div className="flex flex-col w-24 justify-center h-full">
                             <div className="flex justify-between items-center mb-1">
-                                <label className="text-[9px] text-gray-400 font-bold uppercase tracking-wider leading-none">Repel</label>
-                                <span className="text-[10px] text-gray-500 font-mono leading-none">{Math.abs(repulsion)}</span>
+                                <label className={`text-[9px] font-bold uppercase tracking-wider leading-none ${labelClass}`}>Repel</label>
+                                <span className={`text-[10px] font-mono leading-none ${valueClass}`}>{Math.abs(repulsion)}</span>
                             </div>
                             <input 
                                 type="range" 
@@ -133,17 +144,17 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
                                 value={Math.abs(repulsion)} 
                                 onPointerDown={handleInteractionStart}
                                 onChange={(e) => onRepulsionChange(-Number(e.target.value))}
-                                className="h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-red-500"
+                                className={`h-1.5 rounded-lg appearance-none cursor-pointer accent-red-500 ${isDarkMode ? 'bg-gray-600' : 'bg-gray-300'}`}
                                 title="Node repulsion strength"
                             />
                         </div>
 
                          {/* Fit Button */}
                          <div className="flex flex-col justify-center items-center">
-                             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">FIT</span>
+                             <span className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${labelClass}`}>FIT</span>
                             <button 
                                 onClick={onZoomToFit}
-                                className="flex flex-col items-center justify-center bg-gray-700 hover:bg-gray-600 text-white p-1 rounded border border-gray-600 transition-colors h-8 w-8"
+                                className={`flex flex-col items-center justify-center p-1 rounded border transition-colors h-8 w-8 ${iconButtonBg}`}
                                 title="Zoom to Fit"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -154,13 +165,13 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
 
                          {/* Shake Button */}
                          <div className="flex flex-col justify-center items-center">
-                             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">SHAKE</span>
+                             <span className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${labelClass}`}>SHAKE</span>
                             <button 
                                 onClick={() => {
                                     handleInteractionStart();
                                     onJiggle();
                                 }}
-                                className="flex flex-col items-center justify-center bg-gray-700 hover:bg-gray-600 text-white p-1 rounded border border-gray-600 transition-colors h-8 w-8"
+                                className={`flex flex-col items-center justify-center p-1 rounded border transition-colors h-8 w-8 ${iconButtonBg}`}
                                 title="Shake nodes to unstuck them"
                             >
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
@@ -175,14 +186,14 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
                     </div>
 
                     {/* Static Controls Section - Visually Differentiated */}
-                    <div className="flex items-center gap-3 px-4 h-full bg-gray-900/80 border-l border-gray-600 shadow-[inset_6px_0_10px_-8px_rgba(0,0,0,0.5)]">
+                    <div className={`flex items-center gap-3 px-4 h-full border-l shadow-[inset_6px_0_10px_-8px_rgba(0,0,0,0.5)] ${staticControlBg}`}>
                         <div className="flex flex-col justify-center items-center">
-                            <span className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-2">SPREAD</span>
+                            <span className={`text-[9px] font-bold uppercase tracking-wider mb-2 ${labelClass}`}>SPREAD</span>
                             <div className="flex gap-2">
                                 <button 
                                     onClick={onContract} 
                                     disabled={isPhysicsActive}
-                                    className="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white p-1.5 rounded border border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors h-8 w-8 flex items-center justify-center"
+                                    className={`p-1.5 rounded border disabled:opacity-30 disabled:cursor-not-allowed transition-colors h-8 w-8 flex items-center justify-center ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white border-gray-600' : 'bg-white hover:bg-gray-100 text-gray-600 hover:text-black border-gray-300'}`}
                                     title="Pack Closer (Contract)"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -193,7 +204,7 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
                                 <button 
                                     onClick={onExpand} 
                                     disabled={isPhysicsActive}
-                                    className="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white p-1.5 rounded border border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors h-8 w-8 flex items-center justify-center"
+                                    className={`p-1.5 rounded border disabled:opacity-30 disabled:cursor-not-allowed transition-colors h-8 w-8 flex items-center justify-center ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white border-gray-600' : 'bg-white hover:bg-gray-100 text-gray-600 hover:text-black border-gray-300'}`}
                                     title="Space Out (Expand)"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

@@ -1,6 +1,7 @@
 
 // Fix: Import d3 types to resolve "Cannot find namespace 'd3'" errors.
 import * as d3 from 'd3';
+import { FunctionCall, FunctionResponse } from '@google/genai';
 
 export enum RelationshipDirection {
   None = 'NONE',
@@ -68,6 +69,17 @@ export interface HistoryEntry {
   summary?: string;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'model';
+  text?: string;
+  functionCalls?: FunctionCall[]; // To display tool usage
+  functionResponses?: FunctionResponse[];
+  isPending?: boolean; // If true, the tool calls are waiting for user confirmation
+  // Store raw JSON if available for history reconstruction
+  rawJson?: any;
+  requestPayload?: any; // Store the raw request sent to the AI
+}
+
 export interface RelationshipDefinition {
   label: string;
   description?: string;
@@ -116,10 +128,29 @@ export interface AIConnection {
   modelId: string;
 }
 
+export interface CustomStrategyCategory {
+  id: string;
+  label: string;
+  tag: string;
+  colorName: string; // e.g., 'Red', 'Blue'
+  color: string; // text class
+  borderColor: string; // border class
+}
+
+export interface CustomStrategyTool {
+  id: string;
+  name: string;
+  description: string;
+  basePrompt: string;
+  categories: CustomStrategyCategory[];
+  gridCols: string;
+}
+
 export interface GlobalSettings {
   toolsBarOpenByDefault: boolean;
   activeProvider: AIProvider;
   aiConnections: Record<AIProvider, AIConnection>;
+  customStrategies: CustomStrategyTool[];
 }
 
 export interface ModelMetadata {
@@ -202,8 +233,8 @@ export type TrizToolType = 'contradiction' | 'principles' | 'ariz' | 'sufield' |
 export type LssToolType = 'charter' | 'sipoc' | 'voc' | 'ctq' | 'stakeholder' | 'dmaic' | '5whys' | 'fishbone' | 'fmea' | 'vsm' | null;
 export type TocToolType = 'crt' | 'ec' | 'frt' | 'tt' | null;
 export type SsmToolType = 'rich_picture' | 'catwoe' | 'activity_models' | 'comparison' | null;
-export type SwotToolType = 'matrix' | 'pestel' | 'steer' | 'destep' | 'longpest' | 'five_forces' | 'cage' | null;
-export type ExplorerToolType = 'treemap' | 'tags' | 'relationships' | 'sunburst' | 'selective_expansion' | null;
+export type SwotToolType = 'matrix' | 'pestel' | 'steer' | 'destep' | 'longpest' | 'five_forces' | 'cage' | 'custom_create' | string | null;
+export type ExplorerToolType = 'treemap' | 'tags' | 'relationships' | 'sunburst' | null;
 export type TagCloudToolType = 'tags' | 'nodes' | 'words' | 'full_text' | null;
 export type MiningToolType = 'dashboard' | null;
 export type MermaidToolType = 'editor' | null;

@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Element, Relationship, RelationshipDirection, TapestryDocument, TapestryFolder } from '../types';
 import { generateElementMarkdown } from '../utils';
@@ -11,10 +10,11 @@ interface ReportPanelProps {
   onClose: () => void;
   onNodeClick: (elementId: string) => void;
   onOpenDocument?: (docId: string) => void;
+  isDarkMode: boolean;
 }
 
 // Sub-component for a clickable element link
-const ElementLink: React.FC<{ element: Element; onNodeClick: (elementId: string) => void; isIndex?: boolean; relCount?: number }> = ({ element, onNodeClick, isIndex = false, relCount }) => {
+const ElementLink: React.FC<{ element: Element; onNodeClick: (elementId: string) => void; isIndex?: boolean; relCount?: number; isDarkMode: boolean }> = ({ element, onNodeClick, isIndex = false, relCount, isDarkMode }) => {
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     onNodeClick(element.id);
@@ -24,16 +24,17 @@ const ElementLink: React.FC<{ element: Element; onNodeClick: (elementId: string)
   };
 
   const linkText = (isIndex && relCount !== undefined) ? `${element.name} (${relCount})` : element.name;
+  const badgeClass = isDarkMode ? 'bg-gray-700 text-blue-300' : 'bg-gray-200 text-blue-700';
 
   return (
-    <a href={`#element-report-${element.id}`} onClick={handleClick} className="text-blue-400 hover:underline hover:text-blue-300">
-      {isIndex ? linkText : <code className="bg-gray-700 text-blue-300 px-2 py-0.5 rounded-md text-sm">{element.name}</code>}
+    <a href={`#element-report-${element.id}`} onClick={handleClick} className="text-blue-500 hover:underline hover:text-blue-400">
+      {isIndex ? linkText : <code className={`${badgeClass} px-2 py-0.5 rounded-md text-sm`}>{element.name}</code>}
     </a>
   );
 };
 
 // Sub-component for a single relationship line in the report
-const RelationshipItem: React.FC<{ rel: Relationship; elementMap: Map<string, Element>; onNodeClick: (elementId: string) => void }> = ({ rel, elementMap, onNodeClick }) => {
+const RelationshipItem: React.FC<{ rel: Relationship; elementMap: Map<string, Element>; onNodeClick: (elementId: string) => void; isDarkMode: boolean }> = ({ rel, elementMap, onNodeClick, isDarkMode }) => {
   const sourceElement = elementMap.get(rel.source as string);
   const targetElement = elementMap.get(rel.target as string);
   if (!sourceElement || !targetElement) return null;
@@ -47,9 +48,9 @@ const RelationshipItem: React.FC<{ rel: Relationship; elementMap: Map<string, El
 
   return (
     <li className="flex items-center space-x-2 ml-4">
-      <ElementLink element={sourceElement} onNodeClick={onNodeClick} />
-      <span className="text-gray-500 text-xs font-mono">{arrow}</span>
-      <ElementLink element={targetElement} onNodeClick={onNodeClick} />
+      <ElementLink element={sourceElement} onNodeClick={onNodeClick} isDarkMode={isDarkMode} />
+      <span className={`${isDarkMode ? 'text-gray-500' : 'text-gray-400'} text-xs font-mono`}>{arrow}</span>
+      <ElementLink element={targetElement} onNodeClick={onNodeClick} isDarkMode={isDarkMode} />
     </li>
   );
 };
@@ -60,23 +61,28 @@ const ElementReportSection: React.FC<{
   elementRels: Relationship[];
   elementMap: Map<string, Element>;
   onNodeClick: (elementId: string) => void;
-}> = ({ element, elementRels, elementMap, onNodeClick }) => {
+  isDarkMode: boolean;
+}> = ({ element, elementRels, elementMap, onNodeClick, isDarkMode }) => {
+  const headingClass = isDarkMode ? 'text-white border-gray-700' : 'text-gray-900 border-gray-200';
+  const textClass = isDarkMode ? 'text-gray-300' : 'text-gray-700';
+  const labelClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+
   return (
     <div id={`element-report-${element.id}`} className="py-4 scroll-mt-4">
-      <h2 className="text-xl font-bold text-white mb-2 border-b border-gray-700 pb-1">{element.name}</h2>
-      <div className="pl-2 space-y-2 text-gray-300">
-        {element.tags.length > 0 && <p><strong className="font-semibold text-gray-400 w-20 inline-block">Tags:</strong> {element.tags.join(', ')}</p>}
+      <h2 className={`text-xl font-bold mb-2 border-b pb-1 ${headingClass}`}>{element.name}</h2>
+      <div className={`pl-2 space-y-2 ${textClass}`}>
+        {element.tags.length > 0 && <p><strong className={`font-semibold w-20 inline-block ${labelClass}`}>Tags:</strong> {element.tags.join(', ')}</p>}
         {element.notes && (
           <div>
-            <strong className="font-semibold text-gray-400 w-20 inline-block align-top">Notes:</strong>
+            <strong className={`font-semibold w-20 inline-block align-top ${labelClass}`}>Notes:</strong>
             <p className="whitespace-pre-wrap inline-block w-[calc(100%-5rem)]">{element.notes}</p>
           </div>
         )}
         {elementRels.length > 0 && (
           <div className="pt-2">
-            <strong className="font-semibold text-gray-400 block mb-1">Relationships:</strong>
+            <strong className={`font-semibold block mb-1 ${labelClass}`}>Relationships:</strong>
             <ul className="space-y-1">
-              {elementRels.map(rel => <RelationshipItem key={rel.id} rel={rel} elementMap={elementMap} onNodeClick={onNodeClick} />)}
+              {elementRels.map(rel => <RelationshipItem key={rel.id} rel={rel} elementMap={elementMap} onNodeClick={onNodeClick} isDarkMode={isDarkMode} />)}
             </ul>
           </div>
         )}
@@ -89,13 +95,19 @@ const ElementReportSection: React.FC<{
 const DocumentsSection: React.FC<{ 
     documents: TapestryDocument[], 
     folders: TapestryFolder[], 
-    onOpenDocument: (id: string) => void 
-}> = ({ documents, folders, onOpenDocument }) => {
+    onOpenDocument: (id: string) => void;
+    isDarkMode: boolean;
+}> = ({ documents, folders, onOpenDocument, isDarkMode }) => {
     if (!documents || documents.length === 0) return null;
 
+    const bgHoverClass = isDarkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-100';
+    const bgClass = isDarkMode ? 'bg-gray-700' : 'bg-gray-50';
+    const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+    const subTextClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+
     return (
-        <div className="py-6 border-t border-gray-600">
-            <h2 className="text-xl font-bold text-white mb-3">Documents</h2>
+        <div className={`py-6 border-t ${isDarkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+            <h2 className={`text-xl font-bold mb-3 ${textClass}`}>Documents</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                 {documents.map(doc => {
                     const folder = doc.folderId ? folders.find(f => f.id === doc.folderId) : null;
@@ -103,14 +115,14 @@ const DocumentsSection: React.FC<{
                         <div 
                             key={doc.id} 
                             onClick={() => onOpenDocument(doc.id)}
-                            className="bg-gray-700 hover:bg-gray-600 p-2 rounded cursor-pointer flex items-center gap-2 transition-colors"
+                            className={`${bgClass} ${bgHoverClass} p-2 rounded cursor-pointer flex items-center gap-2 transition-colors`}
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
                             </svg>
                             <div>
-                                <span className="text-blue-300 font-semibold">{doc.title}</span>
-                                {folder && <span className="text-gray-400 text-xs ml-2">in {folder.name}</span>}
+                                <span className="text-blue-500 font-semibold">{doc.title}</span>
+                                {folder && <span className={`${subTextClass} text-xs ml-2`}>in {folder.name}</span>}
                             </div>
                         </div>
                     );
@@ -132,17 +144,22 @@ const WysiwigReport: React.FC<{
   documents?: TapestryDocument[];
   folders?: TapestryFolder[];
   onOpenDocument?: (id: string) => void;
-}> = ({ elements, relationships, elementMap, relStats, tagStats, onNodeClick, elementRelCounts, documents, folders, onOpenDocument }) => {
+  isDarkMode: boolean;
+}> = ({ elements, relationships, elementMap, relStats, tagStats, onNodeClick, elementRelCounts, documents, folders, onOpenDocument, isDarkMode }) => {
   if (elements.length === 0) {
     return <p className="text-gray-500 p-4">No elements to display based on the current filter.</p>;
   }
 
+  const headingClass = isDarkMode ? 'text-white border-gray-700' : 'text-gray-900 border-gray-200';
+  const textClass = isDarkMode ? 'text-gray-300' : 'text-gray-700';
+  const subHeadingClass = isDarkMode ? 'text-gray-300' : 'text-gray-800';
+
   return (
     <div>
       {/* Index */}
-      <div className="py-4 border-b border-gray-700">
-        <h2 className="text-xl font-bold text-white mb-2">Element Index</h2>
-        <ul className="list-disc list-inside columns-2 text-gray-300">
+      <div className={`py-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+        <h2 className={`text-xl font-bold mb-2 ${headingClass.split(' ')[0]}`}>Element Index</h2>
+        <ul className={`list-disc list-inside columns-2 ${textClass}`}>
           {elements.map(element => (
             <li key={`index-${element.id}`}>
                 <ElementLink 
@@ -150,6 +167,7 @@ const WysiwigReport: React.FC<{
                     onNodeClick={onNodeClick} 
                     isIndex 
                     relCount={elementRelCounts.get(element.id) || 0}
+                    isDarkMode={isDarkMode}
                 />
             </li>
           ))}
@@ -158,23 +176,23 @@ const WysiwigReport: React.FC<{
 
       {/* Documents */}
       {documents && documents.length > 0 && onOpenDocument && folders && (
-          <DocumentsSection documents={documents} folders={folders} onOpenDocument={onOpenDocument} />
+          <DocumentsSection documents={documents} folders={folders} onOpenDocument={onOpenDocument} isDarkMode={isDarkMode} />
       )}
 
       {/* Details */}
-      <div className="divide-y divide-gray-700 border-t border-gray-600 mt-4">
+      <div className={`divide-y ${isDarkMode ? 'divide-gray-700 border-gray-600' : 'divide-gray-200 border-gray-200'} border-t mt-4`}>
         {elements.map(element => {
           const elementRels = relationships.filter(r => r.source === element.id || r.target === element.id);
-          return <ElementReportSection key={element.id} element={element} elementRels={elementRels} elementMap={elementMap} onNodeClick={onNodeClick} />;
+          return <ElementReportSection key={element.id} element={element} elementRels={elementRels} elementMap={elementMap} onNodeClick={onNodeClick} isDarkMode={isDarkMode} />;
         })}
       </div>
       
       {/* Appendix */}
-      <div className="py-4 mt-4 border-t border-gray-600 text-gray-300">
-        <h2 className="text-xl font-bold text-white mb-3">Appendix</h2>
+      <div className={`py-4 mt-4 border-t ${isDarkMode ? 'border-gray-600' : 'border-gray-200'} ${textClass}`}>
+        <h2 className={`text-xl font-bold mb-3 ${headingClass.split(' ')[0]}`}>Appendix</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
-                <h3 className="text-lg font-semibold text-gray-300 mb-2">Relationship Types</h3>
+                <h3 className={`text-lg font-semibold mb-2 ${subHeadingClass}`}>Relationship Types</h3>
                 {relStats.size > 0 ? (
                     <ul className="list-disc list-inside">
                         {Array.from(relStats.entries()).map(([label, count]) => <li key={label}>{label}: {count}</li>)}
@@ -182,7 +200,7 @@ const WysiwigReport: React.FC<{
                 ) : <p className="text-gray-500">No relationships.</p>}
             </div>
             <div>
-                <h3 className="text-lg font-semibold text-gray-300 mb-2">Tag Usage</h3>
+                <h3 className={`text-lg font-semibold mb-2 ${subHeadingClass}`}>Tag Usage</h3>
                 {tagStats.size > 0 ? (
                     <ul className="list-disc list-inside">
                         {Array.from(tagStats.entries()).map(([tag, count]) => <li key={tag}>{tag}: {count}</li>)}
@@ -243,7 +261,7 @@ const generateMarkdownReport = (
 };
 
 
-export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationships, onClose, onNodeClick, documents, folders, onOpenDocument }) => {
+export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationships, onClose, onNodeClick, documents, folders, onOpenDocument, isDarkMode }) => {
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<'wysiwig' | 'markdown'>('wysiwig');
 
@@ -390,10 +408,16 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationship
     }
   }, [currentMatchIndex, matches]);
 
+  const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const headerClass = isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const inputBgClass = isDarkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300';
+  const iconClass = isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900';
+
   return (
-    <div className="w-full h-full flex flex-col bg-gray-800">
-      <div className="p-4 flex-shrink-0 flex justify-between items-center border-b border-gray-700">
-        <h2 className="text-xl font-bold text-white">Report</h2>
+    <div className={`w-full h-full flex flex-col ${bgClass}`}>
+      <div className={`p-4 flex-shrink-0 flex justify-between items-center border-b ${headerClass}`}>
+        <h2 className={`text-xl font-bold ${textClass}`}>Report</h2>
         <div className="flex items-center space-x-1">
             <div className="flex items-center space-x-1">
                 <input
@@ -402,12 +426,12 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationship
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     onKeyDown={handleSearchKeyDown}
-                    className="bg-gray-700 border border-gray-600 rounded-md px-2 py-1 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 w-32 transition-all focus:w-40"
+                    className={`${inputBgClass} border rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 w-32 transition-all focus:w-40`}
                 />
-                <button onClick={handlePreviousMatch} disabled={matches.length === 0} title="Previous (Shift+Enter)" className="p-2 rounded-md text-gray-400 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                <button onClick={handlePreviousMatch} disabled={matches.length === 0} title="Previous (Shift+Enter)" className={`p-2 rounded-md ${iconClass} hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg>
                 </button>
-                <button onClick={handleNextMatch} disabled={matches.length === 0} title="Next (Enter)" className="p-2 rounded-md text-gray-400 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                <button onClick={handleNextMatch} disabled={matches.length === 0} title="Next (Enter)" className={`p-2 rounded-md ${iconClass} hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
                 </button>
                 {searchTerm.length >= 3 && (
@@ -416,11 +440,11 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationship
                   </span>
                 )}
             </div>
-            <div className="border-l border-gray-600 h-6 mx-2"></div>
+            <div className={`border-l h-6 mx-2 ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}></div>
             <button
                 onClick={() => setViewMode(prev => prev === 'wysiwig' ? 'markdown' : 'wysiwig')}
                 title={viewMode === 'wysiwig' ? "Switch to Markdown View" : "Switch to Rendered View"}
-                className="p-2 rounded-md text-gray-400 hover:bg-gray-700 hover:text-white transition"
+                className={`p-2 rounded-md ${iconClass} hover:bg-gray-100 dark:hover:bg-gray-700 transition`}
             >
                 {viewMode === 'wysiwig' ? (
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
@@ -434,7 +458,7 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationship
             <button
                 onClick={handleCopy}
                 title={isCopied ? "Copied!" : "Copy Report"}
-                className="p-2 rounded-md text-gray-400 hover:bg-gray-700 hover:text-white transition disabled:opacity-50"
+                className={`p-2 rounded-md ${iconClass} hover:bg-gray-100 dark:hover:bg-gray-700 transition disabled:opacity-50`}
                 disabled={isCopied}
             >
                 {isCopied ? (
@@ -447,7 +471,7 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationship
                     </svg>
                 )}
             </button>
-            <button onClick={onClose} className="p-2 rounded-md text-gray-400 hover:bg-gray-700 hover:text-white transition">
+            <button onClick={onClose} className={`p-2 rounded-md ${iconClass} hover:bg-gray-100 dark:hover:bg-gray-700 transition`}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -467,12 +491,13 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationship
             documents={documents}
             folders={folders}
             onOpenDocument={onOpenDocument}
+            isDarkMode={isDarkMode}
           />
         ) : (
           <textarea
             readOnly
             value={reportText}
-            className="w-full h-full flex-grow bg-gray-900 border border-gray-600 rounded-md p-4 text-white font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full h-full flex-grow ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border rounded-md p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500`}
           />
         )}
       </div>

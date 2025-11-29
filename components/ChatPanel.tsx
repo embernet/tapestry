@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Content, Part, Type, Tool, FunctionCall, FunctionResponse } from '@google/genai';
-import { Element, Relationship, ModelActions, ColorScheme, SystemPromptConfig, TapestryDocument, TapestryFolder } from '../types';
-import { generateMarkdownFromGraph, callAI, AIConfig } from '../utils';
-import { AVAILABLE_AI_TOOLS } from '../constants';
+import { Content, FunctionCall, FunctionResponse, Type } from '@google/genai';
+import { Element, Relationship, ModelActions, ColorScheme, SystemPromptConfig, TapestryDocument, TapestryFolder, ChatMessage } from '../types';
+import { generateMarkdownFromGraph, callAI, AIConfig, generateUUID } from '../utils';
 
 interface ChatPanelProps {
   elements: Element[];
@@ -26,27 +25,77 @@ interface ChatPanelProps {
   initialInput?: string;
   activeModel?: string;
   aiConfig: AIConfig;
+  isDarkMode: boolean;
+  messages: ChatMessage[];
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }
 
-interface Message {
-  role: 'user' | 'model';
-  text?: string;
-  functionCalls?: FunctionCall[]; // To display tool usage
-  functionResponses?: FunctionResponse[];
-  isPending?: boolean; // If true, the tool calls are waiting for user confirmation
-}
+// Schema to enforce structured output from the AI
+const CHAT_RESPONSE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    analysis: { type: Type.STRING, description: "Internal reasoning about the user's request, the graph state, and why specific actions are chosen." },
+    message: { type: Type.STRING, description: "The conversational response to show to the user. CRITICAL: If you are providing a list, plan, or detailed explanation, put the FULL text here using Markdown formatting. Do not truncate." },
+    actions: {
+      type: Type.ARRAY,
+      description: "List of actions to perform on the graph.",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          tool: { 
+            type: Type.STRING, 
+            enum: [
+              "addElement", "updateElement", "deleteElement", 
+              "addRelationship", "deleteRelationship", 
+              "setElementAttribute", "deleteElementAttribute", 
+              "setRelationshipAttribute", "deleteRelationshipAttribute", 
+              "readDocument", "createDocument", "updateDocument", "openTool"
+            ] 
+          },
+          parameters: {
+            type: Type.OBJECT,
+            properties: {
+              name: { type: Type.STRING },
+              tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+              notes: { type: Type.STRING },
+              rationale: { type: Type.STRING },
+              sourceName: { type: Type.STRING },
+              targetName: { type: Type.STRING },
+              label: { type: Type.STRING },
+              direction: { type: Type.STRING },
+              elementName: { type: Type.STRING },
+              key: { type: Type.STRING },
+              value: { type: Type.STRING },
+              title: { type: Type.STRING },
+              content: { type: Type.STRING },
+              mode: { type: Type.STRING },
+              tool: { type: Type.STRING },
+              subTool: { type: Type.STRING },
+              source: { type: Type.STRING }, // Fallback for relationship
+              target: { type: Type.STRING }, // Fallback for relationship
+              from: { type: Type.STRING }, // Fallback for relationship
+              to: { type: Type.STRING } // Fallback for relationship
+            }
+          }
+        },
+        required: ["tool", "parameters"]
+      }
+    }
+  },
+  required: ["message", "actions"]
+};
 
 const ChatPanel: React.FC<ChatPanelProps> = ({ 
     elements, relationships, colorSchemes, activeSchemeId, onClose, currentModelId, 
     modelActions, className, isOpen, onOpenPromptSettings, systemPromptConfig, 
     documents, folders, openDocIds, onLogHistory, onOpenHistory, onOpenTool, 
-    initialInput, activeModel, aiConfig 
+    initialInput, activeModel, aiConfig, isDarkMode, messages, setMessages
 }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isCreativeMode, setIsCreativeMode] = useState(true);
+  const [showErrorModal, setShowErrorModal] = useState(false);
   
   // Track decisions for pending actions: index -> status
   const [actionDecisions, setActionDecisions] = useState<Record<number, 'pending' | 'accepted' | 'rejected'>>({});
@@ -54,45 +103,17 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // --- Position & Drag State ---
-  const [position, setPosition] = useState({ x: 20, y: 100 }); // Default Left positioning
+  // Floating Window State
+  const [position, setPosition] = useState({ x: 20, y: 550 });
+  const [size, setSize] = useState({ width: 400, height: 600 });
   const [isDragging, setIsDragging] = useState(false);
-  const dragOffset = useRef({ x: 0, y: 0 });
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-      setIsDragging(true);
-      dragOffset.current = {
-          x: e.clientX - position.x,
-          y: e.clientY - position.y
-      };
-  };
-
-  useEffect(() => {
-      const handleMouseMove = (e: MouseEvent) => {
-          if (isDragging) {
-              const newY = Math.max(0, e.clientY - dragOffset.current.y);
-              setPosition({
-                  x: e.clientX - dragOffset.current.x,
-                  y: newY
-              });
-          }
-      };
-      const handleMouseUp = () => setIsDragging(false);
-
-      if (isDragging) {
-          document.addEventListener('mousemove', handleMouseMove);
-          document.addEventListener('mouseup', handleMouseUp);
-      }
-      return () => {
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-      };
-  }, [isDragging]);
+  const [isResizing, setIsResizing] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const resizeStartRef = useRef({ x: 0, y: 0, w: 0, h: 0 });
 
   useEffect(() => {
       if (initialInput && isOpen) {
           setInput(initialInput);
-          // Auto focus
           setTimeout(() => {
               textareaRef.current?.focus();
               textareaRef.current?.setSelectionRange(initialInput.length, initialInput.length);
@@ -105,14 +126,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   useEffect(scrollToBottom, [messages, actionDecisions]);
-
-  // This effect resets the chat if a new model is loaded.
-  useEffect(() => {
-    setMessages([{ role: 'model', text: "Hello! I'm your AI assistant. Ask me anything about your current model, or ask me to make changes to it." }]);
-    setError(null);
-    setIsLoading(false);
-    setActionDecisions({});
-  }, [currentModelId]);
 
   // Initialize decisions when a new pending message arrives
   useEffect(() => {
@@ -133,184 +146,65 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }, [input, isOpen]);
 
-  const tools: Tool[] = [
-      {
-          functionDeclarations: [
-              {
-                  name: "addElement",
-                  description: "Adds a new element (node) to the graph. Use this when the user wants to create a new idea, person, or entity.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          name: { type: Type.STRING, description: "The name of the element." },
-                          tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Optional tags for categorization. Refer to the Active Schema for standard tags." },
-                          notes: { type: Type.STRING, description: "Optional descriptive notes." },
-                          rationale: { type: Type.STRING, description: "A short note explaining WHY you are proposing to add this element." }
-                      },
-                      required: ["name", "rationale"]
-                  }
-              },
-              {
-                  name: "updateElement",
-                  description: "Updates an existing element. Use this to add tags or update notes.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          name: { type: Type.STRING, description: "The name of the element to update (must match existing name)." },
-                          tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "New tags to add." },
-                          notes: { type: Type.STRING, description: "New notes content." },
-                          rationale: { type: Type.STRING, description: "A short note explaining WHY you are proposing this update." }
-                      },
-                      required: ["name", "rationale"]
-                  }
-              },
-              {
-                  name: "deleteElement",
-                  description: "Deletes an element and its relationships from the graph.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          name: { type: Type.STRING, description: "The name of the element to delete." },
-                          rationale: { type: Type.STRING, description: "A short note explaining WHY you are proposing to delete this." }
-                      },
-                      required: ["name", "rationale"]
-                  }
-              },
-              {
-                  name: "addRelationship",
-                  description: "Connects two existing elements with a relationship.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          sourceName: { type: Type.STRING, description: "The name of the starting element." },
-                          targetName: { type: Type.STRING, description: "The name of the ending element." },
-                          label: { type: Type.STRING, description: "The label describing the relationship (e.g., 'causes', 'belongs to'). Check Schema for standard labels." },
-                          direction: { type: Type.STRING, description: "Direction: 'TO', 'FROM', or 'NONE'. Default is 'TO'." },
-                          rationale: { type: Type.STRING, description: "A short note explaining WHY you are proposing this connection." }
-                      },
-                      required: ["sourceName", "targetName", "label", "rationale"]
-                  }
-              },
-              {
-                  name: "deleteRelationship",
-                  description: "Removes a relationship between two elements.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          sourceName: { type: Type.STRING, description: "The name of the source element." },
-                          targetName: { type: Type.STRING, description: "The name of the target element." },
-                          rationale: { type: Type.STRING, description: "A short note explaining WHY you are proposing to remove this connection." }
-                      },
-                      required: ["sourceName", "targetName", "rationale"]
-                  }
-              },
-              {
-                  name: "setElementAttribute",
-                  description: "Sets a custom attribute (key-value pair) on an element.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          elementName: { type: Type.STRING, description: "The name of the element." },
-                          key: { type: Type.STRING, description: "The attribute key (e.g., 'cost', 'priority')." },
-                          value: { type: Type.STRING, description: "The attribute value." },
-                          rationale: { type: Type.STRING, description: "Why this attribute is being added/updated." }
-                      },
-                      required: ["elementName", "key", "value", "rationale"]
-                  }
-              },
-              {
-                  name: "deleteElementAttribute",
-                  description: "Deletes a custom attribute from an element.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          elementName: { type: Type.STRING, description: "The name of the element." },
-                          key: { type: Type.STRING, description: "The attribute key to remove." },
-                          rationale: { type: Type.STRING, description: "Why this attribute is being removed." }
-                      },
-                      required: ["elementName", "key", "rationale"]
-                  }
-              },
-              {
-                  name: "setRelationshipAttribute",
-                  description: "Sets a custom attribute (key-value pair) on a relationship.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          sourceName: { type: Type.STRING, description: "The source element name." },
-                          targetName: { type: Type.STRING, description: "The target element name." },
-                          key: { type: Type.STRING, description: "The attribute key." },
-                          value: { type: Type.STRING, description: "The attribute value." },
-                          rationale: { type: Type.STRING, description: "Why this attribute is being added/updated." }
-                      },
-                      required: ["sourceName", "targetName", "key", "value", "rationale"]
-                  }
-              },
-              {
-                  name: "deleteRelationshipAttribute",
-                  description: "Deletes a custom attribute from a relationship.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          sourceName: { type: Type.STRING, description: "The source element name." },
-                          targetName: { type: Type.STRING, description: "The target element name." },
-                          key: { type: Type.STRING, description: "The attribute key to remove." },
-                          rationale: { type: Type.STRING, description: "Why this attribute is being removed." }
-                      },
-                      required: ["sourceName", "targetName", "key", "rationale"]
-                  }
-              },
-              // Document Actions
-              {
-                  name: "readDocument",
-                  description: "Reads the full content of a document by its title.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          title: { type: Type.STRING, description: "The title of the document to read." }
-                      },
-                      required: ["title"]
-                  }
-              },
-              {
-                  name: "createDocument",
-                  description: "Creates a new text document.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          title: { type: Type.STRING, description: "The title of the new document." },
-                          content: { type: Type.STRING, description: "The initial content of the document." }
-                      },
-                      required: ["title", "content"]
-                  }
-              },
-              {
-                  name: "updateDocument",
-                  description: "Updates the content of an existing document.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          title: { type: Type.STRING, description: "The title of the document to update." },
-                          content: { type: Type.STRING, description: "The content to add or replace." },
-                          mode: { type: Type.STRING, enum: ["replace", "append"], description: "Whether to 'replace' the entire content or 'append' to the end." }
-                      },
-                      required: ["title", "content", "mode"]
-                  }
-              },
-              {
-                  name: "openTool",
-                  description: "Opens a specific UI tool in the application for the user.",
-                  parameters: {
-                      type: Type.OBJECT,
-                      properties: {
-                          tool: { type: Type.STRING, enum: ["triz", "lss", "toc", "ssm", "scamper", "mining", "tagcloud"], description: "The main tool category." },
-                          subTool: { type: Type.STRING, description: "The specific sub-tool (e.g., 'contradiction' for triz, 'dmaic' for lss, 'crt' for toc)." }
-                      },
-                      required: ["tool"]
-                  }
-              }
-          ]
+  // --- Drag & Resize Handlers ---
+  const handleMouseDown = (e: React.MouseEvent) => {
+      if ((e.target as HTMLElement).closest('button')) return;
+      setIsDragging(true);
+      dragStartRef.current = { x: e.clientX - position.x, y: e.clientY - position.y };
+  };
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setIsResizing(true);
+      resizeStartRef.current = { x: e.clientX, y: e.clientY, w: size.width, h: size.height };
+  };
+
+  useEffect(() => {
+      const handleMouseMove = (e: MouseEvent) => {
+          if (isDragging) {
+              setPosition({
+                  x: e.clientX - dragStartRef.current.x,
+                  y: e.clientY - dragStartRef.current.y
+              });
+          }
+          if (isResizing) {
+              setSize({
+                  width: Math.max(320, resizeStartRef.current.w + (e.clientX - resizeStartRef.current.x)),
+                  height: Math.max(400, resizeStartRef.current.h + (e.clientY - resizeStartRef.current.y))
+              });
+          }
+      };
+      
+      const handleMouseUp = () => {
+          setIsDragging(false);
+          setIsResizing(false);
+      };
+
+      if (isDragging || isResizing) {
+          document.addEventListener('mousemove', handleMouseMove);
+          document.addEventListener('mouseup', handleMouseUp);
       }
+      return () => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+      };
+  }, [isDragging, isResizing]);
+
+  // Tool Definitions for Documentation generation
+  const TOOL_DEFINITIONS = [
+      { name: "addElement", description: "Add a new node.", parameters: "name (required), tags (array), notes, rationale" },
+      { name: "updateElement", description: "Update existing node.", parameters: "name (required target), tags, notes, rationale" },
+      { name: "deleteElement", description: "Delete a node.", parameters: "name (required), rationale" },
+      { name: "addRelationship", description: "Connect two nodes.", parameters: "sourceName, targetName, label, direction ('TO', 'FROM', 'NONE'), rationale" },
+      { name: "deleteRelationship", description: "Remove connection.", parameters: "sourceName, targetName, rationale" },
+      { name: "setElementAttribute", description: "Set key-value pair on node.", parameters: "elementName, key, value, rationale" },
+      { name: "deleteElementAttribute", description: "Remove attribute from node.", parameters: "elementName, key, rationale" },
+      { name: "setRelationshipAttribute", description: "Set key-value pair on link.", parameters: "sourceName, targetName, key, value, rationale" },
+      { name: "deleteRelationshipAttribute", description: "Remove attribute from link.", parameters: "sourceName, targetName, key, rationale" },
+      { name: "readDocument", description: "Read doc content.", parameters: "title" },
+      { name: "createDocument", description: "Create new doc.", parameters: "title, content" },
+      { name: "updateDocument", description: "Update doc content.", parameters: "title, content, mode ('replace'|'append')" },
+      { name: "openTool", description: "Open UI tool.", parameters: "tool ('triz','lss','toc','ssm','scamper','mining','tagcloud'), subTool" }
   ];
 
   const executeFunctionCalls = (functionCalls: FunctionCall[]) => {
@@ -319,71 +213,80 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       functionCalls.forEach((call, index) => {
           const decision = actionDecisions[index];
           let result: any;
+          const args = call.args as any;
 
-          // Default to accepted if decision is undefined or 'pending' (implied acceptance when clicking Apply)
           if (decision === 'rejected') {
               result = { skipped: true, message: "User rejected this action." };
           } else {
               try {
                   switch (call.name) {
                       case 'addElement':
-                          const id = modelActions.addElement(call.args as any);
-                          result = { success: true, message: `Added element '${call.args.name}' with ID ${id}` };
+                          const id = modelActions.addElement(args);
+                          result = { success: true, message: `Added element '${args.name}' with ID ${id}` };
                           break;
                       case 'updateElement':
-                          const updated = modelActions.updateElement(call.args.name as string, call.args as any);
-                          result = { success: updated, message: updated ? `Updated '${call.args.name}'` : `Could not find element '${call.args.name}'` };
+                          const updated = modelActions.updateElement(args.name as string, args);
+                          result = { success: updated, message: updated ? `Updated '${args.name}'` : `Could not find element '${args.name}'` };
                           break;
                       case 'deleteElement':
-                          const deleted = modelActions.deleteElement(call.args.name as string);
-                          result = { success: deleted, message: deleted ? `Deleted '${call.args.name}'` : `Could not find element '${call.args.name}'` };
+                          const deleted = modelActions.deleteElement(args.name as string);
+                          result = { success: deleted, message: deleted ? `Deleted '${args.name}'` : `Could not find element '${args.name}'` };
                           break;
                       case 'addRelationship':
-                          const relAdded = modelActions.addRelationship(
-                              call.args.sourceName as string, 
-                              call.args.targetName as string, 
-                              call.args.label as string, 
-                              call.args.direction as string
-                          );
-                          result = { success: relAdded, message: relAdded ? `Connected '${call.args.sourceName}' to '${call.args.targetName}'` : `Failed to connect. Check if both elements exist.` };
+                          // Handle inconsistent naming from LLM (sourceName vs source)
+                          const src = args.sourceName || args.source || args.from;
+                          const tgt = args.targetName || args.target || args.to;
+                          
+                          if (src && tgt) {
+                              const relAdded = modelActions.addRelationship(
+                                  src, 
+                                  tgt, 
+                                  args.label || '', 
+                                  args.direction
+                              );
+                              result = { success: relAdded, message: relAdded ? `Connected '${src}' to '${tgt}'` : `Failed to connect '${src}' to '${tgt}'. Check if both nodes exist.` };
+                          } else {
+                              result = { success: false, message: "Missing source or target name" };
+                          }
                           break;
                       case 'deleteRelationship':
-                          const relDeleted = modelActions.deleteRelationship(call.args.sourceName as string, call.args.targetName as string);
-                          result = { success: relDeleted, message: relDeleted ? `Removed connection between '${call.args.sourceName}' and '${call.args.targetName}'` : `Connection not found.` };
+                          const delSrc = args.sourceName || args.source;
+                          const delTgt = args.targetName || args.target;
+                          const relDeleted = modelActions.deleteRelationship(delSrc, delTgt);
+                          result = { success: relDeleted, message: relDeleted ? `Removed connection.` : `Connection not found.` };
                           break;
                       case 'setElementAttribute':
-                          const elAttrSet = modelActions.setElementAttribute(call.args.elementName as string, call.args.key as string, call.args.value as string);
-                          result = { success: elAttrSet, message: elAttrSet ? `Set attribute '${call.args.key}' on '${call.args.elementName}'` : `Element not found` };
+                          const elAttrSet = modelActions.setElementAttribute(args.elementName, args.key, args.value);
+                          result = { success: elAttrSet, message: elAttrSet ? `Attribute set.` : `Element not found` };
                           break;
                       case 'deleteElementAttribute':
-                          const elAttrDel = modelActions.deleteElementAttribute(call.args.elementName as string, call.args.key as string);
-                          result = { success: elAttrDel, message: elAttrDel ? `Deleted attribute '${call.args.key}' from '${call.args.elementName}'` : `Element not found` };
+                          const elAttrDel = modelActions.deleteElementAttribute(args.elementName, args.key);
+                          result = { success: elAttrDel, message: elAttrDel ? `Attribute deleted.` : `Element not found` };
                           break;
                       case 'setRelationshipAttribute':
-                          const relAttrSet = modelActions.setRelationshipAttribute(call.args.sourceName as string, call.args.targetName as string, call.args.key as string, call.args.value as string);
-                          result = { success: relAttrSet, message: relAttrSet ? `Set attribute '${call.args.key}' on relationship` : `Relationship not found` };
+                          const relAttrSet = modelActions.setRelationshipAttribute(args.sourceName, args.targetName, args.key, args.value);
+                          result = { success: relAttrSet, message: relAttrSet ? `Attribute set.` : `Relationship not found` };
                           break;
                       case 'deleteRelationshipAttribute':
-                          const relAttrDel = modelActions.deleteRelationshipAttribute(call.args.sourceName as string, call.args.targetName as string, call.args.key as string);
-                          result = { success: relAttrDel, message: relAttrDel ? `Deleted attribute '${call.args.key}' from relationship` : `Relationship not found` };
+                          const relAttrDel = modelActions.deleteRelationshipAttribute(args.sourceName, args.targetName, args.key);
+                          result = { success: relAttrDel, message: relAttrDel ? `Attribute deleted.` : `Relationship not found` };
                           break;
-                      // Document Actions
                       case 'readDocument':
-                          const content = modelActions.readDocument(call.args.title as string);
+                          const content = modelActions.readDocument(args.title);
                           result = { success: content !== null, content: content !== null ? content : "Document not found." };
                           break;
                       case 'createDocument':
-                          const newDocId = modelActions.createDocument(call.args.title as string, call.args.content as string);
-                          result = { success: true, message: `Created document '${call.args.title}'`, docId: newDocId };
+                          const newDocId = modelActions.createDocument(args.title, args.content);
+                          result = { success: true, message: `Created document.`, docId: newDocId };
                           break;
                       case 'updateDocument':
-                          const docUpdated = modelActions.updateDocument(call.args.title as string, call.args.content as string, call.args.mode as any);
-                          result = { success: docUpdated, message: docUpdated ? `Updated document '${call.args.title}'` : "Document not found." };
+                          const docUpdated = modelActions.updateDocument(args.title, args.content, args.mode);
+                          result = { success: docUpdated, message: docUpdated ? `Updated document.` : "Document not found." };
                           break;
                       case 'openTool':
                           if (onOpenTool) {
-                              onOpenTool(call.args.tool as string, call.args.subTool as string);
-                              result = { success: true, message: `Opened tool ${call.args.tool}` };
+                              onOpenTool(args.tool, args.subTool);
+                              result = { success: true, message: `Opened tool ${args.tool}` };
                           } else {
                               result = { success: false, message: "Tool opening not supported" };
                           }
@@ -392,7 +295,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           result = { success: false, message: "Unknown function" };
                   }
               } catch (e) {
-                  console.error("Error executing function:", call.name, e);
                   result = { success: false, message: `Error executing ${call.name}: ${e}` };
               }
           }
@@ -407,30 +309,33 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       return responses;
   }
 
-  // Helper to merge consecutive messages for API history
-  const buildApiHistory = (msgs: Message[]): Content[] => {
+  // Reconstructs history as Text/JSON exchanges for the model context
+  const buildApiHistory = (msgs: ChatMessage[]): Content[] => {
     const history: Content[] = [];
-    let currentContent: Content | null = null;
-
+    
     for (const msg of msgs) {
-        // Don't include pending messages in history sent to API until they are confirmed
-        if (msg.isPending) continue;
+        if (msg.isPending) continue; // Don't include pending turns
 
-        const parts: Part[] = [];
-        if (msg.text) parts.push({ text: msg.text });
-        if (msg.functionCalls) msg.functionCalls.forEach(fc => parts.push({ functionCall: fc }));
-        if (msg.functionResponses) msg.functionResponses.forEach(fr => parts.push({ functionResponse: fr }));
-        
-        if (parts.length === 0) continue;
-
-        if (currentContent && currentContent.role === msg.role) {
-            currentContent.parts.push(...parts);
+        if (msg.role === 'user') {
+            // Check if this user message is actually a result of tool execution
+            if (msg.functionResponses) {
+                const resultsText = msg.functionResponses.map(fr => 
+                    `Action Result [${fr.name}]: ${JSON.stringify(fr.response.result)}`
+                ).join('\n');
+                history.push({ role: 'user', parts: [{ text: resultsText }] });
+            } else {
+                history.push({ role: 'user', parts: [{ text: msg.text || '' }] });
+            }
         } else {
-            if (currentContent) history.push(currentContent);
-            currentContent = { role: msg.role, parts };
+            // Model Role
+            // If we have the raw JSON the model generated, use that to maintain state
+            if (msg.rawJson) {
+                history.push({ role: 'model', parts: [{ text: JSON.stringify(msg.rawJson) }] });
+            } else {
+                history.push({ role: 'model', parts: [{ text: msg.text || '' }] });
+            }
         }
     }
-    if (currentContent) history.push(currentContent);
     return history;
   };
 
@@ -438,176 +343,162 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       const args = fc.args as any;
       switch(fc.name) {
           case 'addElement': return `Add Element: "${args.name}"`;
-          case 'addRelationship': return `Connect: "${args.sourceName}" → "${args.targetName}"`;
+          case 'addRelationship': return `Add Connection`;
           case 'deleteElement': return `Delete Element: "${args.name}"`;
           case 'updateElement': return `Update Element: "${args.name}"`;
-          case 'deleteRelationship': return `Disconnect: "${args.sourceName}" & "${args.targetName}"`;
-          case 'setElementAttribute': return `Set Attribute: "${args.key}" on "${args.elementName}"`;
-          case 'deleteElementAttribute': return `Delete Attribute: "${args.key}" from "${args.elementName}"`;
-          case 'setRelationshipAttribute': return `Set Link Attribute: "${args.key}"`;
-          case 'deleteRelationshipAttribute': return `Delete Link Attribute: "${args.key}"`;
+          case 'deleteRelationship': return `Disconnect: "${args.sourceName || args.source}" & "${args.targetName || args.target}"`;
           case 'readDocument': return `Read Document: "${args.title}"`;
           case 'createDocument': return `Create Document: "${args.title}"`;
-          case 'updateDocument': return `Update Document: "${args.title}" (${args.mode})`;
-          case 'openTool': return `Open Tool: ${args.tool}${args.subTool ? ` / ${args.subTool}` : ''}`;
+          case 'openTool': return `Open Tool: ${args.tool}`;
           default: return fc.name;
       }
   };
 
-  const getActionDetails = (fc: FunctionCall) => {
+  const renderActionContent = (fc: FunctionCall, isDark: boolean) => {
       const args = fc.args as any;
-      const details = [];
-      
-      // Note: Primary identifiers (Name, Target, Source) are now displayed in the Title (getActionTitle).
-      // We include supplementary details here.
+      const labelClass = isDark ? 'text-gray-400' : 'text-gray-500';
+      const textClass = isDark ? 'text-gray-300' : 'text-gray-700';
 
-      if (args.label) details.push(`Label: ${args.label}`);
-      if (args.direction) details.push(`Dir: ${args.direction}`);
-      if (args.tags) details.push(`Tags: ${args.tags.join(', ')}`);
-      if (args.notes) details.push(`Notes: ${args.notes.substring(0, 30)}...`);
-      
-      // For setElementAttribute/setRelationshipAttribute, the Title shows Key, here we show Value.
-      if (args.value && (fc.name.includes('Attribute'))) details.push(`Value: ${args.value}`);
-      
-      if (args.content) details.push(`Content Length: ${args.content.length}`);
-      if (fc.name === 'openTool') return '';
-      
-      if (args.rationale) details.push(`Rationale: ${args.rationale}`);
-      
-      return details.join(' | ');
-  }
+      if (fc.name === 'addRelationship') {
+          return (
+            <div className="mt-1 space-y-1 text-xs">
+                <div className="flex gap-2">
+                    <span className={`${labelClass} font-semibold w-10`}>From:</span>
+                    <span className={`${textClass} font-mono`}>{args.sourceName || args.source}</span>
+                </div>
+                <div className="flex gap-2">
+                    <span className={`${labelClass} font-semibold w-10`}>To:</span>
+                    <span className={`${textClass} font-mono`}>{args.targetName || args.target}</span>
+                </div>
+                <div className="flex gap-2">
+                    <span className={`${labelClass} font-semibold w-10`}>Label:</span>
+                    <span className={`${textClass} italic`}>{args.label || '(none)'}</span>
+                </div>
+                {args.rationale && (
+                    <div className="flex gap-2 mt-1 border-t border-gray-700/50 pt-1">
+                        <span className={`${labelClass} font-semibold w-10`}>Why:</span>
+                        <span className={`${textClass} opacity-80`}>{args.rationale}</span>
+                    </div>
+                )}
+            </div>
+          );
+      }
+
+      return (
+          <div className="mt-1 space-y-1 text-xs">
+              {Object.entries(args).map(([k, v]) => {
+                  if (k === 'name' || k === 'sourceName' || k === 'targetName') return null; // Already in title
+                  return (
+                      <div key={k} className="flex gap-1">
+                          <span className={`${labelClass} font-semibold`}>{k}:</span>
+                          <span className={textClass}>{JSON.stringify(v)}</span>
+                      </div>
+                  );
+              })}
+          </div>
+      );
+  };
 
   const handleSendMessage = async (customPrompt?: string) => {
     if ((!input.trim() && !customPrompt) || isLoading) return;
 
     const userMessageText = customPrompt || input.trim();
-    const userMessage: Message = { role: 'user', text: userMessageText };
+    const userMessage: ChatMessage = { role: 'user', text: userMessageText };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     
     setInput('');
     setIsLoading(true);
     setError(null);
+    setShowErrorModal(false);
 
     try {
         const modelMarkdown = generateMarkdownFromGraph(elements, relationships);
         
-        const strictInstruction = `
-        MODE: STRICT ANALYST
-        - You are a strict analyst.
-        - Answer questions solely based on the information provided in the graph data.
-        - Do not introduce outside facts, general knowledge, or creativity unless explicitly asked for definitions.
-        - Focus on structural analysis and retrieving information contained strictly within the current model.
-        `;
+        const toolsContext = TOOL_DEFINITIONS.map(t => `- ${t.name}: ${t.description} Params: {${t.parameters}}`).join('\n');
 
-        const creativeInstruction = `
-        MODE: CREATIVE PARTNER
-        - You are a creative collaborator and innovation assistant.
-        - Use the graph data as a foundation, but combine it with your extensive general knowledge to suggest improvements.
-        - Proactively look for 'Harmful', 'Challenge', or negative nodes and suggest new 'Action', 'Idea', or 'Useful' nodes to counteract them.
-        - Identify gaps in logic, missing perspectives, or emerging trends and ask the user questions to fill them.
-        - You are encouraged to propose adding new elements using the 'addElement' tool if they add value, solve problems, or represent creative solutions.
-        - Draw parallels with design patterns, historical events, or business strategies where appropriate.
-        - When adding new elements to counteract others, ALWAYS try to link them back to the problem element using 'addRelationship' with an appropriate label (e.g. 'mitigates', 'solves').
-        `;
-
-        let schemaContext = "NO ACTIVE SCHEMA DEFINED. You can use any tags or relationship labels, but prefer standard ones like 'Action', 'Idea', 'Person' and 'causes', 'related to'.";
+        let schemaContext = "No specific schema defined.";
         const activeScheme = colorSchemes.find(s => s.id === activeSchemeId);
         if (activeScheme) {
-             const definitions = activeScheme.relationshipDefinitions || [];
-             const defaultRel = activeScheme.defaultRelationshipLabel;
-             schemaContext = `
-        ACTIVE SCHEMA: "${activeScheme.name}"
-        The following tags are explicitly defined in the current schema. These tags govern the visual appearance of nodes.
-        You MUST use these specific tags when categorizing elements to ensure they integrate correctly with the user's model:
-        ${Object.keys(activeScheme.tagColors).map(tag => `- "${tag}"`).join('\n')}
-        
-        The following standard relationship definitions (label: description) are defined in the current schema:
-        ${definitions.map(d => `- "${d.label}": ${d.description || 'No description'}`).join('\n')}
-        ${defaultRel ? `The DEFAULT relationship label for this schema is: "${defaultRel}". Use this if no specific relationship type is implied.` : ''}
-        
-        RULES FOR SCHEMA USAGE:
-        1. When the user asks to add a specific type of agent (e.g. "add an Idea", "add an Action"), map their request to one of the tags above and include it in the 'tags' list for that element.
-        2. When connecting elements with 'addRelationship', CAREFULLY REVIEW the relationship definitions above. Choose the label whose description best matches the semantic relationship you are trying to create. If none fit well, use a concise custom label.
-        `;
+             schemaContext = `ACTIVE SCHEMA: "${activeScheme.name}"\nTags: ${Object.keys(activeScheme.tagColors).join(', ')}`;
         }
 
-        // Document Context
-        let docContext = "No documents available.";
+        let docContext = "";
         if (documents && documents.length > 0) {
-            const openDocs = documents.filter(d => openDocIds?.includes(d.id));
-            docContext = `AVAILABLE DOCUMENTS:\n${documents.map(d => `- "${d.title}" (in folder: ${d.folderId ? folders?.find(f => f.id === d.folderId)?.name : 'Root'})`).join('\n')}\n\nOPEN DOCUMENTS (Currently Visible): ${openDocs.length > 0 ? openDocs.map(d => `"${d.title}"`).join(', ') : 'None'}`;
+            docContext = `AVAILABLE DOCUMENTS:\n${documents.map(d => `- "${d.title}"`).join('\n')}`;
         }
 
-        // Build Tools Description dynamically based on enabled tools
-        const enabledToolIds = systemPromptConfig.enabledTools || AVAILABLE_AI_TOOLS.map(t => t.id);
-        const toolDescriptions = {
-            'triz': `- TRIZ ('triz'): Problem solving. Subtools: 'contradiction' (Matrix), 'principles' (40 Principles), 'ariz', 'sufield', 'trends'.`,
-            'lss': `- Lean Six Sigma ('lss'): Process improvement. Subtools: 'dmaic', '5whys', 'fishbone', 'fmea', 'vsm'.`,
-            'toc': `- Theory of Constraints ('toc'): Bottleneck analysis. Subtools: 'crt' (Current Reality), 'ec' (Evaporating Cloud), 'frt' (Future Reality), 'tt' (Transition Tree).`,
-            'ssm': `- Soft Systems Methodology ('ssm'): Complex problems. Subtools: 'rich_picture', 'catwoe', 'activity_models', 'comparison'.`,
-            'scamper': `- SCAMPER ('scamper'): Ideation.`,
-            'mining': `- Data Mining ('mining'): Dashboard.`,
-            'tagcloud': `- Tag Cloud ('tagcloud'): Visualization.`,
-            'swot': `- SWOT Analysis ('swot'): Identify internal Strengths/Weaknesses and external Opportunities/Threats. Use 'addElement' with tags 'Strength', 'Weakness', 'Opportunity', 'Threat'.`
-        };
-
-        const availableToolsContext = enabledToolIds.map(id => toolDescriptions[id as keyof typeof toolDescriptions]).filter(Boolean).join('\n');
-
-        const systemInstruction = `${systemPromptConfig.defaultPrompt}
+        const systemInstruction = `
+        You are Tapestry AI, an expert knowledge graph assistant.
         
-        ${isCreativeMode ? creativeInstruction : strictInstruction}
+        ${systemPromptConfig.defaultPrompt}
+        
+        ${isCreativeMode ? 'MODE: CREATIVE PARTNER (Proactive, suggest ideas)' : 'MODE: STRICT ANALYST (Only facts)'}
 
         ${schemaContext}
-        
-        ${systemPromptConfig.userContext ? `USER CONTEXT:\n${systemPromptConfig.userContext}` : ''}
-        ${systemPromptConfig.responseStyle ? `RESPONSE STYLE:\n${systemPromptConfig.responseStyle}` : ''}
-        ${systemPromptConfig.userPrompt ? `ADDITIONAL USER INSTRUCTIONS:\n${systemPromptConfig.userPrompt}` : ''}
-        
-        Context:
-        The user is viewing a knowledge graph. You have been provided the graph data in a markdown-like format below. 
-        You also have access to a document system. You can read, create, and edit text documents using tools.
-        
         ${docContext}
-        
-        AVAILABLE UI TOOLS:
-        You can open specific analysis tools for the user using the 'openTool' function.
-        ${availableToolsContext || "No analysis tools enabled."}
+
+        AVAILABLE TOOLS:
+        You have access to the following tools. You must output a JSON object to use them.
+        ${toolsContext}
+
+        OUTPUT FORMAT:
+        You must respond with a JSON object strictly adhering to this schema:
+        {
+          "analysis": "Your internal thought process...",
+          "message": "The text response to show the user...",
+          "actions": [ { "tool": "toolName", "parameters": { ...args } }, ... ]
+        }
 
         CRITICAL RULES:
-        1. Use the markdown data as your base context.
-        2. **IF THE USER ASKS A QUESTION:** Answer it using text based on the context. **DO NOT** call any tools unless they explicitly ask to modify data or open a tool.
-        3. **IF THE USER ASKS TO MODIFY THE GRAPH:** (e.g. "add a node", "connect A to B", "delete X"), then use the appropriate tools.
-        4. **IF THE USER ASKS FOR ANALYSIS:** You can provide analysis in text OR suggest opening a relevant tool (e.g. "I can open the Fishbone diagram tool for you"). If they agree, use 'openTool'.
-        5. When referring to elements, use their exact Names.
-        6. When adding or updating elements, ALWAYS consult the Active Schema above and apply the most relevant tag from the list if possible.
-        7. **BATCHING:** If a user request involves creating multiple elements and connecting them (e.g. "Add 3 actions to mitigate X"), you MUST generate ALL the necessary 'addElement' and 'addRelationship' tool calls in a SINGLE response. Do not ask for confirmation between individual steps of a single logical request.
-        8. **RATIONALE:** You MUST provide a clear 'rationale' parameter for every tool call, explaining why you are proposing this specific action.
-        9. **ATTRIBUTES:** You can read custom attributes from the context (e.g. {cost="high"}) and modify them using 'setElementAttribute' or 'setRelationshipAttribute'.
-        
+        1. Always return valid JSON.
+        2. If you want to modify the graph or open a tool, add an item to the "actions" array.
+        3. If you just want to talk, leave "actions" empty.
+        4. Refer to nodes by their exact names.
+        5. Use 'rationale' parameter to explain why an action is taken.
+        6. IMPORTANT: For lists, long explanations, or detailed answers, put the ENTIRE content in the "message" field. Do not truncate.
+
         GRAPH DATA:
         ${modelMarkdown}
         `;
 
         const contents: Content[] = buildApiHistory(newMessages);
         
-        const result = await callAI(aiConfig, contents, systemInstruction, tools[0].functionDeclarations);
+        const requestPayload = {
+            config: aiConfig,
+            systemInstruction,
+            contents,
+            schema: CHAT_RESPONSE_SCHEMA
+        };
 
-        const text = result.text;
-        const functionCalls = result.functionCalls;
+        // Pass schema to force JSON output
+        // Pass skipLog: true to prevent duplication in debug view since ChatPanel handles its own state
+        const result = await callAI(aiConfig, contents, systemInstruction, undefined, CHAT_RESPONSE_SCHEMA, true);
 
-        const modelMsg: Message = {
+        const responseJson = JSON.parse(result.text);
+        
+        const toolRequests = responseJson.actions || [];
+        const functionCalls = toolRequests.map((req: any) => ({
+            name: req.tool,
+            args: req.parameters,
+            id: generateUUID()
+        }));
+
+        const modelMsg: ChatMessage = {
             role: 'model',
-            text,
-            functionCalls: functionCalls && functionCalls.length > 0 ? functionCalls : undefined,
-            isPending: functionCalls && functionCalls.length > 0 ? true : false
+            text: responseJson.message || "(No message)",
+            functionCalls: functionCalls.length > 0 ? functionCalls : undefined,
+            isPending: functionCalls.length > 0,
+            rawJson: responseJson,
+            requestPayload: requestPayload
         };
 
         setMessages(prev => [...prev, modelMsg]);
 
     } catch (e: any) {
-        setError(e.message || "Error communicating with AI.");
-        setMessages(prev => prev.slice(0, -1));
+        console.error("AI Error:", e);
+        setError(e.message || "Failed to generate response");
+        setMessages(prev => prev.slice(0, -1)); // Remove failed user message
     } finally {
         setIsLoading(false);
     }
@@ -619,94 +510,72 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
       setIsLoading(true);
       
-      // Execute accepted calls and collect results
+      // Execute accepted calls
       const functionResponses = executeFunctionCalls(msg.functionCalls);
       
-      // Log successful actions to History
-      if (onLogHistory) {
-          const successes = functionResponses.filter(r => (r.response as any).result?.success);
-          if (successes.length > 0) {
-              const content = successes.map(r => {
-                  const resultMsg = (r.response as any).result?.message || "Success";
-                  return `- ${resultMsg}`;
-              }).join('\n');
-
-              onLogHistory(
-                  'AI Chat Action',
-                  `**Applied Changes:**\n\n${content}`,
-                  `Applied ${successes.length} changes`
-              );
-          }
-      }
-
-      // Send responses back to model
-      try {
-          const currentHistory = buildApiHistory(messages.slice(0, msgIndex)); // History before this message
-          
-          // Add the model message with tool calls
-          const modelParts: Part[] = [];
-          if (msg.text) modelParts.push({ text: msg.text });
-          msg.functionCalls.forEach(fc => modelParts.push({ functionCall: fc }));
-          currentHistory.push({ role: 'model', parts: modelParts });
-          
-          // Add the function responses
-          const responseParts: Part[] = functionResponses.map(fr => ({ functionResponse: fr }));
-          currentHistory.push({ role: 'user', parts: responseParts });
-
-          const result = await callAI(
-              aiConfig, 
-              currentHistory, 
-              systemPromptConfig.defaultPrompt // Use default prompt for tool follow-up
-          );
-          
-          const responseText = result.text;
-          const nextCalls = result.functionCalls;
-          
-          setMessages(prev => {
-              const newMsgs = [...prev];
-              // Mark current as processed
-              newMsgs[msgIndex] = { ...msg, isPending: false, functionResponses: functionResponses.map(r => r.response as FunctionResponse) };
-              // Add model response
-              newMsgs.push({ 
-                  role: 'model', 
-                  text: responseText,
-                  functionCalls: nextCalls && nextCalls.length > 0 ? nextCalls : undefined,
-                  isPending: nextCalls && nextCalls.length > 0 ? true : false
-              });
-              return newMsgs;
-          });
-
-      } catch (e) {
-          setError("Failed to send tool results to AI.");
-      } finally {
-          setIsLoading(false);
-      }
+      // We don't send back to model immediately in this flow unless we want a confirmation message.
+      // For now, we just mark as processed and show results in history if user continues chatting.
+      
+      setMessages(prev => {
+          const newMsgs = [...prev];
+          newMsgs[msgIndex] = { ...msg, isPending: false, functionResponses: functionResponses.map(r => r.response as FunctionResponse) };
+          return newMsgs;
+      });
+      
+      setIsLoading(false);
   };
 
+  const handleSelectAll = (msgIndex: number, select: boolean) => {
+      const msg = messages[msgIndex];
+      if (!msg?.functionCalls || !msg.isPending) return;
+      
+      const newDecisions: Record<number, 'pending' | 'accepted' | 'rejected'> = { ...actionDecisions };
+      msg.functionCalls.forEach((_, i) => {
+          newDecisions[i] = select ? 'accepted' : 'rejected';
+      });
+      setActionDecisions(newDecisions);
+  };
+
+  const bgClass = isDarkMode ? 'bg-gray-900' : 'bg-white';
+  const borderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const subTextClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  const messageUserBg = 'bg-blue-600 text-white';
+  const messageModelBg = isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-100 text-gray-800';
+  const actionBg = isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-300';
+  const inputBg = isDarkMode ? 'bg-gray-900 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300';
+
   return (
-    <div
-        style={{
-            left: `${position.x}px`,
-            top: `${position.y}px`,
-            height: `calc(100vh - ${position.y + 20}px)`, // Fit vertical space, keeping 20px margin from bottom
-            maxHeight: 'none'
-        }}
-        className={`fixed w-96 bg-gray-900 border border-gray-700 rounded-lg shadow-2xl flex flex-col z-[200] ${className} ${isOpen ? '' : 'hidden'}`}
+    <>
+    <div 
+        className={`fixed ${bgClass} border ${borderClass} rounded-lg shadow-2xl flex flex-col z-30 ${className} ${isOpen ? '' : 'hidden'}`}
+        style={{ left: position.x, top: position.y, width: size.width, height: size.height }}
     >
-        {/* Header */}
-        <div
+        {/* Header - Draggable */}
+        <div 
+            className={`p-4 border-b ${borderClass} flex justify-between items-center ${isDarkMode ? 'bg-gray-800' : 'bg-gray-50'} rounded-t-lg cursor-move select-none`}
             onMouseDown={handleMouseDown}
-            className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800 rounded-t-lg cursor-move select-none"
         >
             <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                <h2 className="text-lg font-bold text-white">AI Assistant</h2>
+                <h2 className={`text-lg font-bold ${textClass}`}>AI Assistant</h2>
             </div>
             <div className="flex items-center gap-2">
-                <button onMouseDown={(e) => e.stopPropagation()} onClick={onOpenPromptSettings} className="text-gray-400 hover:text-white p-1" title="Settings">
+                <button 
+                    onClick={onOpenHistory} 
+                    className={`${subTextClass} hover:text-blue-500 p-1 flex items-center gap-1 bg-gray-700/30 rounded border border-transparent hover:border-blue-500/50`} 
+                    title="Open AI History"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-xs font-semibold">History</span>
+                </button>
+                <div className="w-px h-4 bg-gray-600 mx-1"></div>
+                <button onClick={onOpenPromptSettings} className={`${subTextClass} hover:text-blue-500 p-1`} title="Settings">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" /></svg>
                 </button>
-                <button onMouseDown={(e) => e.stopPropagation()} onClick={onClose} className="text-gray-400 hover:text-white p-1">
+                <button onClick={onClose} className={`${subTextClass} hover:text-red-500 p-1`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
             </div>
@@ -717,32 +586,40 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             {messages.map((msg, idx) => (
                 <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                     {msg.text && (
-                        <div className={`p-3 rounded-lg max-w-[90%] text-sm whitespace-pre-wrap ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
+                        <div className={`p-3 rounded-lg max-w-[90%] text-sm whitespace-pre-wrap ${msg.role === 'user' ? messageUserBg : messageModelBg}`}>
                             {msg.text}
                         </div>
                     )}
                     {msg.functionCalls && (
-                        <div className="mt-2 bg-gray-800 border border-gray-600 rounded-lg p-2 w-full max-w-[95%] shadow-lg">
-                            <div className="text-xs font-bold text-gray-400 mb-2 uppercase tracking-wider px-1">Suggested Actions</div>
+                        <div className={`mt-2 ${actionBg} border rounded-lg p-2 w-full max-w-[95%] shadow-lg`}>
+                            <div className="flex justify-between items-center mb-2 px-1">
+                                <div className={`text-xs font-bold ${subTextClass} uppercase tracking-wider`}>Proposed Actions</div>
+                                {msg.isPending && (
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleSelectAll(idx, true)} className="text-[10px] text-blue-500 hover:underline font-semibold">Select All</button>
+                                        <button onClick={() => handleSelectAll(idx, false)} className="text-[10px] text-blue-500 hover:underline font-semibold">Select None</button>
+                                    </div>
+                                )}
+                            </div>
                             <div className="space-y-1">
                                 {msg.functionCalls.map((fc, i) => (
-                                    <div key={i} className="flex items-center gap-2 bg-gray-900/50 p-2 rounded text-xs">
+                                    <div key={i} className={`flex items-start gap-2 ${isDarkMode ? 'bg-gray-900/50' : 'bg-gray-50'} p-2 rounded text-xs`}>
                                         {msg.isPending && (
                                             <input 
                                                 type="checkbox" 
                                                 checked={actionDecisions[i] === 'accepted'}
                                                 onChange={() => setActionDecisions(prev => ({ ...prev, [i]: prev[i] === 'accepted' ? 'rejected' : 'accepted' }))}
-                                                className="cursor-pointer"
+                                                className="cursor-pointer mt-0.5"
                                             />
                                         )}
                                         <div className={`flex-grow ${actionDecisions[i] === 'rejected' ? 'opacity-50 line-through' : ''}`}>
-                                            <span className="font-bold text-blue-400">{getActionTitle(fc)}</span>
-                                            <span className="text-gray-400 ml-1">{getActionDetails(fc)}</span>
+                                            <span className="font-bold text-blue-500">{getActionTitle(fc)}</span>
+                                            {renderActionContent(fc, isDarkMode)}
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                            {msg.isPending && (
+                            {msg.isPending ? (
                                 <div className="mt-3 flex justify-end">
                                     <button 
                                         onClick={() => handleApplyPending(idx)}
@@ -751,6 +628,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                                     >
                                         Apply Selected
                                     </button>
+                                </div>
+                            ) : (
+                                <div className="mt-2 text-[10px] text-gray-500 text-right italic border-t border-gray-700 pt-1">
+                                    Processed
                                 </div>
                             )}
                         </div>
@@ -767,7 +648,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
 
         {/* Input */}
-        <div className="p-3 bg-gray-800 border-t border-gray-700">
+        <div className={`p-3 ${isDarkMode ? 'bg-gray-800' : 'bg-white'} border-t ${borderClass}`}>
             <div className="flex gap-2 relative">
                 <textarea
                     ref={textareaRef}
@@ -780,7 +661,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                         }
                     }}
                     placeholder="Ask to create nodes, analyze connections..."
-                    className="w-full bg-gray-900 text-white text-sm rounded p-2 border border-gray-600 focus:border-blue-500 outline-none resize-none max-h-32 scrollbar-thin"
+                    className={`w-full ${inputBg} text-sm rounded p-2 border focus:border-blue-500 outline-none resize-none max-h-32 scrollbar-thin`}
                     rows={1}
                 />
                 <button 
@@ -792,13 +673,66 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 </button>
             </div>
             <div className="flex justify-between items-center mt-2 px-1">
-                <button onClick={() => setIsCreativeMode(!isCreativeMode)} className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${isCreativeMode ? 'border-purple-500 text-purple-400' : 'border-gray-600 text-gray-500'}`}>
+                <button onClick={() => setIsCreativeMode(!isCreativeMode)} className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${isCreativeMode ? 'border-purple-500 text-purple-500' : `${isDarkMode ? 'border-gray-600 text-gray-500' : 'border-gray-300 text-gray-400'}`}`}>
                     {isCreativeMode ? 'Creative Mode' : 'Strict Mode'}
                 </button>
-                {error && <span className="text-red-400 text-xs truncate max-w-[200px]" title={error}>{error}</span>}
+                {error ? (
+                    <button 
+                        onClick={() => setShowErrorModal(true)}
+                        className="bg-red-900/50 hover:bg-red-900 border border-red-500 text-red-400 text-xs px-2 py-0.5 rounded flex items-center gap-1 transition-colors max-w-[200px]"
+                    >
+                        <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span className="truncate">Error (Click to view)</span>
+                    </button>
+                ) : <span></span>}
             </div>
         </div>
+
+        {/* Resize Handle */}
+        <div 
+            className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-40 flex items-end justify-end p-0.5"
+            onMouseDown={handleResizeStart}
+        >
+             <svg viewBox="0 0 10 10" className="w-3 h-3 text-gray-500 opacity-50">
+                <path d="M10 10 L10 0 L0 10 Z" fill="currentColor" />
+            </svg>
+        </div>
     </div>
+
+    {/* Error Modal */}
+    {showErrorModal && error && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <div className={`w-full max-w-lg ${isDarkMode ? 'bg-gray-800 border-red-500' : 'bg-white border-red-400'} border-2 rounded-lg shadow-2xl flex flex-col max-h-[80vh] overflow-hidden`}>
+                <div className="p-3 bg-red-900/20 border-b border-red-500/30 flex justify-between items-center">
+                    <h3 className="text-red-400 font-bold text-sm uppercase flex items-center gap-2">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                        Error Details
+                    </h3>
+                    <button onClick={() => setShowErrorModal(false)} className="text-gray-400 hover:text-white transition-colors">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="p-4 overflow-y-auto font-mono text-xs text-red-300 whitespace-pre-wrap break-words flex-grow bg-black/20">
+                    {error}
+                </div>
+                <div className="p-3 border-t border-gray-700 bg-gray-900/50 flex justify-end gap-2">
+                    <button 
+                        onClick={() => { navigator.clipboard.writeText(error); setShowErrorModal(false); }}
+                        className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-xs font-bold rounded transition-colors"
+                    >
+                        Copy & Close
+                    </button>
+                    <button 
+                        onClick={() => setShowErrorModal(false)}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded transition-colors"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    )}
+    </>
   );
 };
 

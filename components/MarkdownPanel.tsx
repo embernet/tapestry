@@ -7,14 +7,16 @@ interface MarkdownPanelProps {
   onApply: (text: string) => void;
   onClose: () => void;
   modelName: string;
+  isDarkMode: boolean;
 }
 
 interface ImportMarkdownModalProps {
   onClose: () => void;
   onSelectFile: (isAppending: boolean) => void;
+  isDarkMode: boolean;
 }
 
-const ImportMarkdownModal: React.FC<ImportMarkdownModalProps> = ({ onClose, onSelectFile }) => {
+const ImportMarkdownModal: React.FC<ImportMarkdownModalProps> = ({ onClose, onSelectFile, isDarkMode }) => {
   const [isAppending, setIsAppending] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -32,23 +34,26 @@ const ImportMarkdownModal: React.FC<ImportMarkdownModalProps> = ({ onClose, onSe
     onSelectFile(isAppending);
   };
 
+  const modalBg = isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900';
+  const itemBg = isDarkMode ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200';
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50">
-      <div ref={modalRef} className="bg-gray-800 rounded-lg p-8 w-full max-w-md shadow-xl border border-gray-600 text-white">
+      <div ref={modalRef} className={`${modalBg} rounded-lg p-8 w-full max-w-md shadow-xl border`}>
         <h2 className="text-2xl font-bold mb-6">Import Options</h2>
         
-        <p className="text-gray-400 mb-6">Choose how to import the Markdown file into your model.</p>
+        <p className="text-gray-500 mb-6">Choose how to import the Markdown file into your model.</p>
 
-        <label className="flex items-center space-x-3 bg-gray-700 p-4 rounded-md cursor-pointer hover:bg-gray-600 transition">
+        <label className={`flex items-center space-x-3 ${itemBg} p-4 rounded-md cursor-pointer transition`}>
           <input
             type="checkbox"
             checked={isAppending}
             onChange={(e) => setIsAppending(e.target.checked)}
-            className="form-checkbox h-5 w-5 rounded bg-gray-900 border-gray-600 text-blue-500 focus:ring-blue-500"
+            className={`form-checkbox h-5 w-5 rounded ${isDarkMode ? 'bg-gray-900 border-gray-600' : 'bg-white border-gray-400'} text-blue-500 focus:ring-blue-500`}
           />
           <div>
             <span className="font-semibold">Add to existing model</span>
-            <p className="text-sm text-gray-400">Appends the file content to the current text.</p>
+            <p className="text-sm text-gray-500">Appends the file content to the current text.</p>
           </div>
         </label>
         
@@ -66,7 +71,7 @@ const ImportMarkdownModal: React.FC<ImportMarkdownModalProps> = ({ onClose, onSe
 };
 
 
-const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onClose, modelName }) => {
+const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onClose, modelName, isDarkMode }) => {
   const [text, setText] = useState(initialText);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
@@ -98,7 +103,6 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
     setIsImportModalOpen(false);
 
     // Try File System Access API first for better UX (start in Documents)
-    // BUT ONLY IF NOT IN IFRAME (security restriction)
     if (!isInIframe() && 'showOpenFilePicker' in window) {
         try {
             const pickerOptions = {
@@ -120,8 +124,6 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
                 setText(content);
             }
         } catch (err: any) {
-            // If user cancels, AbortError is thrown, which we ignore.
-            // For other errors, we can fall back or log.
             if (err.name !== 'AbortError') {
                 console.warn("File System Access API failed, falling back to input:", err);
                 importFileRef.current?.click();
@@ -158,9 +160,12 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
     reader.readAsText(file);
   };
 
+  const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const textareaBg = isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-gray-50 border-gray-300 text-gray-900';
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className={`w-full h-full flex flex-col ${bgClass}`}>
        <input
         type="file"
         ref={importFileRef}
@@ -172,12 +177,13 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
         <ImportMarkdownModal 
           onClose={() => setIsImportModalOpen(false)}
           onSelectFile={handleSelectFile}
+          isDarkMode={isDarkMode}
         />
       )}
 
       <div className="p-6 flex-shrink-0 flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-white">Markdown View</h2>
-        <button onClick={onClose} className="text-gray-400 hover:text-white">
+        <h2 className={`text-2xl font-bold ${textClass}`}>Markdown View</h2>
+        <button onClick={onClose} className={`text-gray-400 hover:${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
           </svg>
@@ -188,7 +194,7 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            className="w-full h-full flex-grow bg-gray-900 border border-gray-600 rounded-md p-4 text-white font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`w-full h-full flex-grow border rounded-md p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 ${textareaBg}`}
             placeholder={`# This is a comment and will be ignored.\nElement with spaces (Type):tag -[label]-> Another Element\nElement A -[rel]-> Element B; Element C`}
           />
       </div>

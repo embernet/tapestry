@@ -19,6 +19,7 @@ interface RightPanelContainerProps {
   onActiveDockedIdChange: (id: string | null) => void;
   globalZIndex: number;
   onGlobalZIndexChange: (zIndex: number) => void;
+  isDarkMode: boolean;
 }
 
 const DEFAULT_WIDTH = 600;
@@ -31,7 +32,8 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
   activeDockedId, 
   onActiveDockedIdChange,
   globalZIndex,
-  onGlobalZIndexChange
+  onGlobalZIndexChange,
+  isDarkMode
 }) => {
   // Refs for drag/resize operations to avoid closure staleness
   const dragRef = useRef<{
@@ -208,14 +210,33 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
     });
   };
 
+  const containerClass = isDarkMode 
+    ? 'bg-gray-800 border-gray-700' 
+    : 'bg-white border-gray-200';
+  
+  const headerClass = isDarkMode
+    ? 'bg-gray-900 border-gray-700'
+    : 'bg-gray-100 border-gray-200';
+
+  const tabClass = (isActive: boolean) => {
+      if (isActive) {
+          return isDarkMode 
+            ? 'bg-gray-800 text-blue-400 border-t-2 border-t-blue-400'
+            : 'bg-white text-blue-600 border-t-2 border-t-blue-600';
+      }
+      return isDarkMode 
+        ? 'text-gray-400 hover:bg-gray-700 hover:text-gray-200 bg-gray-900/50'
+        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 bg-gray-50';
+  };
+
   return (
     <>
       {/* --- DOCKED CONTAINER --- */}
       {dockedPanels.length > 0 && (
-        <div className="absolute top-20 right-4 bottom-4 w-[600px] z-30 flex flex-col bg-gray-800 border border-gray-700 rounded-lg shadow-2xl overflow-hidden transition-all">
+        <div className={`absolute top-20 right-4 bottom-4 w-[600px] z-30 flex flex-col border rounded-lg shadow-2xl overflow-hidden transition-all ${containerClass}`}>
           
           {/* Dock Toolbar */}
-          <div className="flex items-center justify-between h-8 px-3 bg-gray-900 border-b border-gray-700 select-none">
+          <div className={`flex items-center justify-between h-8 px-3 border-b select-none ${headerClass}`}>
              <div className="flex items-center gap-2 text-gray-400 text-xs font-bold uppercase tracking-wider">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z" />
@@ -225,7 +246,7 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
              </div>
              <button 
                 onClick={handleCloseDock}
-                className="text-gray-500 hover:text-red-400 transition-colors p-1 rounded hover:bg-gray-800"
+                className="text-gray-500 hover:text-red-400 transition-colors p-1 rounded hover:bg-opacity-10 hover:bg-black"
                 title="Close Dock (closes all docked tabs)"
              >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -235,15 +256,11 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
           </div>
 
           {/* Tab Bar */}
-          <div className="flex items-center bg-gray-800 border-b border-gray-700 overflow-x-auto scrollbar-hide h-10">
+          <div className={`flex overflow-x-auto border-b w-full ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
             {dockedPanels.map(panel => (
               <div
                 key={panel.id}
-                className={`group relative flex items-center h-full px-4 py-2 cursor-pointer select-none border-r border-gray-700 min-w-[100px] transition-colors ${
-                  panel.id === activeDockedId 
-                    ? 'bg-gray-800 text-blue-400 border-t-2 border-t-blue-400' 
-                    : 'text-gray-400 hover:bg-gray-700 hover:text-gray-200 bg-gray-900/50'
-                }`}
+                className={`group relative flex items-center h-10 px-4 py-2 cursor-pointer select-none border-r min-w-[100px] flex-shrink-0 transition-colors ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} ${tabClass(panel.id === activeDockedId)}`}
                 onMouseDown={(e) => handleMouseDown(e, panel.id, 'tab-detach')}
                 title="Click to activate, Drag to detach"
               >
@@ -264,7 +281,7 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
           </div>
 
           {/* Content */}
-          <div className="flex-grow overflow-hidden relative bg-gray-800">
+          <div className={`flex-grow overflow-hidden relative ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
             {dockedPanels.map(panel => (
                 <div 
                     key={panel.id} 
@@ -287,7 +304,7 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
           <div
             key={panel.id}
             data-testid={`panel-${panel.id}`}
-            className="fixed flex flex-col bg-gray-800 border border-gray-600 rounded-lg shadow-2xl overflow-hidden"
+            className={`fixed flex flex-col border rounded-lg shadow-2xl overflow-hidden ${containerClass}`}
             style={{
               left: layout.x,
               top: layout.y,
@@ -299,10 +316,10 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
           >
             {/* Floating Header */}
             <div
-              className="flex items-center justify-between h-8 px-2 bg-gray-900 border-b border-gray-700 cursor-move select-none"
+              className={`flex items-center justify-between h-8 px-2 border-b cursor-move select-none ${headerClass}`}
               onMouseDown={(e) => handleMouseDown(e, panel.id, 'move')}
             >
-              <div className="flex items-center space-x-2 text-gray-300">
+              <div className={`flex items-center space-x-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                 <span className="scale-75 opacity-70">{panel.icon}</span>
                 <span className="text-xs font-bold">{panel.title}</span>
               </div>
@@ -312,7 +329,7 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
                 <button
                   onClick={() => handleDock(panel.id)}
                   title="Unpin (Dock back to tabs)"
-                  className="text-blue-400 hover:text-blue-300 p-1 rounded hover:bg-gray-700 transition-colors"
+                  className="text-blue-400 hover:text-blue-300 p-1 rounded hover:bg-opacity-10 hover:bg-black transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 transform rotate-45" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
@@ -322,17 +339,17 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
                 <button
                   onClick={panel.onToggle}
                   title="Close"
-                  className="text-gray-500 hover:text-red-400 p-1 rounded hover:bg-gray-700 transition-colors"
+                  className="text-gray-500 hover:text-red-400 p-1 rounded hover:bg-opacity-10 hover:bg-black transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
                 </button>
               </div>
             </div>
 
             {/* Content */}
-            <div className="flex-grow overflow-hidden relative bg-gray-800">
+            <div className={`flex-grow overflow-hidden relative ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
                 {panel.content}
             </div>
 

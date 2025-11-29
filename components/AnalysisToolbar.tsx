@@ -13,6 +13,7 @@ interface AnalysisToolbarProps {
   isSimulationMode: boolean;
   onToggleSimulation: () => void;
   onResetSimulation: () => void;
+  isDarkMode: boolean;
 }
 
 const ANALYSIS_CATEGORIES = [
@@ -24,7 +25,7 @@ const ANALYSIS_CATEGORIES = [
     { id: 'articulation', label: 'Articulations', tag: 'Articulation', color: 'bg-yellow-300', borderColor: 'border-yellow-300', textColor: 'text-yellow-900', hex: '#fcd34d' }
 ];
 
-const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationships, onBulkTag, onHighlight, onFilter, isCollapsed, onToggle, isSimulationMode, onToggleSimulation, onResetSimulation }) => {
+const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationships, onBulkTag, onHighlight, onFilter, isCollapsed, onToggle, isSimulationMode, onToggleSimulation, onResetSimulation, isDarkMode }) => {
   const [actionType, setActionType] = useState<'tag' | 'highlight' | 'hide' | 'hide_others'>('highlight');
   const [activeCategoryIds, setActiveCategoryIds] = useState<Set<string>>(new Set());
 
@@ -214,49 +215,60 @@ const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationshi
       // The useEffect will clear filters/highlights automatically when activeCategoryIds becomes empty
   };
 
+  // Styles
+  const bgClass = isDarkMode ? 'bg-gray-800 bg-opacity-90 border-gray-600' : 'bg-white bg-opacity-95 border-gray-200';
+  const buttonBgClass = isDarkMode ? 'bg-gray-700 hover:bg-gray-600 border-gray-600 text-purple-400' : 'bg-white hover:bg-gray-50 border-gray-200 text-purple-600';
+  const contentBgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const labelClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  const valueClass = isDarkMode ? 'text-white' : 'text-gray-800';
+  const buttonResetBg = isDarkMode ? 'bg-gray-700 hover:bg-gray-600 border-gray-600 text-gray-300 hover:text-white' : 'bg-white hover:bg-gray-100 border-gray-300 text-gray-600 hover:text-black';
+  const selectBg = isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800';
+  const toggleBtnInactive = isDarkMode ? 'bg-gray-700 border-gray-600 hover:bg-gray-600' : 'bg-white border-gray-300 hover:bg-gray-100';
+  const toggleBtnTextInactive = isDarkMode ? 'text-gray-300' : 'text-gray-600';
+
   return (
     <div className="flex flex-col gap-2 pointer-events-none transition-all duration-300">
-        <div className="flex items-stretch gap-0 bg-gray-800 bg-opacity-90 rounded-lg border border-gray-600 shadow-lg pointer-events-auto overflow-hidden">
+        <div className={`flex items-stretch gap-0 rounded-lg border shadow-lg pointer-events-auto overflow-hidden ${bgClass}`}>
             {/* Collapse Toggle */}
             <button 
                 onClick={onToggle}
-                className="bg-gray-700 hover:bg-gray-600 border-r border-gray-600 w-20 flex flex-col items-center justify-center transition-colors h-20 flex-shrink-0 gap-1"
+                className={`border-r w-20 flex flex-col items-center justify-center transition-colors h-20 flex-shrink-0 gap-1 ${buttonBgClass}`}
                 title={isCollapsed ? "Expand Graph Analysis" : "Collapse Graph Analysis"}
             >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
-                <span className="text-[10px] font-bold tracking-wider uppercase">ANALYSIS</span>
+                <span className={`text-[10px] font-bold tracking-wider uppercase ${isDarkMode ? 'text-gray-300' : 'text-gray-500'}`}>ANALYSIS</span>
             </button>
 
              {/* Expanded Content */}
              {!isCollapsed && (
-                <div className="flex items-center gap-4 p-3 animate-fade-in bg-gray-800 h-20">
+                <div className={`flex items-center gap-4 p-3 animate-fade-in h-20 ${contentBgClass}`}>
                     {/* Stats List */}
-                    <div className="flex flex-col justify-center space-y-1 min-w-[110px] h-full border-r border-gray-600 pr-4">
+                    <div className={`flex flex-col justify-center space-y-1 min-w-[110px] h-full border-r pr-4 ${isDarkMode ? 'border-gray-600' : 'border-gray-200'}`}>
                         <div className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-gray-400 tracking-wider text-[10px]">NODES</span>
-                            <span className="font-mono text-white font-bold">{stats.nodeCount}</span>
+                            <span className={`font-bold tracking-wider text-[10px] ${labelClass}`}>NODES</span>
+                            <span className={`font-mono font-bold ${valueClass}`}>{stats.nodeCount}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-gray-400 tracking-wider text-[10px]">LINKS</span>
-                            <span className="font-mono text-white font-bold">{stats.relCount}</span>
+                            <span className={`font-bold tracking-wider text-[10px] ${labelClass}`}>LINKS</span>
+                            <span className={`font-mono font-bold ${valueClass}`}>{stats.relCount}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs">
-                            <span className="font-bold text-gray-400 tracking-wider text-[10px] whitespace-nowrap">AVG CONN</span>
-                            <span className="font-mono text-white font-bold">{stats.avgRels}</span>
+                            <span className={`font-bold tracking-wider text-[10px] whitespace-nowrap ${labelClass}`}>AVG CONN</span>
+                            <span className={`font-mono font-bold ${valueClass}`}>{stats.avgRels}</span>
                         </div>
                     </div>
 
                     {/* Simulation Section */}
-                    <div className="flex flex-col justify-center h-full px-2 border-r border-gray-600 pr-4">
-                        <span className="text-[10px] font-bold uppercase tracking-wider mb-2 text-blue-400">
+                    <div className={`flex flex-col justify-center h-full px-2 border-r pr-4 ${isDarkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider mb-2 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`}>
                             SIMULATION
                         </span>
                         <div className="flex gap-2 items-center">
                             <button 
                                 onClick={onToggleSimulation}
-                                className={`text-xs px-3 py-1.5 rounded border transition-colors flex items-center gap-2 font-bold ${isSimulationMode ? 'bg-blue-600 border-blue-500 text-white' : 'bg-gray-700 border-gray-600 text-gray-300 hover:text-white'}`}
+                                className={`text-xs px-3 py-1.5 rounded border transition-colors flex items-center gap-2 font-bold ${isSimulationMode ? 'bg-blue-600 border-blue-500 text-white' : `${toggleBtnInactive} ${toggleBtnTextInactive}`}`}
                                 title="Toggle Impact Simulation Mode"
                             >
                                 {isSimulationMode ? (
@@ -272,7 +284,7 @@ const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationshi
                             {isSimulationMode && (
                                 <button 
                                     onClick={onResetSimulation}
-                                    className="bg-gray-700 hover:bg-gray-600 text-xs px-2 py-1.5 rounded border border-gray-600 transition-colors text-gray-300 hover:text-white"
+                                    className={`text-xs px-2 py-1.5 rounded border transition-colors ${buttonResetBg}`}
                                     title="Reset Simulation"
                                 >
                                     Reset
@@ -284,14 +296,14 @@ const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationshi
                     {/* Actions Section */}
                     <div className="flex flex-col justify-center h-full pl-2">
                         <div className="flex items-center justify-between mb-2 gap-2">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                            <span className={`text-[10px] font-bold uppercase tracking-wider ${labelClass}`}>
                                 ACTIONS
                             </span>
                             <div className="flex items-center gap-2">
                                 <select 
                                     value={actionType}
                                     onChange={(e) => setActionType(e.target.value as 'tag' | 'highlight' | 'hide' | 'hide_others')}
-                                    className="bg-gray-900 border border-gray-600 text-[10px] text-white rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 uppercase font-bold max-w-[100px]"
+                                    className={`border text-[10px] rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 uppercase font-bold max-w-[100px] ${selectBg}`}
                                 >
                                     <option value="highlight">Highlight</option>
                                     <option value="tag">Tag</option>
@@ -300,7 +312,7 @@ const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationshi
                                 </select>
                                 <button 
                                     onClick={handleReset}
-                                    className="text-[10px] bg-gray-700 hover:bg-gray-600 border border-gray-600 text-gray-300 px-2 py-0.5 rounded hover:text-white transition-colors"
+                                    className={`text-[10px] border px-2 py-0.5 rounded transition-colors ${buttonResetBg}`}
                                     title={`Reset ${actionType}`}
                                 >
                                     Reset
@@ -319,13 +331,13 @@ const AnalysisToolbar: React.FC<AnalysisToolbarProps> = ({ elements, relationshi
                                         onClick={() => handleToggleCategory(cat.id, cat.tag)}
                                         className={`text-xs px-3 py-1.5 rounded border transition-all flex items-center gap-2 ${
                                             isActive 
-                                            ? `bg-gray-800 ${cat.borderColor} border-2 shadow-[0_0_10px_rgba(0,0,0,0.3)]` 
-                                            : 'bg-gray-700 border-gray-600 hover:bg-gray-600 hover:border-gray-500'
+                                            ? `${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'} ${cat.borderColor} border-2 shadow-[0_0_10px_rgba(0,0,0,0.1)]` 
+                                            : `${toggleBtnInactive}`
                                         }`}
                                         title={`Toggle ${cat.label} (${count})`}
                                     >
                                         <span className={`w-2 h-2 rounded-full ${cat.color}`}></span>
-                                        <span className={`font-semibold ${isActive ? 'text-white' : 'text-gray-300'}`}>
+                                        <span className={`font-semibold ${isActive ? (isDarkMode ? 'text-white' : 'text-gray-900') : toggleBtnTextInactive}`}>
                                             {cat.label} ({count})
                                         </span>
                                     </button>

@@ -27,6 +27,7 @@ interface GraphCanvasProps {
   isBulkEditActive: boolean;
   simulationState?: Record<string, SimulationNodeState>;
   analysisHighlights?: Map<string, string>;
+  isDarkMode?: boolean;
 }
 
 export interface GraphCanvasRef {
@@ -34,6 +35,7 @@ export interface GraphCanvasRef {
   zoomToFit: () => void;
   getCamera: () => { x: number; y: number; k: number };
   setCamera: (x: number, y: number, k: number) => void;
+  exportAsImage: (filename: string, bgColor: string) => void;
 }
 
 /**
@@ -245,7 +247,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   onJiggleTrigger,
   isBulkEditActive,
   simulationState,
-  analysisHighlights
+  analysisHighlights,
+  isDarkMode = true
 }, ref) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
@@ -322,6 +325,54 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         if (!svgRef.current || !zoomRef.current) return;
         const svg = d3.select(svgRef.current);
         svg.transition().duration(750).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(x, y).scale(k));
+    },
+    exportAsImage: (filename: string, bgColor: string = '#ffffff') => {
+        if (!svgRef.current) return;
+        
+        const svg = svgRef.current;
+        const serializer = new XMLSerializer();
+        let source = serializer.serializeToString(svg);
+        
+        // Namespace fix
+        if(!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
+            source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+        }
+        if(!source.match(/^<svg[^>]+xmlns:xlink/)){
+            source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
+        }
+        
+        // Fix for foreignObject issues in some browsers (ensure XHTML namespace)
+        source = source.replace(/<foreignObject/g, '<foreignObject xmlns="http://www.w3.org/2000/svg"');
+
+        const svgBlob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
+        const url = URL.createObjectURL(svgBlob);
+        
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement("canvas");
+            const rect = svg.getBoundingClientRect();
+            const scale = 2; // Higher resolution
+            canvas.width = rect.width * scale;
+            canvas.height = rect.height * scale;
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+                // Background
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                // Draw
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // Download
+                const a = document.createElement('a');
+                a.download = filename;
+                a.href = canvas.toDataURL("image/png");
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+            URL.revokeObjectURL(url);
+        };
+        img.src = url;
     }
   }));
 
@@ -446,15 +497,20 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
 
     simulation.nodes(d3Nodes);
     
+    // Theme Colors
+    const linkColor = isDarkMode ? '#6b7280' : '#4b5563'; // gray-500 : gray-600
+    const textFillColor = isDarkMode ? '#9ca3af' : '#374151'; // gray-400 : gray-700
+    const selectedLinkColor = '#60a5fa'; // blue-400
+
     const link = linkGroup.selectAll<SVGPathElement, D3Link>('.link')
       .data(d3Links, d => d.id)
       .join('path')
       .attr('class', 'link')
-      .attr('stroke', d => (d.id === selectedRelationshipId ? '#60a5fa' : '#6b7280'))
+      .attr('stroke', d => (d.id === selectedRelationshipId ? selectedLinkColor : linkColor))
       .attr('stroke-width', d => (d.id === selectedRelationshipId ? 3 : 2))
       .attr('fill', 'none')
-      .attr('marker-end', d => (d.direction === RelationshipDirection.To ? 'url(#arrow)' : null))
-      .attr('marker-start', d => (d.direction === RelationshipDirection.From ? 'url(#arrow-rev)' : null))
+      .attr('marker-end', d => (d.direction === RelationshipDirection.To ? (isDarkMode ? 'url(#arrow)' : 'url(#arrow-light)') : null))
+      .attr('marker-start', d => (d.direction === RelationshipDirection.From ? (isDarkMode ? 'url(#arrow-rev)' : 'url(#arrow-rev-light)') : null))
       .style('transition', 'opacity 0.3s ease, stroke 0.2s ease, stroke-width 0.2s ease')
       .attr('opacity', l => {
         if (focusMode === 'narrow') return 1.0;
@@ -503,7 +559,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       })
       .style('cursor', 'pointer')
       .style('transition', 'opacity 0.3s ease')
-      .style('fill', d => (d.id === selectedRelationshipId ? '#60a5fa' : '#9ca3af'))
+      .style('fill', d => (d.id === selectedRelationshipId ? selectedLinkColor : textFillColor))
       .attr('opacity', l => {
         if (focusMode === 'narrow') return 1.0;
         if (multiSelection.size === 0 && !selectedElementId && !selectedRelationshipId) return 1.0;
@@ -713,10 +769,10 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         }
       });
 
-  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, multiSelection, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState, analysisHighlights]);
+  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, multiSelection, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState, analysisHighlights, isDarkMode]);
 
   return (
-    <div className="w-full h-full flex-grow bg-gray-900 cursor-grab active:cursor-grabbing" onContextMenu={handleCanvasContextMenu}>
+    <div className={`w-full h-full flex-grow cursor-grab active:cursor-grabbing ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`} onContextMenu={handleCanvasContextMenu}>
       <svg ref={svgRef} className="w-full h-full">
         <defs>
           <marker
@@ -739,6 +795,28 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
             orient="auto">
             <path d="M10,-5L0,0L10,5" fill="#6b7280"></path>
           </marker>
+          {/* Light Mode Markers */}
+          <marker
+            id="arrow-light"
+            viewBox="0 -5 10 10"
+            refX={10}
+            refY={0}
+            markerWidth={6}
+            markerHeight={6}
+            orient="auto">
+            <path d="M0,-5L10,0L0,5" fill="#4b5563"></path>
+          </marker>
+          <marker
+            id="arrow-rev-light"
+            viewBox="0 -5 10 10"
+            refX={0}
+            refY={0}
+            markerWidth={6}
+            markerHeight={6}
+            orient="auto">
+            <path d="M10,-5L0,0L10,5" fill="#4b5563"></path>
+          </marker>
+
           <filter id="glow-green" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
             <feMerge>

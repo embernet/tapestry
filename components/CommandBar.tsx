@@ -6,9 +6,10 @@ interface CommandBarProps {
   isCollapsed?: boolean;
   onToggle?: () => void;
   onOpenHistory?: () => void;
+  isDarkMode: boolean;
 }
 
-const CommandBar: React.FC<CommandBarProps> = ({ onExecute, isCollapsed, onToggle, onOpenHistory }) => {
+const CommandBar: React.FC<CommandBarProps> = ({ onExecute, isCollapsed, onToggle, onOpenHistory, isDarkMode }) => {
   const [internalCollapsed, setInternalCollapsed] = useState(true);
   const [input, setInput] = useState('');
 
@@ -33,25 +34,33 @@ const CommandBar: React.FC<CommandBarProps> = ({ onExecute, isCollapsed, onToggl
     }
   };
 
+  const bgClass = isDarkMode ? 'bg-gray-800 bg-opacity-90 border-gray-600' : 'bg-white bg-opacity-95 border-gray-200';
+  const controlBgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const buttonBgClass = isDarkMode ? 'bg-gray-700 hover:bg-gray-600 border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-200';
+  const inputBgClass = isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-gray-50 border-gray-300 text-gray-900';
+  const textMain = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+  const textSub = isDarkMode ? 'text-gray-500' : 'text-gray-400';
+  const iconButtonBg = isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white' : 'bg-white hover:bg-gray-100 text-gray-600 hover:text-black border border-gray-300';
+
   return (
     <div className="flex flex-col gap-2 pointer-events-none transition-all duration-300">
-      <div className="flex items-stretch gap-0 bg-gray-800 bg-opacity-90 rounded-lg border border-gray-600 shadow-lg pointer-events-auto overflow-hidden">
+      <div className={`flex items-stretch gap-0 rounded-lg border shadow-lg pointer-events-auto overflow-hidden ${bgClass}`}>
         {/* Toggle Button */}
         <button 
             onClick={handleToggle}
-            className="bg-gray-700 hover:bg-gray-600 border-r border-gray-600 w-20 flex flex-col items-center justify-center transition-colors h-20 flex-shrink-0 gap-1"
+            className={`border-r w-20 flex flex-col items-center justify-center transition-colors h-20 flex-shrink-0 gap-1 ${buttonBgClass}`}
             title={collapsed ? "Open Command Bar" : "Collapse Command Bar"}
         >
              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
-            {collapsed && <span className="text-[10px] text-gray-400 font-bold tracking-wider">CMD</span>}
+            {collapsed && <span className={`text-[10px] font-bold tracking-wider ${textMain}`}>CMD</span>}
         </button>
 
         {!collapsed && (
-            <div className="flex items-center p-3 animate-fade-in bg-gray-800 h-20">
+            <div className={`flex items-center p-3 animate-fade-in h-20 ${controlBgClass}`}>
                 <div className="flex flex-col w-80 h-full justify-center">
-                    <label className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">
+                    <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${textMain}`}>
                         Quick Add (Markdown)
                     </label>
                     <textarea
@@ -59,10 +68,10 @@ const CommandBar: React.FC<CommandBarProps> = ({ onExecute, isCollapsed, onToggl
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="Element A -[relationship]> Element B; Element C"
-                        className="bg-gray-900 border border-gray-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none scrollbar-thin scrollbar-thumb-gray-600 flex-grow"
+                        className={`border rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none scrollbar-thin scrollbar-thumb-gray-600 flex-grow ${inputBgClass}`}
                         style={{ minHeight: '2.5rem' }}
                     />
-                    <div className="text-[9px] text-gray-500 mt-0.5 text-right">
+                    <div className={`text-[9px] mt-0.5 text-right ${textSub}`}>
                         Enter to run, Shift+Enter for newline
                     </div>
                 </div>
@@ -83,7 +92,7 @@ const CommandBar: React.FC<CommandBarProps> = ({ onExecute, isCollapsed, onToggl
                 {onOpenHistory && (
                     <button
                         onClick={onOpenHistory}
-                        className="ml-2 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white rounded self-center h-10 w-10 flex items-center justify-center shadow-lg transition-colors flex-shrink-0"
+                        className={`ml-2 rounded self-center h-10 w-10 flex items-center justify-center shadow-lg transition-colors flex-shrink-0 ${iconButtonBg}`}
                         title="Command History"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">

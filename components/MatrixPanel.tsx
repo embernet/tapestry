@@ -6,9 +6,10 @@ interface MatrixPanelProps {
   elements: Element[];
   relationships: Relationship[];
   onClose: () => void;
+  isDarkMode: boolean;
 }
 
-const MatrixPanel: React.FC<MatrixPanelProps> = ({ elements, relationships, onClose }) => {
+const MatrixPanel: React.FC<MatrixPanelProps> = ({ elements, relationships, onClose, isDarkMode }) => {
   const [hoveredCell, setHoveredCell] = useState<{ source: string, target: string } | null>(null);
 
   // Sort elements alphabetically for the matrix axes
@@ -25,16 +26,6 @@ const MatrixPanel: React.FC<MatrixPanelProps> = ({ elements, relationships, onCl
       
       map.get(rel.source as string)?.set(rel.target as string, rel);
       
-      // If bidirectional logic is needed, handle here. 
-      // For now, we strictly map Direction: 
-      // To: Source -> Target
-      // From: Target -> Source (so we map it inverse here for the matrix?)
-      // Actually, matrix usually shows directed edges. Row=Source, Col=Target.
-      
-      // If direction is From (Target -> Source), it essentially means Source <-- Target.
-      // In a Row=Source matrix, this link belongs in the cell (Target, Source).
-      // However, the data structure stores it as {source: A, target: B, direction: From}.
-      // Visually this is B -> A.
       if (rel.direction === 'FROM') {
           map.get(rel.target as string)?.set(rel.source as string, rel);
       } else if (rel.direction === 'NONE') {
@@ -49,20 +40,29 @@ const MatrixPanel: React.FC<MatrixPanelProps> = ({ elements, relationships, onCl
   const CELL_SIZE = 20;
   const PADDING = 100; // Space for labels
   
+  const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const borderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+  const labelTextClass = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+  const canvasBgClass = isDarkMode ? 'bg-gray-900' : 'bg-gray-50';
+  const selfCellClass = isDarkMode ? 'bg-gray-800' : 'bg-gray-200';
+  const emptyCellClass = isDarkMode ? 'bg-gray-900 hover:bg-gray-800' : 'bg-white hover:bg-gray-100';
+  const cellBorderClass = isDarkMode ? 'border-gray-800' : 'border-gray-100';
+
   return (
-    <div className="w-full h-full flex flex-col">
-        <div className="p-4 flex-shrink-0 flex justify-between items-center border-b border-gray-700">
-            <h2 className="text-xl font-bold text-white">Matrix View</h2>
-            <button onClick={onClose} className="text-gray-400 hover:text-white">
+    <div className={`w-full h-full flex flex-col ${bgClass}`}>
+        <div className={`p-4 flex-shrink-0 flex justify-between items-center border-b ${borderClass}`}>
+            <h2 className={`text-xl font-bold ${textClass}`}>Matrix View</h2>
+            <button onClick={onClose} className={`${labelTextClass} hover:text-blue-500`}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
         </div>
         
-        <div className="flex-grow overflow-auto bg-gray-900 p-4 relative">
+        <div className={`flex-grow overflow-auto p-4 relative ${canvasBgClass}`}>
             {elements.length === 0 ? (
-                <p className="text-gray-500">No elements to display.</p>
+                <p className={labelTextClass}>No elements to display.</p>
             ) : (
                 <div style={{ 
                     position: 'relative', 
@@ -73,7 +73,7 @@ const MatrixPanel: React.FC<MatrixPanelProps> = ({ elements, relationships, onCl
                     {sortedElements.map((el, i) => (
                         <div 
                             key={`col-${el.id}`}
-                            className="absolute origin-bottom-left transform -rotate-45 text-xs text-gray-400 whitespace-nowrap"
+                            className={`absolute origin-bottom-left transform -rotate-45 text-xs whitespace-nowrap ${labelTextClass}`}
                             style={{ 
                                 left: PADDING + i * CELL_SIZE + 12, 
                                 top: PADDING - 5,
@@ -89,7 +89,7 @@ const MatrixPanel: React.FC<MatrixPanelProps> = ({ elements, relationships, onCl
                         <React.Fragment key={`row-${rowEl.id}`}>
                             {/* Row Header */}
                             <div 
-                                className="absolute text-xs text-gray-400 text-right whitespace-nowrap overflow-hidden"
+                                className={`absolute text-xs text-right whitespace-nowrap overflow-hidden ${labelTextClass}`}
                                 style={{ 
                                     left: 0, 
                                     top: PADDING + i * CELL_SIZE, 
@@ -113,10 +113,10 @@ const MatrixPanel: React.FC<MatrixPanelProps> = ({ elements, relationships, onCl
                                         key={`${rowEl.id}-${colEl.id}`}
                                         onMouseEnter={() => setHoveredCell({ source: rowEl.id, target: colEl.id })}
                                         onMouseLeave={() => setHoveredCell(null)}
-                                        className={`absolute border border-gray-800 transition-colors ${
-                                            isSelf ? 'bg-gray-800' : 
+                                        className={`absolute border ${cellBorderClass} transition-colors ${
+                                            isSelf ? selfCellClass : 
                                             rel ? 'bg-blue-500 hover:bg-blue-400' : 
-                                            'bg-gray-900 hover:bg-gray-800'
+                                            emptyCellClass
                                         }`}
                                         style={{
                                             left: PADDING + j * CELL_SIZE,
