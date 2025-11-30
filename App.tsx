@@ -44,6 +44,7 @@ import { usePersistence } from './hooks/usePersistence';
 import MiningToolbar from './components/MiningToolbar';
 import MiningModal from './components/MiningModal';
 import { GuidancePanel } from './components/GuidancePanel';
+import SearchToolbar from './components/SearchToolbar';
 
 // Explicitly define coordinate type to fix type inference issues
 type Coords = { x: number; y: number };
@@ -277,10 +278,10 @@ export default function App() {
   }, [detachedHistoryIds, panelZIndex]);
 
   // --- Tool Handlers ---
-  const handleTrizToolSelect = (tool: TrizToolType) => { tools.setActiveTrizTool(tool); tools.setIsTrizModalOpen(true); tools.setTrizInitialParams(null); };
-  const handleLssToolSelect = (tool: LssToolType) => { tools.setActiveLssTool(tool); tools.setIsLssModalOpen(true); tools.setLssInitialParams(null); };
-  const handleTocToolSelect = (tool: TocToolType) => { tools.setActiveTocTool(tool); tools.setIsTocModalOpen(true); tools.setTocInitialParams(null); };
-  const handleSsmToolSelect = (tool: SsmToolType) => { tools.setActiveSsmTool(tool); tools.setIsSsmModalOpen(true); tools.setSsmInitialParams(null); };
+  const handleTrizToolSelect = (tool: TrizToolType) => { tools.setActiveTrizTool(tool); tools.setIsTrizModalOpen(true); tools.setTrizInitialParams(null); tools.setActiveTool(null); };
+  const handleLssToolSelect = (tool: LssToolType) => { tools.setActiveLssTool(tool); tools.setIsLssModalOpen(true); tools.setLssInitialParams(null); tools.setActiveTool(null); };
+  const handleTocToolSelect = (tool: TocToolType) => { tools.setActiveTocTool(tool); tools.setIsTocModalOpen(true); tools.setTocInitialParams(null); tools.setActiveTool(null); };
+  const handleSsmToolSelect = (tool: SsmToolType) => { tools.setActiveSsmTool(tool); tools.setIsSsmModalOpen(true); tools.setSsmInitialParams(null); tools.setActiveTool(null); };
   const handleExplorerToolSelect = (tool: ExplorerToolType) => {
       if (tool === 'treemap') panelState.setIsTreemapPanelOpen(prev => !prev);
       if (tool === 'tags') panelState.setIsTagDistPanelOpen(prev => !prev);
@@ -296,22 +297,11 @@ export default function App() {
       if (tool === 'nodes') panelState.setIsInfluenceCloudOpen(prev => !prev);
       if (tool === 'words') panelState.setIsTextAnalysisOpen(prev => !prev);
       if (tool === 'full_text') panelState.setIsFullTextAnalysisOpen(prev => !prev);
+      tools.setActiveTool(null);
   };
   const handleSwotToolSelect = (tool: SwotToolType) => { tools.setActiveSwotTool(tool); tools.setSwotInitialDoc(null); tools.setIsSwotModalOpen(true); tools.setActiveTool(null); };
-  const handleMermaidToolSelect = (tool: MermaidToolType) => { if (tool === 'editor') panelState.setIsMermaidPanelOpen(true); };
+  const handleMermaidToolSelect = (tool: MermaidToolType) => { if (tool === 'editor') panelState.setIsMermaidPanelOpen(true); tools.setActiveTool(null); };
   const handleMiningToolSelect = () => { setIsMiningModalOpen(true); tools.setActiveTool(null); };
-
-  // --- Guidance Logic ---
-  // Design Decision: Guidance panel is rendered separately and floats on the LEFT side to allow 
-  // users to see it simultaneously with the tool/canvas content on the right.
-  const handleOpenGuidance = useCallback((toolId: string) => {
-      const doc = TOOL_DOCUMENTATION.find(t => t.id === toolId);
-      if (doc) {
-          panelState.setGuidanceContent(doc.guidance);
-          panelState.setIsGuidancePanelOpen(true);
-          // Note: No panel layout logic needed here as it is fixed positioned in render
-      }
-  }, [panelState]);
 
   useEffect(() => { if (tools.activeTool !== 'bulk') { setIsBulkEditActive(false); } }, [tools.activeTool]);
 
@@ -431,6 +421,8 @@ export default function App() {
             return; 
         }
         else if (doc.type === 'scamper-analysis') { tools.setActiveTool('scamper'); tools.setScamperInitialDoc(doc); tools.setIsScamperModalOpen(true); return; }
+        else if (doc.type === 'triz-analysis') { tools.setActiveTool('triz'); tools.setTrizInitialParams(null); tools.setIsTrizModalOpen(true); return; } // Note: TRIZ modal doesn't currently fully support loading doc content like SWOT does, but can be extended. For now this opens the tool.
+        
         if (!openDocIds.includes(docId)) { setOpenDocIds(prev => [...prev, docId]); }
         if (origin === 'report') { 
             const reportLayout = panelLayouts['report']; 
@@ -552,6 +544,40 @@ export default function App() {
   const handleRejectLayout = () => { if (originalElements) { setElements(originalElements); } setIsPhysicsModeActive(false); setOriginalElements(null); };
   const handleScaleLayout = useCallback((factor: number) => { if (isPhysicsModeActive) return; setElements(prev => { if (prev.length === 0) return prev; const xs = prev.map(e => e.x || 0); const ys = prev.map(e => e.y || 0); const avgX = xs.reduce((a,b) => a+b, 0) / prev.length; const avgY = ys.reduce((a,b) => a+b, 0) / prev.length; return prev.map(e => { const x = e.x || 0; const y = e.y || 0; const dx = x - avgX; const dy = y - avgY; const newX = avgX + dx * factor; const newY = avgY + dy * factor; return { ...e, x: newX, y: newY, fx: newX, fy: newY, updatedAt: new Date().toISOString() }; }); }); }, [isPhysicsModeActive]);
   const handleZoomToFit = () => { graphCanvasRef.current?.zoomToFit(); };
+
+  // --- Search Handlers ---
+  const handleSearch = useCallback((matchIds: Set<string>) => {
+      const map = new Map<string, string>();
+      // Use Neon Green for match highlights
+      matchIds.forEach(id => map.set(id, '#00ff00')); 
+      setAnalysisHighlights(map);
+  }, []);
+
+  const [searchInitialCamera, setSearchInitialCamera] = useState<{x: number, y: number, k: number} | null>(null);
+
+  useEffect(() => {
+      if (tools.activeTool === 'search' && graphCanvasRef.current) {
+          setSearchInitialCamera(graphCanvasRef.current.getCamera());
+      }
+  }, [tools.activeTool]);
+
+  const handleSearchReset = useCallback(() => {
+      if (searchInitialCamera && graphCanvasRef.current) {
+          graphCanvasRef.current.setCamera(searchInitialCamera.x, searchInitialCamera.y, searchInitialCamera.k);
+      }
+      setAnalysisHighlights(new Map());
+  }, [searchInitialCamera]);
+
+  const handleFocusSingle = useCallback((elementId: string) => {
+      // Simulate click to open panel
+      handleNodeClick(elementId, new MouseEvent('click'));
+      
+      // Center camera
+      const element = elements.find(e => e.id === elementId);
+      if (element && element.x !== undefined && element.y !== undefined && graphCanvasRef.current) {
+          graphCanvasRef.current.setCamera(-element.x + window.innerWidth/2, -element.y + window.innerHeight/2, 1.5);
+      }
+  }, [elements, handleNodeClick]);
 
   // --- Presentation Handlers ---
   const handleCaptureSlide = () => { const camera = graphCanvasRef.current?.getCamera() || { x: 0, y: 0, k: 1 }; const newSlide: StorySlide = { id: generateUUID(), title: `Slide ${slides.length + 1}`, description: '', camera, selectedElementId: selectedElementId }; setSlides(prev => [...prev, newSlide]); };
@@ -766,17 +792,55 @@ export default function App() {
                      <div className="relative w-8 h-8"><svg xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-8 h-8 text-blue-400 transform -rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.9 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg></div>
                      <span className={`text-[10px] font-bold tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>TOOLS</span>
                 </button>
+                <SearchToolbar 
+                    elements={elements} 
+                    onSearch={handleSearch} 
+                    onFocusSingle={handleFocusSingle} 
+                    isCollapsed={tools.activeTool !== 'search'} 
+                    onToggle={() => tools.toggleTool('search')} 
+                    isDarkMode={isDarkMode} 
+                    onReset={handleSearchReset}
+                />
                 <SchemaToolbar schemes={colorSchemes} activeSchemeId={activeSchemeId} onSchemeChange={setActiveSchemeId} activeColorScheme={activeColorScheme} onDefaultRelationshipChange={handleUpdateDefaultRelationship} defaultTags={defaultTags} onDefaultTagsChange={setDefaultTags} elements={elements} isCollapsed={tools.activeTool !== 'schema'} onToggle={() => tools.toggleTool('schema')} onUpdateSchemes={(newSchemes) => setColorSchemes(newSchemes)} isDarkMode={isDarkMode} />
                 <LayoutToolbar linkDistance={layoutParams.linkDistance} repulsion={layoutParams.repulsion} onLinkDistanceChange={(val) => setLayoutParams(p => ({...p, linkDistance: val}))} onRepulsionChange={(val) => setLayoutParams(p => ({...p, repulsion: val}))} onJiggle={() => setJiggleTrigger(prev => prev + 1)} onZoomToFit={handleZoomToFit} isPhysicsActive={isPhysicsModeActive} onStartAutoLayout={handleStartPhysicsLayout} onAcceptAutoLayout={handleAcceptLayout} onRejectAutoLayout={handleRejectLayout} onExpand={() => handleScaleLayout(1.1)} onContract={() => handleScaleLayout(0.9)} isCollapsed={tools.activeTool !== 'layout'} onToggle={() => tools.toggleTool('layout')} isDarkMode={isDarkMode} />
                 <AnalysisToolbar elements={elements} relationships={relationships} onBulkTag={handleBulkTagAction} onHighlight={handleAnalysisHighlight} onFilter={handleAnalysisFilter} isCollapsed={tools.activeTool !== 'analysis'} onToggle={() => tools.toggleTool('analysis')} isSimulationMode={isSimulationMode} onToggleSimulation={() => setIsSimulationMode(p => !p)} onResetSimulation={() => setSimulationState({})} isDarkMode={isDarkMode} />
-                <ScamperToolbar selectedElementId={selectedElementId} onScamper={(operator, letter) => { tools.setScamperInitialDoc(null); tools.setScamperTrigger({ operator, letter }); tools.setIsScamperModalOpen(true); }} isCollapsed={tools.activeTool !== 'scamper'} onToggle={() => tools.toggleTool('scamper')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
-                <TrizToolbar activeTool={tools.activeTrizTool} onSelectTool={handleTrizToolSelect} isCollapsed={tools.activeTool !== 'triz'} onToggle={() => tools.toggleTool('triz')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
-                <LssToolbar activeTool={tools.activeLssTool} onSelectTool={handleLssToolSelect} isCollapsed={tools.activeTool !== 'lss'} onToggle={() => tools.toggleTool('lss')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
-                <TocToolbar activeTool={tools.activeTocTool} onSelectTool={handleTocToolSelect} isCollapsed={tools.activeTool !== 'toc'} onToggle={() => tools.toggleTool('toc')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
-                <SsmToolbar activeTool={tools.activeSsmTool} onSelectTool={handleSsmToolSelect} isCollapsed={tools.activeTool !== 'ssm'} onToggle={() => tools.toggleTool('ssm')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
+                <ScamperToolbar selectedElementId={selectedElementId} onScamper={(operator, letter) => { tools.setScamperInitialDoc(null); tools.setScamperTrigger({ operator, letter }); tools.setIsScamperModalOpen(true); tools.setActiveTool(null); }} isCollapsed={tools.activeTool !== 'scamper'} onToggle={() => tools.toggleTool('scamper')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
+                <TrizToolbar 
+                    activeTool={tools.activeTrizTool} 
+                    onSelectTool={(tool) => { handleTrizToolSelect(tool); tools.setActiveTool(null); }}
+                    isCollapsed={tools.activeTool !== 'triz'} 
+                    onToggle={() => tools.toggleTool('triz')} 
+                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
+                    isDarkMode={isDarkMode} 
+                    onOpenGuidance={() => tools.handleOpenGuidance('triz')}
+                />
+                <LssToolbar 
+                    activeTool={tools.activeLssTool} 
+                    onSelectTool={(tool) => { handleLssToolSelect(tool); tools.setActiveTool(null); }}
+                    isCollapsed={tools.activeTool !== 'lss'} 
+                    onToggle={() => tools.toggleTool('lss')} 
+                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
+                    isDarkMode={isDarkMode} 
+                />
+                <TocToolbar 
+                    activeTool={tools.activeTocTool} 
+                    onSelectTool={(tool) => { handleTocToolSelect(tool); tools.setActiveTool(null); }}
+                    isCollapsed={tools.activeTool !== 'toc'} 
+                    onToggle={() => tools.toggleTool('toc')} 
+                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
+                    isDarkMode={isDarkMode} 
+                />
+                <SsmToolbar 
+                    activeTool={tools.activeSsmTool} 
+                    onSelectTool={(tool) => { handleSsmToolSelect(tool); tools.setActiveTool(null); }}
+                    isCollapsed={tools.activeTool !== 'ssm'} 
+                    onToggle={() => tools.toggleTool('ssm')} 
+                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
+                    isDarkMode={isDarkMode} 
+                />
                 <SwotToolbar 
                     activeTool={tools.activeSwotTool} 
-                    onSelectTool={handleSwotToolSelect} 
+                    onSelectTool={(tool) => { handleSwotToolSelect(tool); tools.setActiveTool(null); }}
                     isCollapsed={tools.activeTool !== 'swot'} 
                     onToggle={() => tools.toggleTool('swot')} 
                     onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
@@ -784,18 +848,33 @@ export default function App() {
                     customStrategies={globalSettings.customStrategies} 
                     onOpenGuidance={() => tools.handleOpenGuidance('strategy')}
                 />
-                <ExplorerToolbar onSelectTool={handleExplorerToolSelect} isCollapsed={tools.activeTool !== 'explorer'} onToggle={() => tools.toggleTool('explorer')} isDarkMode={isDarkMode} />
+                <ExplorerToolbar 
+                    onSelectTool={(tool) => { handleExplorerToolSelect(tool); tools.setActiveTool(null); }}
+                    isCollapsed={tools.activeTool !== 'explorer'} 
+                    onToggle={() => tools.toggleTool('explorer')} 
+                    isDarkMode={isDarkMode} 
+                />
                 <TagCloudToolbar 
-                    onSelectTool={handleTagCloudToolSelect} 
+                    onSelectTool={(tool) => { handleTagCloudToolSelect(tool); tools.setActiveTool(null); }} 
                     isCollapsed={tools.activeTool !== 'tagcloud'} 
                     onToggle={() => tools.toggleTool('tagcloud')} 
                     isDarkMode={isDarkMode} 
                     onOpenGuidance={() => tools.handleOpenGuidance('wordcloud')}
                 />
-                <MermaidToolbar onSelectTool={handleMermaidToolSelect} isCollapsed={tools.activeTool !== 'mermaid'} onToggle={() => tools.toggleTool('mermaid')} isDarkMode={isDarkMode} />
+                <MermaidToolbar 
+                    onSelectTool={(tool) => { handleMermaidToolSelect(tool); tools.setActiveTool(null); }}
+                    isCollapsed={tools.activeTool !== 'mermaid'} 
+                    onToggle={() => tools.toggleTool('mermaid')} 
+                    isDarkMode={isDarkMode} 
+                />
                 <BulkEditToolbar activeColorScheme={activeColorScheme} tagsToAdd={bulkTagsToAdd} tagsToRemove={bulkTagsToRemove} onTagsToAddChange={setBulkTagsToAdd} onTagsToRemoveChange={setBulkTagsToRemove} isActive={isBulkEditActive} onToggleActive={() => setIsBulkEditActive(p => !p)} isCollapsed={tools.activeTool !== 'bulk'} onToggle={() => tools.toggleTool('bulk')} isDarkMode={isDarkMode} />
                 <CommandBar onExecute={handleCommandExecution} isCollapsed={tools.activeTool !== 'command'} onToggle={() => tools.toggleTool('command')} onOpenHistory={handleOpenCommandHistory} isDarkMode={isDarkMode} />
-                <MiningToolbar onSelectTool={handleMiningToolSelect} isCollapsed={tools.activeTool !== 'mining'} onToggle={() => tools.toggleTool('mining')} isDarkMode={isDarkMode} />
+                <MiningToolbar 
+                    onSelectTool={() => { handleMiningToolSelect(); tools.setActiveTool(null); }}
+                    isCollapsed={tools.activeTool !== 'mining'} 
+                    onToggle={() => tools.toggleTool('mining')} 
+                    isDarkMode={isDarkMode} 
+                />
             </div>
         </div>
       )}
@@ -847,7 +926,24 @@ export default function App() {
 
       <ChatPanel className={(!panelState.isChatPanelOpen || !persistence.currentModelId || isPresenting) ? 'hidden' : ''} isOpen={panelState.isChatPanelOpen} elements={elements} relationships={relationships} colorSchemes={colorSchemes} activeSchemeId={activeSchemeId} onClose={() => panelState.setIsChatPanelOpen(false)} currentModelId={persistence.currentModelId} modelActions={aiActions} onOpenPromptSettings={() => { setSettingsInitialTab('ai_prompts'); setIsSettingsModalOpen(true); }} systemPromptConfig={systemPromptConfig} documents={documents} folders={folders} openDocIds={openDocIds} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onOpenTool={tools.handleOpenTool} initialInput={chatDraftMessage} aiConfig={aiConfig} isDarkMode={isDarkMode} messages={chatMessages} setMessages={setChatMessages} />
       <ScamperModal isOpen={tools.isScamperModalOpen} onClose={() => tools.setIsScamperModalOpen(false)} elements={elements} relationships={relationships} selectedElementId={selectedElementId} modelActions={aiActions} triggerOp={tools.scamperTrigger} onClearTrigger={() => tools.setScamperTrigger(null)} documents={documents} folders={folders} onUpdateDocument={handleUpdateDocument} modelName={persistence.currentModelName} initialDoc={tools.scamperInitialDoc} onLogHistory={handleLogHistory} defaultTags={defaultTags} aiConfig={aiConfig} />
-      <TrizModal isOpen={tools.isTrizModalOpen} activeTool={tools.activeTrizTool} elements={elements} relationships={relationships} modelActions={aiActions} documents={documents} folders={folders} onUpdateDocument={handleUpdateDocument} initialParams={tools.trizInitialParams} onClose={() => tools.setIsTrizModalOpen(false)} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onAnalyze={handleAnalyzeWithChat} customPrompt={getToolPrompt('triz', tools.activeTrizTool)} aiConfig={aiConfig} />
+      <TrizModal 
+        isOpen={tools.isTrizModalOpen} 
+        activeTool={tools.activeTrizTool} 
+        elements={elements} 
+        relationships={relationships} 
+        modelActions={aiActions} 
+        documents={documents} 
+        folders={folders} 
+        onUpdateDocument={handleUpdateDocument} 
+        initialParams={tools.trizInitialParams} 
+        onClose={() => tools.setIsTrizModalOpen(false)} 
+        onLogHistory={handleLogHistory} 
+        onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} 
+        onAnalyze={handleAnalyzeWithChat} 
+        customPrompt={getToolPrompt('triz', tools.activeTrizTool)} 
+        aiConfig={aiConfig} 
+        onOpenGuidance={() => tools.handleOpenGuidance('triz-' + tools.activeTrizTool)}
+      />
       <LssModal isOpen={tools.isLssModalOpen} activeTool={tools.activeLssTool} elements={elements} relationships={relationships} modelActions={aiActions} documents={documents} folders={folders} onUpdateDocument={handleUpdateDocument} initialParams={tools.lssInitialParams} onClose={() => tools.setIsLssModalOpen(false)} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onAnalyze={handleAnalyzeWithChat} customPrompt={getToolPrompt('lss', tools.activeLssTool)} aiConfig={aiConfig} />
       <TocModal isOpen={tools.isTocModalOpen} activeTool={tools.activeTocTool} elements={elements} relationships={relationships} modelActions={aiActions} documents={documents} folders={folders} onUpdateDocument={handleUpdateDocument} initialParams={tools.tocInitialParams} onClose={() => tools.setIsTocModalOpen(false)} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onAnalyze={handleAnalyzeWithChat} customPrompt={getToolPrompt('toc', tools.activeTocTool)} aiConfig={aiConfig} />
       <SsmModal isOpen={tools.isSsmModalOpen} activeTool={tools.activeSsmTool} elements={elements} relationships={relationships} modelActions={aiActions} documents={documents} folders={folders} onUpdateDocument={handleUpdateDocument} initialParams={tools.ssmInitialParams} onClose={() => tools.setIsSsmModalOpen(false)} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onAnalyze={handleAnalyzeWithChat} customPrompt={getToolPrompt('ssm', tools.activeSsmTool)} aiConfig={aiConfig} />

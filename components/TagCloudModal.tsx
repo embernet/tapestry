@@ -25,6 +25,7 @@ type ViewState =
 interface CloudItem {
     id?: string;
     text: string;
+    originalText?: string;
     value: number;
     color: string;
     rotation: number;
@@ -220,7 +221,7 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
         }
 
         // Main views
-        let items = baseData.items;
+        let items: any[] = baseData.items;
         
         // Apply Transformation Map if not Original
         if (activeMode !== 'Original') {
@@ -228,7 +229,8 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
             if (map) {
                 items = items.map(item => ({
                     ...item,
-                    text: map[item.text] || item.text // Fallback to original if no mapping
+                    originalText: item.text,
+                    text: map[item.text] || item.text
                 }));
             }
         }
@@ -264,7 +266,9 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
             
             Words: ${JSON.stringify(wordsToTransform)}
             
-            Return a JSON object where the key is the original word and the value is the transformed word.
+            Return a JSON object containing an array of mappings.
+            Structure: { "mappings": [ { "original": "word", "transformed": "new_word" }, ... ] }
+            
             - Keep the casing consistent.
             - If a word cannot be transformed meaningfully, keep it as is.
             - "Related": contextually associated concepts.
@@ -272,12 +276,25 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
             - "Hypernyms": more general categories.
             - "Hyponyms": more specific examples.
             
-            Output strictly JSON: { "original": "transformed", ... }
+            Output valid JSON only.
             `;
 
+            // Safer schema: Array of objects avoids issues with weird characters in keys
             const responseSchema = {
                 type: Type.OBJECT,
-                additionalProperties: { type: Type.STRING }
+                properties: {
+                    mappings: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                original: { type: Type.STRING },
+                                transformed: { type: Type.STRING }
+                            },
+                            required: ["original", "transformed"]
+                        }
+                    }
+                }
             };
 
             const response = await callAI(
@@ -288,7 +305,34 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
                 responseSchema
             );
 
-            const mapping = JSON.parse(response.text || "{}");
+            let text = response.text || "{}";
+            // Strip markdown code blocks if present (common cause of JSON parse errors)
+            text = text.replace(/```json\n?|```/g, '').trim();
+
+            let result;
+            try {
+                result = JSON.parse(text);
+            } catch (parseError) {
+                console.warn("JSON Parse failed, attempting flexible fix", text);
+                throw parseError;
+            }
+            
+            const mapping: Record<string, string> = {};
+            if (result.mappings && Array.isArray(result.mappings)) {
+                result.mappings.forEach((m: any) => {
+                    if (m.original && m.transformed) {
+                        mapping[m.original] = m.transformed;
+                    }
+                });
+            } else {
+                // Fallback: Model might have ignored structure instructions but returned KV pairs
+                Object.keys(result).forEach(key => {
+                    if (typeof result[key] === 'string') {
+                        mapping[key] = result[key];
+                    }
+                });
+            }
+
             cachedTransformations.current[newMode] = mapping;
             setActiveMode(newMode);
 
@@ -301,11 +345,7 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
     };
 
     const handleTagClick = (tag: string) => {
-        // If transformed, we might need to map back or search by transformed? 
-        // For simplicity, we search by the *displayed* text if in transformed mode
-        // But logic expects original tag ID usually.
-        // If we are in transformed mode, drilling down might be inaccurate unless we map back.
-        // For now, let's treat the text as the tag key.
+        // Use original tag if available to ensure lookup works
         setViewStack([...viewStack, { type: 'elements_by_tag', tag }]);
     };
 
@@ -431,13 +471,13 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
                         displayedItems.items.map((item, idx) => (
                             <button
                                 key={`${item.text}-${idx}`}
-                                onClick={() => handleTagClick(item.text)}
+                                onClick={() => handleTagClick(item.originalText || item.text)}
                                 className={`hover:scale-110 transition-transform cursor-pointer ${item.color} font-bold leading-none opacity-90 hover:opacity-100`}
                                 style={{ 
                                     fontSize: getFontSize(item.value, displayedItems.max),
                                     transform: `rotate(${item.rotation}deg)` 
                                 }}
-                                title={`${item.value} elements`}
+                                title={`${item.value} elements${item.originalText ? ` (Original: ${item.originalText})` : ''}`}
                             >
                                 {item.text}
                             </button>
@@ -448,13 +488,13 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
                         displayedItems.items.map((item, idx) => (
                             <button
                                 key={`${item.text}-${idx}`}
-                                onClick={() => handleWordClick(item.text)}
+                                onClick={() => handleWordClick(item.originalText || item.text)}
                                 className={`hover:scale-110 transition-transform cursor-pointer ${item.color} font-bold leading-none capitalize opacity-90 hover:opacity-100`}
                                 style={{ 
                                     fontSize: getFontSize(item.value, displayedItems.max, 14, 72),
                                     transform: `rotate(${item.rotation}deg)`
                                 }}
-                                title={`${item.value} occurrences`}
+                                title={`${item.value} occurrences${item.originalText ? ` (Original: ${item.originalText})` : ''}`}
                             >
                                 {item.text}
                             </button>
@@ -471,7 +511,7 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
                                     fontSize: getFontSize(item.value, displayedItems.max, 12, 56),
                                     transform: `rotate(${item.rotation}deg)`
                                 }}
-                                title={`${item.value} connections`}
+                                title={`${item.value} connections${item.originalText ? ` (Original: ${item.originalText})` : ''}`}
                             >
                                 {item.text}
                             </button>

@@ -1,9 +1,11 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship, TrizToolType, ModelActions, TapestryDocument, TapestryFolder } from '../types';
 import { generateMarkdownFromGraph, AIConfig } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
+import { TRIZ_PRINCIPLES_FULL } from '../documentation';
 
 interface TrizModalProps {
   isOpen: boolean;
@@ -22,33 +24,21 @@ interface TrizModalProps {
   customPrompt?: string;
   activeModel?: string;
   aiConfig: AIConfig;
+  onOpenGuidance?: () => void;
 }
 
-// ... (Keep all constants and subcomponents PERSPECTIVES, TRIZ_PRINCIPLES_DATA, ContradictionPanel, PrinciplesPanel, ArizPanel, SufieldPanel, TrendsPanel identical to original) ...
-// [Subcomponents omitted for brevity, assume they are present as in previous versions]
-
 const PERSPECTIVES = [
+    { key: 'general', label: 'General' },
     { key: 'engineering', label: 'Engineering' },
     { key: 'business', label: 'Business' },
     { key: 'software', label: 'Software' },
-    { key: 'physics', label: 'Physics' },
-    { key: 'social', label: 'Social Systems' },
-    { key: 'psychology', label: 'Psychology & Behaviour' },
-    { key: 'environment', label: 'Ecology / Environment' },
-    { key: 'economics', label: 'Economics & Incentives' },
-    { key: 'policy', label: 'Policy / Governance' },
-    { key: 'ethics', label: 'Ethics / Philosophy' },
-    { key: 'health', label: 'Health / Medicine' },
-    { key: 'logistics', label: 'Logistics / Supply Chains' },
-    { key: 'urban', label: 'Urban Systems' },
-    { key: 'design', label: 'Design / Human-Centred' }
+    { key: 'social', label: 'Social' },
+    { key: 'environment', label: 'Environment' },
+    { key: 'education', label: 'Education' },
+    { key: 'health', label: 'Health' },
+    { key: 'arts', label: 'Arts' },
+    { key: 'culinary', label: 'Culinary' }
 ] as const;
-
-const TRIZ_PRINCIPLES_DATA = [
-    // ... (Assume full list exists)
-    { id: 1, name: "1. Segmentation", engineering: "Divide an object into independent parts...", business: "Segment market audiences...", software: "Microservices architecture...", physics: "Particle nature of matter...", social: "Decentralize communities...", psychology: "Compartmentalize tasks...", environment: "Create habitat patches...", economics: "Micro-transactions...", policy: "Federalism...", ethics: "Situational ethics...", health: "Quarantine...", logistics: "Palletization...", urban: "Zoning...", design: "Chunking information..." },
-    // ... etc
-];
 
 const ContradictionPanel: React.FC<{ elements: Element[], onGenerate: (p1: string, p2: string) => void, isLoading: boolean }> = ({ elements, onGenerate, isLoading }) => {
     const [improvingId, setImprovingId] = useState('');
@@ -98,23 +88,31 @@ const ContradictionPanel: React.FC<{ elements: Element[], onGenerate: (p1: strin
 const PrinciplesPanel: React.FC<{ elements: Element[], onGenerate: (principleData: string, target: string) => void, isLoading: boolean }> = ({ elements, onGenerate, isLoading }) => {
     const [selectedPrincipleId, setSelectedPrincipleId] = useState<number>(1);
     const [targetNode, setTargetNode] = useState('');
-    const [selectedPerspective, setSelectedPerspective] = useState<string>('engineering');
+    const [selectedPerspective, setSelectedPerspective] = useState<string>('general');
     
     const [customName, setCustomName] = useState('');
     const [customDesc, setCustomDesc] = useState('');
     const [isAutoFilling, setIsAutoFilling] = useState(false);
 
-    const currentPrinciple = useMemo(() => TRIZ_PRINCIPLES_DATA.find(p => p.id === selectedPrincipleId) || TRIZ_PRINCIPLES_DATA[0], [selectedPrincipleId]);
+    // Use full list from documentation
+    const currentPrinciple = useMemo(() => TRIZ_PRINCIPLES_FULL.find(p => p.id === selectedPrincipleId) || TRIZ_PRINCIPLES_FULL[0], [selectedPrincipleId]);
+
+    // Determine current description to show in UI
+    const currentDescription = useMemo(() => {
+        if (selectedPerspective === 'custom') return customDesc || "Enter a custom description below.";
+        // @ts-ignore - dynamic access
+        return currentPrinciple[selectedPerspective] || currentPrinciple.general || "General description not available.";
+    }, [currentPrinciple, selectedPerspective, customDesc]);
 
     const handleAutoFillCustom = async () => {
         if (!customName.trim()) {
-            alert("Please enter a name for your custom perspective (e.g. 'Culinary', 'Education').");
+            alert("Please enter a name for your custom domain (e.g. 'Culinary', 'Military').");
             return;
         }
         setIsAutoFilling(true);
         try {
             const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const prompt = `Explain TRIZ Principle "${currentPrinciple.name}" (${currentPrinciple.engineering}) from the perspective of "${customName}". Provide a concise 2-3 sentence description/analogy.`;
+            const prompt = `Explain TRIZ Principle "${currentPrinciple.name}" (${currentPrinciple.engineering}) from the problem domain of "${customName}". Provide a concise 2-3 sentence description/analogy with a British English example.`;
             
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
@@ -144,7 +142,7 @@ const PrinciplesPanel: React.FC<{ elements: Element[], onGenerate: (principleDat
             perspectiveName = customName || "Custom";
         } else {
             // @ts-ignore
-            description = currentPrinciple[selectedPerspective];
+            description = currentPrinciple[selectedPerspective] || currentPrinciple.general;
             // @ts-ignore
             perspectiveName = PERSPECTIVES.find(p => p.key === selectedPerspective)?.label || selectedPerspective;
         }
@@ -167,27 +165,29 @@ const PrinciplesPanel: React.FC<{ elements: Element[], onGenerate: (principleDat
                     value={selectedPrincipleId}
                     onChange={e => setSelectedPrincipleId(Number(e.target.value))}
                 >
-                    {TRIZ_PRINCIPLES_DATA.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    {TRIZ_PRINCIPLES_FULL.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
-                <div className="text-[10px] text-gray-500 font-bold tracking-wide mt-2 text-center">SELECT PERSPECTIVE OR DESCRIBE YOUR OWN BELOW</div>
+                
+                {/* Dynamic Description Box */}
+                <div className="mt-3 bg-gray-800 border border-violet-500/50 rounded p-3 text-sm text-gray-300 italic min-h-[60px]">
+                    <span className="text-violet-400 font-bold not-italic mr-2">
+                        {selectedPerspective === 'custom' ? (customName || 'Custom') : PERSPECTIVES.find(p => p.key === selectedPerspective)?.label}:
+                    </span>
+                    {currentDescription}
+                </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 flex-grow overflow-y-auto pr-2">
+            <div className="text-[10px] text-gray-500 font-bold tracking-wide mt-1 text-center uppercase">Choose Problem Domain</div>
+
+            <div className="grid grid-cols-2 gap-2 flex-grow overflow-y-auto pr-2 custom-scrollbar">
                 {PERSPECTIVES.map(p => (
-                    <div 
+                    <button 
                         key={p.key}
                         onClick={() => setSelectedPerspective(p.key)}
-                        className={`p-4 rounded border cursor-pointer transition-all flex flex-col gap-2 h-full ${selectedPerspective === p.key ? 'bg-violet-900/30 border-violet-500 ring-1 ring-violet-500' : 'bg-gray-800 border-gray-700 hover:bg-gray-750 hover:border-gray-500'}`}
+                        className={`p-2 rounded border text-left transition-all text-xs ${selectedPerspective === p.key ? 'bg-violet-900/40 border-violet-500 text-white font-bold' : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-gray-750 hover:text-gray-200'}`}
                     >
-                        <div className="flex justify-between items-center">
-                            <span className="text-xs font-bold uppercase tracking-wider text-gray-400">{p.label}</span>
-                            {selectedPerspective === p.key && <span className="text-violet-400">●</span>}
-                        </div>
-                        <p className="text-sm text-gray-200 leading-relaxed">
-                            {/* @ts-ignore */}
-                            {currentPrinciple[p.key] || "Description not available."}
-                        </p>
-                    </div>
+                        {p.label}
+                    </button>
                 ))}
             </div>
 
@@ -196,7 +196,7 @@ const PrinciplesPanel: React.FC<{ elements: Element[], onGenerate: (principleDat
                     onClick={() => setSelectedPerspective('custom')}
                     className={`cursor-pointer transition-colors mb-3 flex justify-between items-center ${selectedPerspective === 'custom' ? 'text-violet-400 font-bold' : 'text-gray-400 hover:text-gray-300'}`}
                 >
-                    <span className="text-xs font-bold uppercase tracking-wider">Custom Perspective</span>
+                    <span className="text-xs font-bold uppercase tracking-wider">Custom Domain</span>
                     {selectedPerspective === 'custom' && <span>●</span>}
                 </div>
                 
@@ -206,7 +206,7 @@ const PrinciplesPanel: React.FC<{ elements: Element[], onGenerate: (principleDat
                         value={customName}
                         onChange={e => setCustomName(e.target.value)}
                         onClick={() => setSelectedPerspective('custom')}
-                        placeholder="e.g. Culinary, Education, Military..."
+                        placeholder="e.g. Culinary, Military, Sports..."
                         className="bg-gray-900 border border-gray-600 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-violet-500 flex-grow"
                     />
                     <button 
@@ -327,7 +327,7 @@ const TrendsPanel: React.FC<{ elements: Element[], onGenerate: (node: string) =>
     );
 };
 
-const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel, aiConfig }) => {
+const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel, aiConfig, onOpenGuidance }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -390,7 +390,7 @@ const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, rel
               
               userPrompt = `Apply TRIZ Principle: "${principleData.name}" to the node "${target}".
               
-              FOCUS PERSPECTIVE: ${principleData.perspective}
+              PROBLEM DOMAIN: ${principleData.perspective}
               DESCRIPTION TO APPLY: "${principleData.description}"
               
               Instructions:
@@ -398,14 +398,14 @@ const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, rel
               2. Provide your analysis in a STRUCTURED MARKDOWN format.
               3. The Markdown MUST start with a header: "# TRIZ Analysis: ${principleData.name} applied to ${target}"
               4. Immediately after the header, include a section "## Summary of Improvements" with a bulleted list of the key ideas.
-              5. Include a subsection "**Perspective:** ${principleData.perspective}"
+              5. Include a subsection "**Problem Domain:** ${principleData.perspective}"
               6. Suggest specific modifications to the graph (adding sub-nodes, changing attributes, adding relationships) that implement this principle.
-              7. In your analysis text, explain HOW this specific perspective applies.`;
+              7. In your analysis text, explain HOW this specific domain logic applies.`;
           } else if (activeTool === 'ariz') {
               subjectName = arg1.substring(0, 20);
               userPrompt = `Apply a simplified ARIZ process to the problem: "${arg1}".
               1. Formulate the Mini-Problem.
-              2. Analyze the conflict zone.
+              2. Analyse the conflict zone.
               3. Define the Ideal Final Result (IFR).
               4. Suggest graph changes to move towards the IFR.
               5. Output the analysis in MARKDOWN format.`;
@@ -419,7 +419,7 @@ const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, rel
               5. Output the analysis in MARKDOWN format.`;
           } else if (activeTool === 'trends') {
               subjectName = arg1;
-              userPrompt = `Analyze the evolution state of "${arg1}".
+              userPrompt = `Analyse the evolution state of "${arg1}".
               1. Identify its position on the S-Curve.
               2. Check trends like "Transition to Super-system", "Increasing Dynamization", "Uneven Development".
               3. Suggest future state nodes.
@@ -519,7 +519,7 @@ const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, rel
 
       } catch (e) {
           console.error("TRIZ Error", e);
-          setAnalysisText("Error analyzing model. Please try again.");
+          setAnalysisText("Error analysing model. Please try again.");
       } finally {
           setIsLoading(false);
       }
@@ -573,6 +573,17 @@ const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, rel
                 TRIZ / <span className="text-white">{toolInfo.title}</span>
             </h2>
             <div className="flex items-center gap-2">
+                {onOpenGuidance && (
+                    <button 
+                        onClick={onOpenGuidance}
+                        className="p-1.5 rounded transition hover:bg-gray-700 text-yellow-500 hover:text-white"
+                        title="Guidance & Tips"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+                        </svg>
+                    </button>
+                )}
                 {onOpenHistory && (
                     <button onClick={onOpenHistory} className="text-gray-400 hover:text-white mr-2" title="View History">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -677,7 +688,7 @@ const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, rel
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
-                        <p>Select a TRIZ tool to analyze your model.</p>
+                        <p>Select a TRIZ tool to analyse your model.</p>
                     </div>
                 )}
                 

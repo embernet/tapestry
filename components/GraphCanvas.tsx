@@ -613,7 +613,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .style('transition', 'stroke 0.2s ease, stroke-width 0.2s ease, filter 0.2s ease')
         .attr('stroke-width', d => {
             if (simulationState && simulationState[d.id] !== 'neutral') return 4;
-            if (analysisHighlights && analysisHighlights.has(d.id)) return 4;
+            if (analysisHighlights && analysisHighlights.has(d.id)) return 6; // Distinct stroke width for highlights
             if (multiSelection.has(d.id)) return 4;
             return 1.5;
         })
@@ -670,9 +670,19 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
             .attr('width', width).attr('height', height)
             .attr('x', -width / 2).attr('y', -height / 2);
 
+        // Highlight resizing logic: Increase rect size if highlighted to let border poke out
+        let rectWidth = width;
+        let rectHeight = height;
+        
+        if (analysisHighlights && analysisHighlights.has(d.id)) {
+            const highlightPadding = 16; // Add extra padding for highlight state
+            rectWidth += highlightPadding;
+            rectHeight += highlightPadding;
+        }
+
         nodeElement.select('rect:not(.move-zone)')
-            .attr('width', width).attr('height', height)
-            .attr('x', -width / 2).attr('y', -height / 2);
+            .attr('width', rectWidth).attr('height', rectHeight)
+            .attr('x', -rectWidth / 2).attr('y', -rectHeight / 2);
         
         const CONNECT_BORDER_WIDTH = 20;
         const moveZoneWidth = Math.max(0, width - 2 * CONNECT_BORDER_WIDTH);
