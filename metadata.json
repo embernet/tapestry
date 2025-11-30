@@ -1,5 +1,5 @@
 {
-  "name": "Tapestry",
+  "name": "Tapestry Studio",
   "description": "A visual tool to capture and connect facts as nodes in a dynamic graph. Create facts, define their relationships, and customize their appearance to build a web of knowledge.",
   "requestFramePermissions": []
 }

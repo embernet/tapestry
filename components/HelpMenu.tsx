@@ -22,7 +22,7 @@ export const HelpMenu: React.FC<HelpMenuProps> = ({ onClose, onAbout, onPatternG
             <div className={`border-t ${dividerClass} my-1`}></div>
             <button onClick={() => { onPatternGallery(); onClose(); }} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Pattern Gallery</button>
             <button onClick={() => { onSelfTest(); onClose(); }} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass} border-b ${dividerClass}`}>Run Self Test</button>
-            <button onClick={() => { onAbout(); onClose(); }} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>About Tapestry</button>
+            <button onClick={() => { onAbout(); onClose(); }} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>About Tapestry Studio</button>
             <div className={`border-t ${dividerClass} my-1`}></div>
             <a href="https://github.com/embernet/tapestry" target="_blank" rel="noopener noreferrer" className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Documentation</a>
         </div>

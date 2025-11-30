@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 
 export const TapestryBanner = () => {
@@ -15,7 +16,7 @@ export const TapestryBanner = () => {
         y: "55%",
         dominantBaseline: "middle" as const,
         textAnchor: "middle" as const,
-        fontSize: "110",
+        fontSize: "65",
         fontFamily: "Impact, sans-serif",
         strokeWidth: "3",
         stroke: "#ffffff",
@@ -54,7 +55,7 @@ export const TapestryBanner = () => {
                         </filter>
                     </defs>
                     <rect width="600" height="150" fill="url(#warpPattern)" opacity="0.3" />
-                    <text {...commonTextProps} fill="url(#weaveComposite)">TAPESTRY</text>
+                    <text {...commonTextProps} fill="url(#weaveComposite)">TAPESTRY STUDIO</text>
                     <rect width="600" height="150" fill="url(#weftPattern)" opacity="0.1" style={{ mixBlendMode: 'overlay' }} pointerEvents="none" />
                 </svg>
             </div>
@@ -78,7 +79,7 @@ export const TapestryBanner = () => {
                         </pattern>
                     </defs>
                     <rect width="600" height="150" fill="url(#highlandBg)" />
-                    <text {...commonTextProps} fill="url(#highlandText)">TAPESTRY</text>
+                    <text {...commonTextProps} fill="url(#highlandText)">TAPESTRY STUDIO</text>
                 </svg>
             </div>
 
@@ -105,7 +106,7 @@ export const TapestryBanner = () => {
                     </defs>
                     <rect width="600" height="150" fill="#0f172a" />
                     <rect width="600" height="150" fill="url(#circuitPattern)" opacity="0.1" />
-                    <text {...commonTextProps} fill="url(#circuitText)">TAPESTRY</text>
+                    <text {...commonTextProps} fill="url(#circuitText)">TAPESTRY STUDIO</text>
                 </svg>
             </div>
 
@@ -126,7 +127,7 @@ export const TapestryBanner = () => {
                         </pattern>
                     </defs>
                     <rect width="600" height="150" fill="url(#heritageBg)" />
-                    <text {...commonTextProps} fill="url(#heritageText)">TAPESTRY</text>
+                    <text {...commonTextProps} fill="url(#heritageText)">TAPESTRY STUDIO</text>
                 </svg>
             </div>
 
@@ -158,7 +159,7 @@ export const TapestryBanner = () => {
                     </defs>
                     <rect width="600" height="150" fill="#1f2937" />
                     <rect width="600" height="150" fill="url(#processPattern)" opacity="0.2" />
-                    <text {...commonTextProps} fill="url(#processText)">TAPESTRY</text>
+                    <text {...commonTextProps} fill="url(#processText)">TAPESTRY STUDIO</text>
                 </svg>
             </div>
 
@@ -179,7 +180,7 @@ export const TapestryBanner = () => {
                         </pattern>
                     </defs>
                     <rect width="600" height="150" fill="url(#autumnBg)" />
-                    <text {...commonTextProps} fill="url(#autumnText)">TAPESTRY</text>
+                    <text {...commonTextProps} fill="url(#autumnText)">TAPESTRY STUDIO</text>
                 </svg>
             </div>
 
@@ -207,7 +208,7 @@ export const TapestryBanner = () => {
                         </filter>
                     </defs>
                     <rect width="600" height="150" fill="url(#starPattern)" opacity="0.5" />
-                    <text {...commonTextProps} fill="url(#constellationText)">TAPESTRY</text>
+                    <text {...commonTextProps} fill="url(#constellationText)">TAPESTRY STUDIO</text>
                 </svg>
             </div>
 
@@ -229,7 +230,7 @@ export const TapestryBanner = () => {
                         </pattern>
                     </defs>
                     <rect width="600" height="150" fill="url(#loomBg)" />
-                    <text {...commonTextProps} fill="url(#loomText)">TAPESTRY</text>
+                    <text {...commonTextProps} fill="url(#loomText)">TAPESTRY STUDIO</text>
                 </svg>
             </div>
 
@@ -254,7 +255,7 @@ export const TapestryBanner = () => {
                         </pattern>
                     </defs>
                     <rect width="600" height="150" fill="url(#dnaBg)" />
-                    <text {...commonTextProps} fill="url(#dnaText)">TAPESTRY</text>
+                    <text {...commonTextProps} fill="url(#dnaText)">TAPESTRY STUDIO</text>
                 </svg>
             </div>
 
@@ -272,7 +273,7 @@ export const TapestryBanner = () => {
                         </pattern>
                     </defs>
                     <rect width="600" height="150" fill="url(#canvasBg)" />
-                    <text {...commonTextProps} fill="url(#canvasText)">TAPESTRY</text>
+                    <text {...commonTextProps} fill="url(#canvasText)">TAPESTRY STUDIO</text>
                 </svg>
             </div>
 

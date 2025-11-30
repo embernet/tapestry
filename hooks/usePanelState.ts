@@ -1,5 +1,6 @@
 
 import { useState } from 'react';
+import { GuidanceContent } from '../types';
 
 export const usePanelState = () => {
   // --- Standard Panels ---
@@ -16,6 +17,8 @@ export const usePanelState = () => {
   const [isMermaidPanelOpen, setIsMermaidPanelOpen] = useState(false);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
+  const [isGuidancePanelOpen, setIsGuidancePanelOpen] = useState(false);
+  const [guidanceContent, setGuidanceContent] = useState<GuidanceContent | null>(null);
 
   // --- Explorer Panels ---
   const [isTreemapPanelOpen, setIsTreemapPanelOpen] = useState(false);
@@ -44,6 +47,7 @@ export const usePanelState = () => {
     setIsMermaidPanelOpen(false);
     setIsFilterPanelOpen(false);
     setIsChatPanelOpen(false);
+    setIsGuidancePanelOpen(false);
     setIsTreemapPanelOpen(false);
     setIsTagDistPanelOpen(false);
     setIsRelDistPanelOpen(false);
@@ -69,6 +73,9 @@ export const usePanelState = () => {
     isFilterPanelOpen, setIsFilterPanelOpen,
     isChatPanelOpen, setIsChatPanelOpen,
     
+    isGuidancePanelOpen, setIsGuidancePanelOpen,
+    guidanceContent, setGuidanceContent,
+
     isTreemapPanelOpen, setIsTreemapPanelOpen,
     isTagDistPanelOpen, setIsTagDistPanelOpen,
     isRelDistPanelOpen, setIsRelDistPanelOpen,

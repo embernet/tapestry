@@ -5,6 +5,7 @@ import {
     ExplorerToolType, TagCloudToolType, SwotToolType, 
     MermaidToolType, HistoryEntry, TapestryDocument 
 } from '../types';
+import { TOOL_DOCUMENTATION } from '../documentation';
 
 export const useTools = (panelState?: any) => {
   // General Tool State
@@ -96,6 +97,15 @@ export const useTools = (panelState?: any) => {
       }
   }, [panelState]);
 
+  const handleOpenGuidance = useCallback((toolId: string) => {
+      if (!panelState) return;
+      const doc = TOOL_DOCUMENTATION.find(t => t.id === toolId);
+      if (doc) {
+          panelState.setGuidanceContent(doc.guidance);
+          panelState.setIsGuidancePanelOpen(true);
+      }
+  }, [panelState]);
+
   const handleReopenHistory = useCallback((entry: HistoryEntry) => {
       const toolId = entry.tool.split(':')[0].toLowerCase().trim(); 
       const subTool = entry.subTool;
@@ -181,6 +191,7 @@ export const useTools = (panelState?: any) => {
     // Actions
     toggleTool,
     handleOpenTool,
-    handleReopenHistory
+    handleReopenHistory,
+    handleOpenGuidance
   };
 };

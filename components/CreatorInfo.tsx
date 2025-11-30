@@ -4,9 +4,10 @@ import React from 'react';
 interface CreatorInfoProps {
     className?: string;
     isDarkMode?: boolean;
+    onAboutClick?: () => void;
 }
 
-export const CreatorInfo: React.FC<CreatorInfoProps> = ({ className = "", isDarkMode = true }) => {
+export const CreatorInfo: React.FC<CreatorInfoProps> = ({ className = "", isDarkMode = true, onAboutClick }) => {
     const textClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
     const hoverClass = isDarkMode ? 'hover:text-white' : 'hover:text-black';
     const svgHoverClass = isDarkMode ? 'group-hover:text-gray-100' : 'group-hover:text-gray-800';
@@ -14,7 +15,14 @@ export const CreatorInfo: React.FC<CreatorInfoProps> = ({ className = "", isDark
     return (
         <div className={`flex flex-col items-center gap-2 ${className}`}>
             <p className={`${textClass} font-medium text-sm`}>Created by Mark Burnett (c) 2025</p>
-            <div className="flex gap-4">
+            
+            {onAboutClick && (
+                <p className={`text-center max-w-lg text-xs leading-relaxed my-2 ${textClass} px-4`}>
+                    Tapestry Studio is free to use and copy under the MIT licence. The GitHub link is below if you want to deploy it yourself. Use the settings panel to add your own API key for the AI of your choice. Connect to me on LinkedIn and let me know what you think. You can read more in the <button onClick={onAboutClick} className={`underline hover:text-blue-400 font-medium transition-colors cursor-pointer`}>About page</button>.
+                </p>
+            )}
+
+            <div className="flex gap-4 mt-2">
                 <a href="https://www.linkedin.com/in/markburnett" target="_blank" rel="noopener noreferrer" className={`flex items-center gap-1 ${textClass} ${hoverClass} transition-colors group text-sm`}>
                      <svg className="w-5 h-5 group-hover:text-blue-500 transition-colors" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path fillRule="evenodd" d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z" clipRule="evenodd" />

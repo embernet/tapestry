@@ -10,6 +10,7 @@ interface SwotToolbarProps {
   onOpenSettings: () => void;
   isDarkMode: boolean;
   customStrategies?: CustomStrategyTool[];
+  onOpenGuidance?: () => void;
 }
 
 const STRATEGY_TOOLS = [
@@ -103,7 +104,8 @@ const SwotToolbar: React.FC<SwotToolbarProps> = ({
   onToggle,
   onOpenSettings,
   isDarkMode,
-  customStrategies = []
+  customStrategies = [],
+  onOpenGuidance
 }) => {
 
   const bgClass = isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-200';
@@ -146,8 +148,21 @@ const SwotToolbar: React.FC<SwotToolbarProps> = ({
 
         {!isCollapsed && (
             <div className={`absolute top-full left-0 mt-2 w-72 border rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600 ${dropdownBg}`}>
-                 <div className={`p-2 border-b text-[10px] font-bold uppercase tracking-wider text-center ${headerBg} ${textHeader}`}>
-                     Strategic Analysis Tools
+                 <div className={`p-2 border-b flex justify-between items-center sticky top-0 z-10 ${headerBg}`}>
+                     <span className={`text-[10px] font-bold uppercase tracking-wider pl-1 ${textHeader}`}>
+                         Strategic Analysis Tools
+                     </span>
+                     {onOpenGuidance && (
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); onOpenGuidance(); }}
+                            className={`transition-colors p-1 rounded ${isDarkMode ? 'text-yellow-500 hover:text-white hover:bg-gray-700' : 'text-yellow-600 hover:text-gray-900 hover:bg-gray-200'}`}
+                            title="Guidance & Tips"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+                            </svg>
+                        </button>
+                     )}
                  </div>
                  
                  {STRATEGY_TOOLS.map(tool => (

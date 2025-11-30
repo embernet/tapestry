@@ -134,7 +134,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 <path d="M4 12c2-2 4-2 6 0s4 2 6 0" />
                 <path d="M4 16c2-2 4-2 6 0s4 2 6 0" />
             </svg>
-            <span className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Tapestry</span>
+            <span className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>Tapestry Studio</span>
             <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'} transition-transform ${isMainMenuOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </svg>

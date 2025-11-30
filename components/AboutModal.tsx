@@ -6,9 +6,10 @@ import { CreatorInfo } from './CreatorInfo';
 interface ModalProps {
   onClose: () => void;
   isDarkMode?: boolean;
+  onUserGuideClick?: () => void;
 }
 
-export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true }) => {
+export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true, onUserGuideClick }) => {
     const ref = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const handleClick = (e: MouseEvent) => { if(ref.current && !ref.current.contains(e.target as Node)) onClose(); }
@@ -40,15 +41,32 @@ export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true })
                             <TapestryAnimator />
                         </div>
                         <div>
-                            <h2 className={`text-4xl font-bold ${headerClass} tracking-tight`}>Tapestry</h2>
+                            <h2 className={`text-4xl font-bold ${headerClass} tracking-tight`}>Tapestry Studio</h2>
                             <p className="text-blue-400 text-xs font-bold uppercase tracking-[0.2em] mt-1">Visual Knowledge Graph</p>
                         </div>
                     </div>
 
                     {/* Description */}
                     <p className={`${textClass} text-lg mb-8 leading-relaxed`}>
-                        Tapestry is a tool for creating and exploring knowledge graphs. It helps you understand the relationships between ideas, people, organisations, and actions to find ways to improve situations and plan what to do next. It is a space for reflection, communication, and innovation.
+                        Tapestry Studio is a tool for creating and exploring knowledge graphs. It helps you understand the relationships between ideas, people, organisations, and actions to find ways to improve situations and plan what to do next. It is a space for reflection, communication, and innovation.
                     </p>
+
+                    {onUserGuideClick && (
+                        <div className={`p-4 rounded border mb-8 flex items-center justify-between ${isDarkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'}`}>
+                            <div className="flex items-center gap-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                </svg>
+                                <span className={`font-medium ${isDarkMode ? 'text-blue-100' : 'text-blue-900'}`}>New to Tapestry?</span>
+                            </div>
+                            <button 
+                                onClick={onUserGuideClick}
+                                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-sm transition-colors"
+                            >
+                                Open User Guide
+                            </button>
+                        </div>
+                    )}
 
                     <div className={`border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} my-6`}></div>
 

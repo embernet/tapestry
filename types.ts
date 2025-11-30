@@ -227,6 +227,17 @@ export interface StorySlide {
   selectedElementId: string | null;
 }
 
+export interface GuidanceSection {
+  title?: string;
+  text?: string;
+  items?: string[];
+}
+
+export interface GuidanceContent {
+  title: string;
+  sections: GuidanceSection[];
+}
+
 // ---
 
 export type TrizToolType = 'contradiction' | 'principles' | 'ariz' | 'sufield' | 'trends' | null;

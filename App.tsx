@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage } from './types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
+import { TOOL_DOCUMENTATION } from './documentation';
 import { usePanelDefinitions } from './components/usePanelDefinitions';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
 import ElementDetailsPanel from './components/ElementDetailsPanel';
@@ -42,6 +43,7 @@ import { useSelfTest } from './hooks/useSelfTest';
 import { usePersistence } from './hooks/usePersistence';
 import MiningToolbar from './components/MiningToolbar';
 import MiningModal from './components/MiningModal';
+import { GuidancePanel } from './components/GuidancePanel';
 
 // Explicitly define coordinate type to fix type inference issues
 type Coords = { x: number; y: number };
@@ -298,6 +300,18 @@ export default function App() {
   const handleSwotToolSelect = (tool: SwotToolType) => { tools.setActiveSwotTool(tool); tools.setSwotInitialDoc(null); tools.setIsSwotModalOpen(true); tools.setActiveTool(null); };
   const handleMermaidToolSelect = (tool: MermaidToolType) => { if (tool === 'editor') panelState.setIsMermaidPanelOpen(true); };
   const handleMiningToolSelect = () => { setIsMiningModalOpen(true); tools.setActiveTool(null); };
+
+  // --- Guidance Logic ---
+  // Design Decision: Guidance panel is rendered separately and floats on the LEFT side to allow 
+  // users to see it simultaneously with the tool/canvas content on the right.
+  const handleOpenGuidance = useCallback((toolId: string) => {
+      const doc = TOOL_DOCUMENTATION.find(t => t.id === toolId);
+      if (doc) {
+          panelState.setGuidanceContent(doc.guidance);
+          panelState.setIsGuidancePanelOpen(true);
+          // Note: No panel layout logic needed here as it is fixed positioned in render
+      }
+  }, [panelState]);
 
   useEffect(() => { if (tools.activeTool !== 'bulk') { setIsBulkEditActive(false); } }, [tools.activeTool]);
 
@@ -666,6 +680,7 @@ export default function App() {
     onReopenHistory: tools.handleReopenHistory,
     onAnalyzeWithChat: handleAnalyzeWithChat,
     onDeleteHistory: handleDeleteHistory,
+    onOpenWordCloudGuidance: () => tools.handleOpenGuidance('wordcloud'),
     panelLayouts,
     panelZIndex, setPanelZIndex,
     setPanelLayouts,
@@ -676,10 +691,9 @@ export default function App() {
     isDarkMode, // Passed for styling child panels
     isDebugPanelOpen,
     setIsDebugPanelOpen,
-    chatMessages
+    chatMessages,
+    aiConfig // Pass AI Config for AI features inside panels
 });
-
-  if (persistence.isInitialLoad && !persistence.isCreateModelModalOpen) { return ( <div className={`w-screen h-screen flex items-center justify-center ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}> Loading... </div> ); }
 
   return (
     <div className="w-screen h-screen overflow-hidden flex relative">
@@ -760,9 +774,24 @@ export default function App() {
                 <LssToolbar activeTool={tools.activeLssTool} onSelectTool={handleLssToolSelect} isCollapsed={tools.activeTool !== 'lss'} onToggle={() => tools.toggleTool('lss')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
                 <TocToolbar activeTool={tools.activeTocTool} onSelectTool={handleTocToolSelect} isCollapsed={tools.activeTool !== 'toc'} onToggle={() => tools.toggleTool('toc')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
                 <SsmToolbar activeTool={tools.activeSsmTool} onSelectTool={handleSsmToolSelect} isCollapsed={tools.activeTool !== 'ssm'} onToggle={() => tools.toggleTool('ssm')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
-                <SwotToolbar activeTool={tools.activeSwotTool} onSelectTool={handleSwotToolSelect} isCollapsed={tools.activeTool !== 'swot'} onToggle={() => tools.toggleTool('swot')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} customStrategies={globalSettings.customStrategies} />
+                <SwotToolbar 
+                    activeTool={tools.activeSwotTool} 
+                    onSelectTool={handleSwotToolSelect} 
+                    isCollapsed={tools.activeTool !== 'swot'} 
+                    onToggle={() => tools.toggleTool('swot')} 
+                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
+                    isDarkMode={isDarkMode} 
+                    customStrategies={globalSettings.customStrategies} 
+                    onOpenGuidance={() => tools.handleOpenGuidance('strategy')}
+                />
                 <ExplorerToolbar onSelectTool={handleExplorerToolSelect} isCollapsed={tools.activeTool !== 'explorer'} onToggle={() => tools.toggleTool('explorer')} isDarkMode={isDarkMode} />
-                <TagCloudToolbar onSelectTool={handleTagCloudToolSelect} isCollapsed={tools.activeTool !== 'tagcloud'} onToggle={() => tools.toggleTool('tagcloud')} isDarkMode={isDarkMode} />
+                <TagCloudToolbar 
+                    onSelectTool={handleTagCloudToolSelect} 
+                    isCollapsed={tools.activeTool !== 'tagcloud'} 
+                    onToggle={() => tools.toggleTool('tagcloud')} 
+                    isDarkMode={isDarkMode} 
+                    onOpenGuidance={() => tools.handleOpenGuidance('wordcloud')}
+                />
                 <MermaidToolbar onSelectTool={handleMermaidToolSelect} isCollapsed={tools.activeTool !== 'mermaid'} onToggle={() => tools.toggleTool('mermaid')} isDarkMode={isDarkMode} />
                 <BulkEditToolbar activeColorScheme={activeColorScheme} tagsToAdd={bulkTagsToAdd} tagsToRemove={bulkTagsToRemove} onTagsToAddChange={setBulkTagsToAdd} onTagsToRemoveChange={setBulkTagsToRemove} isActive={isBulkEditActive} onToggleActive={() => setIsBulkEditActive(p => !p)} isCollapsed={tools.activeTool !== 'bulk'} onToggle={() => tools.toggleTool('bulk')} isDarkMode={isDarkMode} />
                 <CommandBar onExecute={handleCommandExecution} isCollapsed={tools.activeTool !== 'command'} onToggle={() => tools.toggleTool('command')} onOpenHistory={handleOpenCommandHistory} isDarkMode={isDarkMode} />
@@ -775,6 +804,21 @@ export default function App() {
         <FilterPanel allTags={allTags} tagCounts={tagCounts} tagFilter={tagFilter} dateFilter={dateFilter} onTagFilterChange={setTagFilter} onDateFilterChange={setDateFilter} onClose={() => panelState.setIsFilterPanelOpen(false)} isDarkMode={isDarkMode} />
       )}
       
+      {/* 
+        DESIGN DECISION: Guidance Panel is rendered explicitly here as a fixed/absolute positioned element
+        on the LEFT side of the screen (distinct from the right-hand dock). This allows the user to view 
+        the guidance documentation simultaneously with the tool interface or canvas on the right.
+      */}
+      {panelState.isGuidancePanelOpen && persistence.currentModelId && !isPresenting && (
+        <div className="fixed left-4 top-40 z-[600] w-[400px] h-[calc(100vh-200px)] shadow-2xl rounded-lg overflow-hidden border border-gray-600 bg-gray-900">
+            <GuidancePanel 
+                content={panelState.guidanceContent} 
+                onClose={() => panelState.setIsGuidancePanelOpen(false)} 
+                isDarkMode={isDarkMode}
+            />
+        </div>
+      )}
+
       {persistence.currentModelId && !isPresenting && (
         <RightPanelContainer panels={panelDefinitions} layouts={panelLayouts} onLayoutChange={setPanelLayouts} activeDockedId={activeDockedPanelId} onActiveDockedIdChange={setActiveDockedPanelId} globalZIndex={panelZIndex} onGlobalZIndexChange={setPanelZIndex} isDarkMode={isDarkMode} />
       )}
@@ -807,7 +851,26 @@ export default function App() {
       <LssModal isOpen={tools.isLssModalOpen} activeTool={tools.activeLssTool} elements={elements} relationships={relationships} modelActions={aiActions} documents={documents} folders={folders} onUpdateDocument={handleUpdateDocument} initialParams={tools.lssInitialParams} onClose={() => tools.setIsLssModalOpen(false)} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onAnalyze={handleAnalyzeWithChat} customPrompt={getToolPrompt('lss', tools.activeLssTool)} aiConfig={aiConfig} />
       <TocModal isOpen={tools.isTocModalOpen} activeTool={tools.activeTocTool} elements={elements} relationships={relationships} modelActions={aiActions} documents={documents} folders={folders} onUpdateDocument={handleUpdateDocument} initialParams={tools.tocInitialParams} onClose={() => tools.setIsTocModalOpen(false)} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onAnalyze={handleAnalyzeWithChat} customPrompt={getToolPrompt('toc', tools.activeTocTool)} aiConfig={aiConfig} />
       <SsmModal isOpen={tools.isSsmModalOpen} activeTool={tools.activeSsmTool} elements={elements} relationships={relationships} modelActions={aiActions} documents={documents} folders={folders} onUpdateDocument={handleUpdateDocument} initialParams={tools.ssmInitialParams} onClose={() => tools.setIsSsmModalOpen(false)} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onAnalyze={handleAnalyzeWithChat} customPrompt={getToolPrompt('ssm', tools.activeSsmTool)} aiConfig={aiConfig} />
-      <SwotModal isOpen={tools.isSwotModalOpen} activeTool={tools.activeSwotTool} elements={elements} relationships={relationships} modelActions={aiActions} documents={documents} folders={folders} onUpdateDocument={handleUpdateDocument} onClose={() => tools.setIsSwotModalOpen(false)} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} modelName={persistence.currentModelName} initialDoc={tools.swotInitialDoc} aiConfig={aiConfig} isDarkMode={isDarkMode} customStrategies={globalSettings.customStrategies} onSaveCustomStrategies={handleCustomStrategiesChange} />
+      <SwotModal 
+        isOpen={tools.isSwotModalOpen} 
+        activeTool={tools.activeSwotTool} 
+        elements={elements} 
+        relationships={relationships} 
+        modelActions={aiActions} 
+        documents={documents} 
+        folders={folders} 
+        onUpdateDocument={handleUpdateDocument} 
+        onClose={() => tools.setIsSwotModalOpen(false)} 
+        onLogHistory={handleLogHistory} 
+        onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} 
+        modelName={persistence.currentModelName} 
+        initialDoc={tools.swotInitialDoc} 
+        aiConfig={aiConfig} 
+        isDarkMode={isDarkMode} 
+        customStrategies={globalSettings.customStrategies} 
+        onSaveCustomStrategies={handleCustomStrategiesChange} 
+        onOpenGuidance={() => tools.handleOpenGuidance('strategy')}
+      />
       <MiningModal isOpen={isMiningModalOpen} elements={elements} relationships={relationships} onClose={() => setIsMiningModalOpen(false)} onNodeSelect={(id) => { setIsMiningModalOpen(false); handleNodeClick(id, new MouseEvent('click')); }} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onAnalyze={handleAnalyzeWithChat} />
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} initialTab={settingsInitialTab} globalSettings={globalSettings} onGlobalSettingsChange={handleGlobalSettingsChange} modelSettings={systemPromptConfig} onModelSettingsChange={setSystemPromptConfig} />
       {persistence.isSchemaUpdateModalOpen && <SchemaUpdateModal changes={persistence.schemaUpdateChanges} onClose={() => persistence.setIsSchemaUpdateModalOpen(false)} />}
@@ -853,7 +916,7 @@ export default function App() {
                      <div className="text-center mt-4"><button onClick={() => persistence.setIsOpenModelModalOpen(true)} className="text-sm text-blue-400 hover:text-blue-300 hover:underline">View All Recovered Models</button></div>
                  </div>
              )}
-             <CreatorInfo className="mt-8" isDarkMode={isDarkMode} />
+             <CreatorInfo className="mt-8" isDarkMode={isDarkMode} onAboutClick={() => setIsAboutModalOpen(true)} />
         </div>
       )}
 
@@ -871,7 +934,7 @@ export default function App() {
       {persistence.pendingImport && (
           <ConflictResolutionModal localMetadata={persistence.pendingImport.localMetadata} diskMetadata={persistence.pendingImport.diskMetadata} localData={persistence.pendingImport.localData} diskData={persistence.pendingImport.diskData} onCancel={() => persistence.setPendingImport(null)} onChooseLocal={() => { persistence.handleLoadModel(persistence.pendingImport!.localMetadata.id); persistence.setPendingImport(null); }} onChooseDisk={() => { persistence.loadModelData(persistence.pendingImport!.diskData, persistence.pendingImport!.diskMetadata.id, persistence.pendingImport!.diskMetadata); persistence.setPendingImport(null); }} />
       )}
-      {isAboutModalOpen && <AboutModal onClose={() => setIsAboutModalOpen(false)} isDarkMode={isDarkMode} />}
+      {isAboutModalOpen && <AboutModal onClose={() => setIsAboutModalOpen(false)} onUserGuideClick={() => { setIsAboutModalOpen(false); setIsUserGuideModalOpen(true); }} isDarkMode={isDarkMode} />}
       {isPatternGalleryModalOpen && <PatternGalleryModal onClose={() => setIsPatternGalleryModalOpen(false)} isDarkMode={isDarkMode} />}
     </div>
   );

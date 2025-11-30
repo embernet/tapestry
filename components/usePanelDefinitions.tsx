@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { PanelDefinition } from './RightPanelContainer';
-import { Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, ModelActions, ColorScheme, PanelLayout, ChatMessage } from '../types';
+import { Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, ModelActions, ColorScheme, PanelLayout, ChatMessage, GuidanceContent } from '../types';
 import { ReportPanel } from './ReportPanel';
 import { DocumentManagerPanel, DocumentEditorPanel } from './DocumentPanel';
 import TablePanel from './TablePanel';
@@ -18,7 +18,8 @@ import { SunburstPanel } from './SunburstPanel';
 import { TagCloudPanel } from './TagCloudModal';
 import HistoryItemPanel from './HistoryItemPanel';
 import { DebugPanel } from './DebugPanel';
-import { generateMarkdownFromGraph } from '../utils';
+import { GuidancePanel } from './GuidancePanel';
+import { generateMarkdownFromGraph, AIConfig } from '../utils';
 
 interface UsePanelDefinitionsProps {
   // State Flags
@@ -46,6 +47,9 @@ interface UsePanelDefinitionsProps {
   setIsHistoryPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
   isDebugPanelOpen: boolean;
   setIsDebugPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  isGuidancePanelOpen: boolean;
+  setIsGuidancePanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  guidanceContent: GuidanceContent | null;
   
   // Explorer State
   isTreemapPanelOpen: boolean;
@@ -115,6 +119,7 @@ interface UsePanelDefinitionsProps {
   onReopenHistory: (entry: HistoryEntry) => void;
   onAnalyzeWithChat: (context: string) => void;
   onDeleteHistory: (id: string) => void;
+  onOpenWordCloudGuidance: () => void;
   
   // Helpers
   panelLayouts: Record<string, PanelLayout>;
@@ -125,6 +130,7 @@ interface UsePanelDefinitionsProps {
   setOriginalElements: React.Dispatch<React.SetStateAction<Element[] | null>>;
   graphCanvasRef: React.RefObject<any>;
   aiActions: ModelActions;
+  aiConfig: AIConfig;
   
   // Theme
   isDarkMode: boolean;
@@ -407,6 +413,8 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
                         relationships={props.filteredRelationships} 
                         onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))} 
                         isDarkMode={props.isDarkMode}
+                        aiConfig={props.aiConfig}
+                        onOpenGuidance={props.onOpenWordCloudGuidance}
                      />, 
             isOpen: props.isConceptCloudOpen, 
             onToggle: () => props.setIsConceptCloudOpen(p => !p) 
@@ -421,6 +429,8 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
                         relationships={props.filteredRelationships} 
                         onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))} 
                         isDarkMode={props.isDarkMode}
+                        aiConfig={props.aiConfig}
+                        onOpenGuidance={props.onOpenWordCloudGuidance}
                      />, 
             isOpen: props.isInfluenceCloudOpen, 
             onToggle: () => props.setIsInfluenceCloudOpen(p => !p) 
@@ -435,6 +445,8 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
                         relationships={props.filteredRelationships} 
                         onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))} 
                         isDarkMode={props.isDarkMode}
+                        aiConfig={props.aiConfig}
+                        onOpenGuidance={props.onOpenWordCloudGuidance}
                      />, 
             isOpen: props.isTextAnalysisOpen, 
             onToggle: () => props.setIsTextAnalysisOpen(p => !p) 
@@ -449,6 +461,8 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
                         relationships={props.filteredRelationships} 
                         onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))} 
                         isDarkMode={props.isDarkMode}
+                        aiConfig={props.aiConfig}
+                        onOpenGuidance={props.onOpenWordCloudGuidance}
                      />, 
             isOpen: props.isFullTextAnalysisOpen, 
             onToggle: () => props.setIsFullTextAnalysisOpen(p => !p) 

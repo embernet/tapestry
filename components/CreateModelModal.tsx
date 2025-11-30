@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 
 interface CreateModelModalProps {
@@ -19,7 +20,7 @@ export const CreateModelModal: React.FC<CreateModelModalProps> = ({ onCreate, on
     return (
         <div className="fixed inset-0 bg-black bg-opacity-90 flex justify-center items-center z-50 p-4">
             <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-2xl border border-gray-600 text-white">
-                <h2 className="text-2xl font-bold mb-6">{isInitialSetup ? 'Welcome to Tapestry' : 'Create New Model'}</h2>
+                <h2 className="text-2xl font-bold mb-6">{isInitialSetup ? 'Welcome to Tapestry Studio' : 'Create New Model'}</h2>
                 
                 <div className="space-y-4 mb-6">
                     <div>
