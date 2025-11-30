@@ -209,7 +209,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                     { label: 'Documents', state: panelState.isDocumentPanelOpen, toggle: () => panelState.setIsDocumentPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg> },
                     { label: 'History', state: panelState.isHistoryPanelOpen, toggle: () => panelState.setIsHistoryPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> },
                     { label: 'Table', state: panelState.isTablePanelOpen, toggle: () => panelState.setIsTablePanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" /></svg> },
-                    { label: 'Matrix', state: panelState.isMatrixPanelOpen, toggle: () => panelState.setIsMatrixPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> },
+                    { label: 'Matrix', state: panelState.isMatrixPanelOpen, toggle: () => panelState.setIsMatrixPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z M12 3v18 M3 12h18" /></svg> },
                     { label: 'Grid', state: panelState.isGridPanelOpen, toggle: () => panelState.setIsGridPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /></svg> },
                     { label: 'Markdown', state: panelState.isMarkdownPanelOpen, toggle: () => panelState.setIsMarkdownPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg> },
                     { label: 'JSON', state: panelState.isJSONPanelOpen, toggle: () => panelState.setIsJSONPanelOpen(p => !p), icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-500 hover:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg> }
@@ -305,7 +305,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         </button>
         <button onClick={() => panelState.setIsMatrixPanelOpen((prev: boolean) => !prev)} title="Matrix View" className={`p-2 rounded-md transition ${textClass}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z M12 3v18 M3 12h18" />
             </svg>
         </button>
         <button onClick={() => panelState.setIsGridPanelOpen((prev: boolean) => !prev)} title="Attribute Grid View" className={`p-2 rounded-md transition ${textClass}`}>
@@ -326,7 +326,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
         </button>
-        <button onClick={() => panelState.setIsHistoryPanelOpen((prev: boolean) => !prev)} title="History Log" className={`p-2 rounded-md transition ${textClass}`}>
+        <button onClick={() => panelState.setIsHistoryPanelOpen((prev: boolean) => !prev)} title="AI History" className={`p-2 rounded-md transition ${textClass}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -379,7 +379,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
         <button onClick={onToggleDebug} title="Debug Mode" className={`p-2 rounded-md transition ${textClass}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.1 13.34l-3.53 3.53c-.78.78-2.05.78-2.83 0a2 2 0 010-2.83l3.53-3.53m12.37-9.9c-.97-.97-2.53-1.02-3.38.1l-.88 1.16a1.5 1.5 0 01-1.2.6h-.6a1.5 1.5 0 00-1.06.44l-4.13 4.13 2.83 2.83 4.13-4.13a1.5 1.5 0 00.44-1.06v-.6a1.5 1.5 0 01.6-1.2l1.16-.88c1.12-.85 1.07-2.4-.1-3.38z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9.5 2C6.5 2 4 4.5 4 7.5c0 1.2.4 2.3 1 3.2-.6.9-1 2-1 3.2 0 2.5 2 4.5 4.5 4.5h.5c.3 2 2 3.5 4 3.5s3.7-1.5 4-3.5h.5c2.5 0 4.5-2 4.5-4.5 0-1.2-.4-2.3-1-3.2.6-.9 1-2 1-3.2C21 4.5 18.5 2 15.5 2c-1.2 0-2.3.4-3.2 1-.9-.6-2-1-3.2-1z" />
             </svg>
         </button>
         

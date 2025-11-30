@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship, TocToolType, ModelActions, TapestryDocument, TapestryFolder } from '../types';
-import { generateMarkdownFromGraph, AIConfig } from '../utils';
+import { generateMarkdownFromGraph, AIConfig, callAI } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
@@ -23,9 +23,6 @@ interface TocModalProps {
   activeModel?: string;
   aiConfig: AIConfig;
 }
-
-// ... (Keep Sub Components CrtPanel, EcPanel, FrtPanel, TtPanel identical) ...
-// [Subcomponents omitted for brevity]
 
 const CrtPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> = ({ onGenerate, isLoading }) => {
     return (
@@ -176,7 +173,6 @@ const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relat
 
       try {
           const graphMarkdown = generateMarkdownFromGraph(elements, relationships);
-          const ai = new GoogleGenAI({ apiKey: aiConfig.apiKey || process.env.API_KEY });
           
           const systemPromptBase = customPrompt || DEFAULT_TOOL_PROMPTS['toc'];
           let systemInstruction = `${systemPromptBase}
@@ -214,46 +210,46 @@ const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relat
               3. Add 'Step' nodes and link them logically (Conditions -> Actions -> Outcomes).`;
           }
 
-          const response = await ai.models.generateContent({
-              model: activeModel || 'gemini-2.5-flash',
-              contents: userPrompt,
-              config: {
-                  systemInstruction,
-                  responseMimeType: "application/json",
-                  responseSchema: {
-                      type: Type.OBJECT,
-                      properties: {
-                          analysis: { type: Type.STRING },
-                          actions: {
-                              type: Type.ARRAY,
-                              items: {
+          const responseSchema = {
+              type: Type.OBJECT,
+              properties: {
+                  analysis: { type: Type.STRING },
+                  actions: {
+                      type: Type.ARRAY,
+                      items: {
+                          type: Type.OBJECT,
+                          properties: {
+                              name: { type: Type.STRING },
+                              args: { 
                                   type: Type.OBJECT,
                                   properties: {
                                       name: { type: Type.STRING },
-                                      args: { 
-                                          type: Type.OBJECT,
-                                          properties: {
-                                              name: { type: Type.STRING },
-                                              sourceName: { type: Type.STRING },
-                                              targetName: { type: Type.STRING },
-                                              label: { type: Type.STRING },
-                                              direction: { type: Type.STRING },
-                                              tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-                                              notes: { type: Type.STRING },
-                                              elementName: { type: Type.STRING },
-                                              key: { type: Type.STRING },
-                                              value: { type: Type.STRING }
-                                          }
-                                      }
+                                      sourceName: { type: Type.STRING },
+                                      targetName: { type: Type.STRING },
+                                      label: { type: Type.STRING },
+                                      direction: { type: Type.STRING },
+                                      tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                      notes: { type: Type.STRING },
+                                      elementName: { type: Type.STRING },
+                                      key: { type: Type.STRING },
+                                      value: { type: Type.STRING }
                                   }
                               }
                           }
                       }
                   }
               }
-          });
+          };
 
-          const result = JSON.parse(response.text || "{}");
+          const resultRaw = await callAI(
+              aiConfig,
+              userPrompt,
+              systemInstruction,
+              undefined,
+              responseSchema
+          );
+
+          const result = JSON.parse(resultRaw.text || "{}");
           setAnalysisText(result.analysis);
           
           const actions = (result.actions || []).map((a: any, i: number) => ({ ...a, id: i, status: 'pending' }));
@@ -314,8 +310,6 @@ const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relat
       }
   };
 
-  // ... (Keep all handlers like handleApplyAction, handleCopy, etc. identical) ...
-  // [Handlers omitted for brevity]
   const handleApplyAction = (index: number) => {
       const action = suggestions[index];
       if (!action) return;
@@ -466,16 +460,16 @@ const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relat
                 {!analysisText && !isLoading && (
                     <div className="flex flex-col items-center justify-center h-full text-gray-600 opacity-50">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        <p>Select a TOC tool to optimize your system constraints.</p>
+                        <p>Select a TOC tool to analyze your model.</p>
                     </div>
                 )}
                 
                 {isLoading && (
                     <div className="flex flex-col items-center justify-center h-full">
                         <div className="w-10 h-10 border-4 border-amber-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                        <p className="text-amber-400 animate-pulse text-sm">Identifying Bottlenecks...</p>
+                        <p className="text-amber-400 animate-pulse text-sm">Identifying Constraints...</p>
                     </div>
                 )}
             </div>

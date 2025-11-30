@@ -655,6 +655,28 @@ const SwotModal: React.FC<SwotModalProps> = ({
               return next;
           });
 
+          // Log to AI History
+          if (onLogHistory) {
+              const summaryLines: string[] = [];
+              Object.keys(result).forEach(key => {
+                  if (result[key] && Array.isArray(result[key]) && result[key].length > 0) {
+                      const categoryLabel = activeConfig.categories.find(c => c.id === key)?.label || key;
+                      summaryLines.push(`**${categoryLabel}**: ${result[key].length} items`);
+                      result[key].slice(0, 3).forEach((item: string) => summaryLines.push(`- ${item}`));
+                      if (result[key].length > 3) summaryLines.push(`- ... (+${result[key].length - 3} more)`);
+                  }
+              });
+              
+              if (summaryLines.length > 0) {
+                  onLogHistory(
+                      `Strategy: ${activeConfig.title}`,
+                      `Generated Analysis:\n\n${summaryLines.join('\n')}`,
+                      `${activeConfig.title} Generation`,
+                      activeTool
+                  );
+              }
+          }
+
       } catch (e) {
           console.error("Matrix AI Error", e);
           alert("Failed to generate analysis.");

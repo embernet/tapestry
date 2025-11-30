@@ -120,6 +120,7 @@ interface UsePanelDefinitionsProps {
   onAnalyzeWithChat: (context: string) => void;
   onDeleteHistory: (id: string) => void;
   onOpenWordCloudGuidance: () => void;
+  onLogHistory?: (tool: string, content: string, summary?: string, subTool?: string, toolParams?: any) => void;
   
   // Helpers
   panelLayouts: Record<string, PanelLayout>;
@@ -197,7 +198,7 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
         { 
             id: 'matrix', 
             title: 'Matrix', 
-            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>, 
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z M12 3v18 M3 12h18" /></svg>, 
             content: <MatrixPanel 
                         elements={props.filteredElements} 
                         relationships={props.filteredRelationships} 
@@ -306,7 +307,7 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
         },
         { 
             id: 'history', 
-            title: 'History', 
+            title: 'AI History', 
             icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>, 
             content: <HistoryPanel 
                         history={props.history} 
@@ -323,7 +324,7 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
         { 
             id: 'debug', 
             title: 'Debug', 
-            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>, 
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.5 2C6.5 2 4 4.5 4 7.5c0 1.2.4 2.3 1 3.2-.6.9-1 2-1 3.2 0 2.5 2 4.5 4.5 4.5h.5c.3 2 2 3.5 4 3.5s3.7-1.5 4-3.5h.5c2.5 0 4.5-2 4.5-4.5 0-1.2-.4-2.3-1-3.2.6-.9 1-2 1-3.2C21 4.5 18.5 2 15.5 2c-1.2 0-2.3.4-3.2 1-.9-.6-2-1-3.2-1z" /></svg>, 
             content: <DebugPanel 
                         messages={props.chatMessages} 
                         onClose={() => props.setIsDebugPanelOpen(false)} 
@@ -415,6 +416,7 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
                         isDarkMode={props.isDarkMode}
                         aiConfig={props.aiConfig}
                         onOpenGuidance={props.onOpenWordCloudGuidance}
+                        onLogHistory={props.onLogHistory}
                      />, 
             isOpen: props.isConceptCloudOpen, 
             onToggle: () => props.setIsConceptCloudOpen(p => !p) 
@@ -431,6 +433,7 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
                         isDarkMode={props.isDarkMode}
                         aiConfig={props.aiConfig}
                         onOpenGuidance={props.onOpenWordCloudGuidance}
+                        onLogHistory={props.onLogHistory}
                      />, 
             isOpen: props.isInfluenceCloudOpen, 
             onToggle: () => props.setIsInfluenceCloudOpen(p => !p) 
@@ -447,6 +450,7 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
                         isDarkMode={props.isDarkMode}
                         aiConfig={props.aiConfig}
                         onOpenGuidance={props.onOpenWordCloudGuidance}
+                        onLogHistory={props.onLogHistory}
                      />, 
             isOpen: props.isTextAnalysisOpen, 
             onToggle: () => props.setIsTextAnalysisOpen(p => !p) 
@@ -463,6 +467,7 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
                         isDarkMode={props.isDarkMode}
                         aiConfig={props.aiConfig}
                         onOpenGuidance={props.onOpenWordCloudGuidance}
+                        onLogHistory={props.onLogHistory}
                      />, 
             isOpen: props.isFullTextAnalysisOpen, 
             onToggle: () => props.setIsFullTextAnalysisOpen(p => !p) 

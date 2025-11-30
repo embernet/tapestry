@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage } from './types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
@@ -45,6 +44,7 @@ import MiningToolbar from './components/MiningToolbar';
 import MiningModal from './components/MiningModal';
 import { GuidancePanel } from './components/GuidancePanel';
 import SearchToolbar from './components/SearchToolbar';
+import { DebugPanel } from './components/DebugPanel';
 
 // Explicitly define coordinate type to fix type inference issues
 type Coords = { x: number; y: number };
@@ -102,9 +102,13 @@ export default function App() {
   const tools = useTools(panelState);
   const { isBulkEditActive, setIsBulkEditActive } = tools;
 
-  // --- Chat Context State ---
-  const [chatDraftMessage, setChatDraftMessage] = useState<string>('');
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  // --- Chat & Debug State ---
+  // chatConversation: For the AI Assistant UI (persists only for session, shows User <-> AI chat)
+  const [chatConversation, setChatConversation] = useState<ChatMessage[]>([]);
+  // debugLog: For the Debug Panel (shows raw traffic from ALL tools via aiLogger)
+  const [debugLog, setDebugLog] = useState<ChatMessage[]>([]);
+  // chatDraftMessage: To prepopulate chat from other tools
+  const [chatDraftMessage, setChatDraftMessage] = useState('');
 
   // --- Bulk Edit State ---
   const [bulkTagsToAdd, setBulkTagsToAdd] = useState<string[]>([]);
@@ -181,7 +185,8 @@ export default function App() {
   // --- Logger Subscription ---
   useEffect(() => {
       const unsubscribe = aiLogger.subscribe((msg: ChatMessage) => {
-          setChatMessages(prev => [...prev, msg]);
+          // Log to Debug Panel only
+          setDebugLog(prev => [...prev, msg]);
       });
       return unsubscribe;
   }, []);
@@ -320,7 +325,7 @@ export default function App() {
   // --- Reset Chat on new model ---
   useEffect(() => {
       if (persistence.currentModelId) {
-          setChatMessages([{ role: 'model', text: "Hello! I'm your AI assistant. Ask me anything about your current model, or ask me to make changes to it." }]);
+          setChatConversation([{ role: 'model', text: "Hello! I'm your AI assistant. Ask me anything about your current model, or ask me to make changes to it." }]);
       }
   }, [persistence.currentModelId]);
 
@@ -717,7 +722,7 @@ export default function App() {
     isDarkMode, // Passed for styling child panels
     isDebugPanelOpen,
     setIsDebugPanelOpen,
-    chatMessages,
+    chatMessages: chatConversation, // Pass local chat history
     aiConfig // Pass AI Config for AI features inside panels
 });
 
@@ -924,7 +929,8 @@ export default function App() {
         </div>
     )}
 
-      <ChatPanel className={(!panelState.isChatPanelOpen || !persistence.currentModelId || isPresenting) ? 'hidden' : ''} isOpen={panelState.isChatPanelOpen} elements={elements} relationships={relationships} colorSchemes={colorSchemes} activeSchemeId={activeSchemeId} onClose={() => panelState.setIsChatPanelOpen(false)} currentModelId={persistence.currentModelId} modelActions={aiActions} onOpenPromptSettings={() => { setSettingsInitialTab('ai_prompts'); setIsSettingsModalOpen(true); }} systemPromptConfig={systemPromptConfig} documents={documents} folders={folders} openDocIds={openDocIds} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onOpenTool={tools.handleOpenTool} initialInput={chatDraftMessage} aiConfig={aiConfig} isDarkMode={isDarkMode} messages={chatMessages} setMessages={setChatMessages} />
+      <ChatPanel className={(!panelState.isChatPanelOpen || !persistence.currentModelId || isPresenting) ? 'hidden' : ''} isOpen={panelState.isChatPanelOpen} elements={elements} relationships={relationships} colorSchemes={colorSchemes} activeSchemeId={activeSchemeId} onClose={() => panelState.setIsChatPanelOpen(false)} currentModelId={persistence.currentModelId} modelActions={aiActions} onOpenPromptSettings={() => { setSettingsInitialTab('ai_prompts'); setIsSettingsModalOpen(true); }} systemPromptConfig={systemPromptConfig} documents={documents} folders={folders} openDocIds={openDocIds} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onOpenTool={tools.handleOpenTool} initialInput={chatDraftMessage} aiConfig={aiConfig} isDarkMode={isDarkMode} messages={chatConversation} setMessages={setChatConversation} />
+      {isDebugPanelOpen && <DebugPanel messages={debugLog} onClose={() => setIsDebugPanelOpen(false)} isDarkMode={isDarkMode} />}
       <ScamperModal isOpen={tools.isScamperModalOpen} onClose={() => tools.setIsScamperModalOpen(false)} elements={elements} relationships={relationships} selectedElementId={selectedElementId} modelActions={aiActions} triggerOp={tools.scamperTrigger} onClearTrigger={() => tools.setScamperTrigger(null)} documents={documents} folders={folders} onUpdateDocument={handleUpdateDocument} modelName={persistence.currentModelName} initialDoc={tools.scamperInitialDoc} onLogHistory={handleLogHistory} defaultTags={defaultTags} aiConfig={aiConfig} />
       <TrizModal 
         isOpen={tools.isTrizModalOpen} 

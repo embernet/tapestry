@@ -472,8 +472,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         };
 
         // Pass schema to force JSON output
-        // Pass skipLog: true to prevent duplication in debug view since ChatPanel handles its own state
-        const result = await callAI(aiConfig, contents, systemInstruction, undefined, CHAT_RESPONSE_SCHEMA, true);
+        // skipLog is set to FALSE so that AI Assistant interactions appear in the Debug Panel
+        const result = await callAI(aiConfig, contents, systemInstruction, undefined, CHAT_RESPONSE_SCHEMA, false);
 
         const responseJson = JSON.parse(result.text);
         
@@ -494,6 +494,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         };
 
         setMessages(prev => [...prev, modelMsg]);
+
+        // Log to Main App History if valid
+        if (onLogHistory && (responseJson.message || functionCalls.length > 0)) {
+            const actionSummary = functionCalls.length > 0 ? `\nSuggested Actions: ${functionCalls.length}` : '';
+            const summary = responseJson.message.substring(0, 100) + (responseJson.message.length > 100 ? '...' : '');
+            
+            onLogHistory(
+                'AI Chat',
+                `**User:** ${userMessageText}\n\n**AI:** ${responseJson.message}${actionSummary}`,
+                summary,
+                'chat'
+            );
+        }
 
     } catch (e: any) {
         console.error("AI Error:", e);

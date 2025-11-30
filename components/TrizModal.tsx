@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship, TrizToolType, ModelActions, TapestryDocument, TapestryFolder } from '../types';
-import { generateMarkdownFromGraph, AIConfig } from '../utils';
+import { generateMarkdownFromGraph, AIConfig, callAI } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
@@ -365,7 +365,6 @@ const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, rel
 
       try {
           const graphMarkdown = generateMarkdownFromGraph(elements, relationships);
-          const ai = new GoogleGenAI({ apiKey: aiConfig.apiKey || process.env.API_KEY });
           
           const systemPromptBase = customPrompt || DEFAULT_TOOL_PROMPTS['triz'];
           let systemInstruction = `${systemPromptBase}
@@ -426,46 +425,47 @@ const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, rel
               4. Output the analysis in MARKDOWN format.`;
           }
 
-          const response = await ai.models.generateContent({
-              model: activeModel || 'gemini-2.5-flash',
-              contents: userPrompt,
-              config: {
-                  systemInstruction,
-                  responseMimeType: "application/json",
-                  responseSchema: {
-                      type: Type.OBJECT,
-                      properties: {
-                          analysis: { type: Type.STRING },
-                          actions: {
-                              type: Type.ARRAY,
-                              items: {
+          const responseSchema = {
+              type: Type.OBJECT,
+              properties: {
+                  analysis: { type: Type.STRING },
+                  actions: {
+                      type: Type.ARRAY,
+                      items: {
+                          type: Type.OBJECT,
+                          properties: {
+                              name: { type: Type.STRING },
+                              args: { 
                                   type: Type.OBJECT,
                                   properties: {
                                       name: { type: Type.STRING },
-                                      args: { 
-                                          type: Type.OBJECT,
-                                          properties: {
-                                              name: { type: Type.STRING },
-                                              sourceName: { type: Type.STRING },
-                                              targetName: { type: Type.STRING },
-                                              label: { type: Type.STRING },
-                                              direction: { type: Type.STRING },
-                                              tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-                                              notes: { type: Type.STRING },
-                                              elementName: { type: Type.STRING },
-                                              key: { type: Type.STRING },
-                                              value: { type: Type.STRING }
-                                          }
-                                      }
+                                      sourceName: { type: Type.STRING },
+                                      targetName: { type: Type.STRING },
+                                      label: { type: Type.STRING },
+                                      direction: { type: Type.STRING },
+                                      tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+                                      notes: { type: Type.STRING },
+                                      elementName: { type: Type.STRING },
+                                      key: { type: Type.STRING },
+                                      value: { type: Type.STRING }
                                   }
                               }
                           }
                       }
                   }
               }
-          });
+          };
 
-          const result = JSON.parse(response.text || "{}");
+          // Use callAI utility to leverage centralized logging (Debug Panel)
+          const resultRaw = await callAI(
+              aiConfig,
+              userPrompt,
+              systemInstruction,
+              undefined,
+              responseSchema
+          );
+
+          const result = JSON.parse(resultRaw.text || "{}");
           setAnalysisText(result.analysis);
           
           const actions = (result.actions || []).map((a: any, i: number) => ({ ...a, id: i, status: 'pending' }));

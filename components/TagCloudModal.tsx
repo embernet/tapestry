@@ -12,6 +12,7 @@ interface TagCloudPanelProps {
   isDarkMode: boolean;
   aiConfig: AIConfig;
   onOpenGuidance?: () => void;
+  onLogHistory?: (tool: string, content: string, summary?: string, subTool?: string, toolParams?: any) => void;
 }
 
 type ViewState = 
@@ -75,7 +76,7 @@ const shuffleAndEnrich = (items: Omit<CloudItem, 'color' | 'rotation'>[], isDark
     }));
 };
 
-export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, relationships, onNodeSelect, isDarkMode, aiConfig, onOpenGuidance }) => {
+export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, relationships, onNodeSelect, isDarkMode, aiConfig, onOpenGuidance, onLogHistory }) => {
     const [viewStack, setViewStack] = useState<ViewState[]>([]);
     
     // AI Transformation State
@@ -335,6 +336,17 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
 
             cachedTransformations.current[newMode] = mapping;
             setActiveMode(newMode);
+
+            // Log to AI History
+            if (onLogHistory) {
+                const sample = Object.entries(mapping).slice(0, 5).map(([orig, trans]) => `${orig} -> ${trans}`).join(', ');
+                onLogHistory(
+                    'Word Cloud',
+                    `Transformed ${wordsToTransform.length} words to **${newMode}** mode.\n\nSample: ${sample}...`,
+                    `Transformed View: ${newMode}`,
+                    'tagcloud'
+                );
+            }
 
         } catch (e) {
             console.error("Transformation failed", e);
