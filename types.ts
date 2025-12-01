@@ -148,6 +148,7 @@ export interface CustomStrategyTool {
 
 export interface GlobalSettings {
   toolsBarOpenByDefault: boolean;
+  theme: 'light' | 'dark';
   activeProvider: AIProvider;
   aiConnections: Record<AIProvider, AIConnection>;
   customStrategies: CustomStrategyTool[];
@@ -176,6 +177,12 @@ export interface DateFilterState {
   createdBefore: string;
   updatedAfter: string;
   updatedBefore: string;
+}
+
+export interface NodeFilterState {
+  centerId: string | null;
+  hops: number;
+  active: boolean;
 }
 
 export interface ModelActions {

@@ -129,6 +129,8 @@ interface UsePanelDefinitionsProps {
   setPanelLayouts: React.Dispatch<React.SetStateAction<Record<string, PanelLayout>>>;
   setIsPhysicsModeActive: React.Dispatch<React.SetStateAction<boolean>>;
   setOriginalElements: React.Dispatch<React.SetStateAction<Element[] | null>>;
+  originalElements: Element[] | null;
+  setElements: React.Dispatch<React.SetStateAction<Element[]>>;
   graphCanvasRef: React.RefObject<any>;
   aiActions: ModelActions;
   aiConfig: AIConfig;
@@ -136,6 +138,45 @@ interface UsePanelDefinitionsProps {
   // Theme
   isDarkMode: boolean;
 }
+
+// Helper to calculate max depth from center node
+const calculateMaxDepth = (centerId: string, relationships: Relationship[]) => {
+    if (!centerId) return 0;
+    
+    // Build adjacency list
+    const adj = new Map<string, string[]>();
+    relationships.forEach(r => {
+        const s = r.source as string;
+        const t = r.target as string;
+        if (!adj.has(s)) adj.set(s, []);
+        if (!adj.has(t)) adj.set(t, []);
+        adj.get(s)!.push(t);
+        adj.get(t)!.push(s);
+    });
+
+    let depth = 0;
+    let currentLayer = [centerId];
+    const visited = new Set<string>([centerId]);
+
+    while (true) {
+        const nextLayer: string[] = [];
+        for (const nodeId of currentLayer) {
+            const neighbors = adj.get(nodeId) || [];
+            for (const neighbor of neighbors) {
+                if (!visited.has(neighbor)) {
+                    visited.add(neighbor);
+                    nextLayer.push(neighbor);
+                }
+            }
+        }
+        
+        if (nextLayer.length === 0) break;
+        depth++;
+        currentLayer = nextLayer;
+    }
+    
+    return depth;
+};
 
 export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
   return useMemo(() => {
@@ -355,19 +396,24 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
                         centerNodeName={props.elements.find(e => e.id === props.sunburstState.centerId)?.name || null}
                         hops={props.sunburstState.hops}
                         visibleCount={props.filteredElements.length}
+                        maxHops={props.sunburstState.centerId ? calculateMaxDepth(props.sunburstState.centerId, props.relationships) : 0}
                         onHopsChange={(newHops) => props.setSunburstState(prev => ({ ...prev, hops: newHops }))}
                         onRestart={() => {
+                            if (props.originalElements) {
+                                props.setElements(props.originalElements);
+                            }
                             props.setSunburstState(prev => ({ ...prev, centerId: null, hops: 0 }));
                             props.setIsPhysicsModeActive(false);
-                            if (props.setOriginalElements) {
-                                props.setOriginalElements(null);
-                            }
+                            props.setOriginalElements(null);
                         }}
                         onReset={() => {
                              props.setSunburstState(prev => ({ ...prev, hops: 0 }));
                              props.graphCanvasRef.current?.setCamera(0,0,1);
                         }}
                         onClose={() => {
+                            if (props.originalElements) {
+                                props.setElements(props.originalElements);
+                            }
                             props.setIsSunburstPanelOpen(false);
                             props.setSunburstState(prev => ({ ...prev, active: false }));
                             props.setIsPhysicsModeActive(false);
@@ -382,6 +428,9 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
                 if (willOpen) {
                     props.setSunburstState(prev => ({ ...prev, active: true }));
                 } else {
+                    if (props.originalElements) {
+                        props.setElements(props.originalElements);
+                    }
                     props.setSunburstState(prev => ({ ...prev, active: false }));
                     props.setIsPhysicsModeActive(false);
                     props.setOriginalElements(null);

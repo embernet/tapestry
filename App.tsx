@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage } from './types';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, NodeFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage } from './types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
 import { TOOL_DOCUMENTATION } from './documentation';
 import { usePanelDefinitions } from './components/usePanelDefinitions';
@@ -67,6 +67,7 @@ export default function App() {
   // --- Settings State ---
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
       toolsBarOpenByDefault: true,
+      theme: 'dark',
       activeProvider: 'gemini',
       aiConnections: {
           gemini: { provider: 'gemini', apiKey: '', modelId: 'gemini-2.5-flash' },
@@ -83,7 +84,16 @@ export default function App() {
   const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'ai_settings' | 'ai_prompts' | 'ai_tools' | 'prompts'>('general');
 
   // --- Theme State ---
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+      try {
+          const saved = localStorage.getItem(GLOBAL_SETTINGS_KEY);
+          if (saved) {
+              const parsed = JSON.parse(saved);
+              return parsed.theme === 'light' ? false : true;
+          }
+      } catch(e) {}
+      return true;
+  });
 
   // --- Documents State ---
   const [documents, setDocuments] = useState<TapestryDocument[]>([]);
@@ -155,6 +165,7 @@ export default function App() {
   
   const [tagFilter, setTagFilter] = useState<{ included: Set<string>, excluded: Set<string> }>({ included: new Set(), excluded: new Set() });
   const [dateFilter, setDateFilter] = useState<DateFilterState>({ createdAfter: '', createdBefore: '', updatedAfter: '', updatedBefore: '' });
+  const [nodeFilter, setNodeFilter] = useState<NodeFilterState>({ centerId: null, hops: 1, active: false });
   
   const [isPhysicsModeActive, setIsPhysicsModeActive] = useState(false);
   const [originalElements, setOriginalElements] = useState<Element[] | null>(null);
@@ -203,8 +214,10 @@ export default function App() {
               const parsed = JSON.parse(savedSettings);
               // Ensure customStrategies is initialized even if not in old save
               if (!parsed.customStrategies) parsed.customStrategies = [];
+              if (!parsed.theme) parsed.theme = 'dark'; // Ensure theme exists
               setGlobalSettings(prev => ({ ...prev, ...parsed }));
               tools.setIsToolsPanelOpen(parsed.toolsBarOpenByDefault ?? true);
+              setIsDarkMode(parsed.theme === 'dark');
           }
       } catch (e) {
           console.error("Failed to load global settings", e);
@@ -213,7 +226,14 @@ export default function App() {
 
   const handleGlobalSettingsChange = (settings: GlobalSettings) => {
       setGlobalSettings(settings);
+      setIsDarkMode(settings.theme === 'dark');
       localStorage.setItem(GLOBAL_SETTINGS_KEY, JSON.stringify(settings));
+  };
+
+  const handleThemeToggle = () => {
+      const newTheme = isDarkMode ? 'light' : 'dark';
+      const newSettings: GlobalSettings = { ...globalSettings, theme: newTheme };
+      handleGlobalSettingsChange(newSettings);
   };
 
   const handleCustomStrategiesChange = (strategies: CustomStrategyTool[]) => {
@@ -363,7 +383,7 @@ export default function App() {
   const tagCounts = useMemo(() => { const counts = new Map<string, number>(); elements.forEach(element => { element.tags.forEach(tag => { counts.set(tag, (counts.get(tag) || 0) + 1); }); }); return counts; }, [elements]);
   useEffect(() => { setTagFilter(prevFilter => { const allTagsSet = new Set(allTags); const newIncluded = new Set<string>(); for (const tag of allTags) { const wasPreviouslyIncluded = prevFilter.included.has(tag); const wasPreviouslyExcluded = prevFilter.excluded.has(tag); if (wasPreviouslyIncluded) { newIncluded.add(tag); } else if (!wasPreviouslyExcluded) { newIncluded.add(tag); } } const newExcluded = new Set<string>(); for (const tag of prevFilter.excluded) { if (allTagsSet.has(tag)) { newExcluded.add(tag); } } return { included: newIncluded, excluded: newExcluded }; }); }, [allTags]);
   
-  // --- Sunburst Logic ---
+  // --- Sunburst & Filter Logic ---
   const getSunburstNodes = useCallback((centerId: string, depth: number) => {
       const visibleIds = new Set<string>([centerId]);
       let currentLayer = [centerId];
@@ -381,11 +401,16 @@ export default function App() {
   }, [relationships]);
 
   const filteredElements = useMemo(() => { 
+      // Handle Sunburst Panel View
       if (panelState.isSunburstPanelOpen && panelState.sunburstState.active && panelState.sunburstState.centerId) {
           const visibleIds = getSunburstNodes(panelState.sunburstState.centerId, panelState.sunburstState.hops);
           return elements.filter(e => visibleIds.has(e.id));
       }
-      const { included, excluded } = tagFilter; 
+
+      // Handle Standard Filtering
+      let currentElements = elements;
+
+      // 1. Date Filter
       const matchesDate = (element: Element) => { 
           const createdDate = element.createdAt.substring(0, 10); 
           const updatedDate = element.updatedAt.substring(0, 10); 
@@ -394,19 +419,45 @@ export default function App() {
           if (dateFilter.updatedAfter && updatedDate < dateFilter.updatedAfter) return false; 
           if (dateFilter.updatedBefore && updatedDate > dateFilter.updatedBefore) return false; 
           return true; 
-      }; 
-      return elements.filter(element => { 
-          if (!matchesDate(element)) return false; 
-          if (analysisFilterState.mode === 'hide') { if (analysisFilterState.ids.has(element.id)) return false; } 
-          else if (analysisFilterState.mode === 'hide_others') { if (!analysisFilterState.ids.has(element.id)) return false; }
-          if (excluded.size === 0 && included.size === allTags.length) return true; 
+      };
+      
+      currentElements = currentElements.filter(matchesDate);
+
+      // 2. Node Hops Filter (New)
+      if (nodeFilter.active && nodeFilter.centerId) {
+          const visibleIds = getSunburstNodes(nodeFilter.centerId, nodeFilter.hops);
+          currentElements = currentElements.filter(e => visibleIds.has(e.id));
+      }
+
+      // 3. Analysis Filter (Hide/Hide Others)
+      if (analysisFilterState.mode === 'hide') {
+          currentElements = currentElements.filter(e => !analysisFilterState.ids.has(e.id));
+      } else if (analysisFilterState.mode === 'hide_others') {
+          currentElements = currentElements.filter(e => analysisFilterState.ids.has(e.id));
+      }
+
+      // 4. Tag Filter
+      const { included, excluded } = tagFilter;
+      currentElements = currentElements.filter(element => { 
+          if (excluded.has(element.tags.find(t => excluded.has(t)) || '')) return false; // Optimization? No, simple logic:
           if (element.tags.some(tag => excluded.has(tag))) return false; 
+          
+          // If no tags are explicitly excluded and all tags are included (default state), show everything
+          if (excluded.size === 0 && included.size === allTags.length) return true; 
+          
+          // If node has no tags, show it (unless hidden by other means) - mimicking default behavior where untagged are usually visible unless strictly filtering for specific tags
           if (element.tags.length === 0) return true; 
+          
           return element.tags.some(tag => included.has(tag)); 
       }); 
-  }, [elements, tagFilter, allTags, dateFilter, analysisFilterState, panelState.isSunburstPanelOpen, panelState.sunburstState, getSunburstNodes]);
 
-  const filteredRelationships = useMemo(() => { const { included, excluded } = tagFilter; const visibleElementIds = new Set(filteredElements.map(f => f.id)); return relationships.filter(rel => visibleElementIds.has(rel.source as string) && visibleElementIds.has(rel.target as string)); }, [relationships, filteredElements, tagFilter, allTags]);
+      return currentElements;
+  }, [elements, tagFilter, allTags, dateFilter, analysisFilterState, panelState.isSunburstPanelOpen, panelState.sunburstState, getSunburstNodes, nodeFilter]);
+
+  const filteredRelationships = useMemo(() => { 
+      const visibleElementIds = new Set(filteredElements.map(f => f.id)); 
+      return relationships.filter(rel => visibleElementIds.has(rel.source as string) && visibleElementIds.has(rel.target as string)); 
+  }, [relationships, filteredElements]);
 
   const handleDeleteElement = useCallback((elementId: string) => { setElements(prev => prev.filter(f => f.id !== elementId)); setRelationships(prev => prev.filter(r => r.source !== elementId && r.target !== elementId)); if (selectedElementId === elementId) { setSelectedElementId(null); } if (multiSelection.has(elementId)) { const next = new Set(multiSelection); next.delete(elementId); setMultiSelection(next); } }, [selectedElementId, multiSelection]);
   
@@ -456,7 +507,7 @@ export default function App() {
             return; 
         }
         else if (doc.type === 'scamper-analysis') { tools.setActiveTool('scamper'); tools.setScamperInitialDoc(doc); tools.setIsScamperModalOpen(true); return; }
-        else if (doc.type === 'triz-analysis') { tools.setActiveTool('triz'); tools.setTrizInitialParams(null); tools.setIsTrizModalOpen(true); return; } // Note: TRIZ modal doesn't currently fully support loading doc content like SWOT does, but can be extended. For now this opens the tool.
+        else if (doc.type === 'triz-analysis') { tools.setActiveTool('triz'); tools.setTrizInitialParams(null); tools.setIsTrizModalOpen(true); return; } 
         
         if (!openDocIds.includes(docId)) { setOpenDocIds(prev => [...prev, docId]); }
         if (origin === 'report') { 
@@ -818,6 +869,8 @@ export default function App() {
     setPanelLayouts,
     setIsPhysicsModeActive,
     setOriginalElements,
+    originalElements, // Added
+    setElements,      // Added
     graphCanvasRef,
     aiActions,
     isDarkMode, // Passed for styling child panels
@@ -882,7 +935,7 @@ export default function App() {
             onSelfTest={runSelfTest}
             onUserGuide={() => setIsUserGuideModalOpen(true)}
             isDarkMode={isDarkMode}
-            onToggleTheme={() => setIsDarkMode(prev => !prev)}
+            onToggleTheme={handleThemeToggle}
             onToggleDebug={() => setIsDebugPanelOpen(prev => !prev)}
           />
       )}
@@ -1040,7 +1093,19 @@ export default function App() {
       )}
 
       {panelState.isFilterPanelOpen && persistence.currentModelId && !isPresenting && (
-        <FilterPanel allTags={allTags} tagCounts={tagCounts} tagFilter={tagFilter} dateFilter={dateFilter} onTagFilterChange={setTagFilter} onDateFilterChange={setDateFilter} onClose={() => panelState.setIsFilterPanelOpen(false)} isDarkMode={isDarkMode} />
+        <FilterPanel 
+            allTags={allTags} 
+            tagCounts={tagCounts} 
+            tagFilter={tagFilter} 
+            dateFilter={dateFilter} 
+            nodeFilter={nodeFilter}
+            elements={elements}
+            onTagFilterChange={setTagFilter} 
+            onDateFilterChange={setDateFilter} 
+            onNodeFilterChange={setNodeFilter}
+            onClose={() => panelState.setIsFilterPanelOpen(false)} 
+            isDarkMode={isDarkMode} 
+        />
       )}
       
       {/* 
@@ -1144,7 +1209,7 @@ export default function App() {
         onOpenGuidance={() => tools.handleOpenGuidance('strategy')}
       />
       <MiningModal isOpen={isMiningModalOpen} elements={elements} relationships={relationships} onClose={() => setIsMiningModalOpen(false)} onNodeSelect={(id) => { setIsMiningModalOpen(false); handleNodeClick(id, new MouseEvent('click')); }} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onAnalyze={handleAnalyzeWithChat} />
-      <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} initialTab={settingsInitialTab} globalSettings={globalSettings} onGlobalSettingsChange={handleGlobalSettingsChange} modelSettings={systemPromptConfig} onModelSettingsChange={setSystemPromptConfig} />
+      <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} initialTab={settingsInitialTab} globalSettings={globalSettings} onGlobalSettingsChange={handleGlobalSettingsChange} modelSettings={systemPromptConfig} onModelSettingsChange={setSystemPromptConfig} isDarkMode={isDarkMode} />
       {persistence.isSchemaUpdateModalOpen && <SchemaUpdateModal changes={persistence.schemaUpdateChanges} onClose={() => persistence.setIsSchemaUpdateModalOpen(false)} />}
       <SelfTestModal isOpen={isSelfTestModalOpen} onClose={() => setIsSelfTestModalOpen(false)} logs={testLogs} status={testStatus} isDarkMode={isDarkMode} />
       {isUserGuideModalOpen && <UserGuideModal onClose={() => setIsUserGuideModalOpen(false)} isDarkMode={isDarkMode} />}
@@ -1171,7 +1236,7 @@ export default function App() {
              </div>
              <div className="w-[600px] text-center space-y-4">
                  <p className="font-bold text-blue-400">This project is in Alpha release and is in active development.</p>
-                 <p className={`text-lg leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Tapestry is a knowledge graph editor that brings together many engineering, business, creativity, and innovation tools and uses AI to bring them to life.</p>
+                 <p className={`text-lg leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Tapestry Studio is an AI-powered knowledge graph editor, creativity, and problem solving tool that brings together many Science, Engineering, Business, and Innovation tools and uses AI to bring them to life.</p>
                  <AiDisclaimer isDarkMode={isDarkMode} />
              </div>
              {persistence.modelsIndex.length > 0 && (

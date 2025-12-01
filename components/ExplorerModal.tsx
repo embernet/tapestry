@@ -8,8 +8,9 @@ const D3Treemap: React.FC<{
     data: any, 
     width: number, 
     height: number, 
-    onLeafClick: (node: any) => void 
-}> = ({ data, width, height, onLeafClick }) => {
+    onLeafClick: (node: any) => void,
+    isDarkMode: boolean
+}> = ({ data, width, height, onLeafClick, isDarkMode }) => {
     const svgRef = useRef<SVGSVGElement>(null);
 
     useEffect(() => {
@@ -18,13 +19,16 @@ const D3Treemap: React.FC<{
         const svg = d3.select(svgRef.current);
         svg.selectAll("*").remove();
 
+        const textColor = isDarkMode ? "#6b7280" : "#9ca3af";
+        const titleColor = isDarkMode ? "#fff" : "#1f2937";
+
         // Handle empty data gracefully
         if (!data.children || data.children.length === 0) {
             svg.append("text")
                 .attr("x", width / 2)
                 .attr("y", height / 2)
                 .attr("text-anchor", "middle")
-                .attr("fill", "#6b7280")
+                .attr("fill", textColor)
                 .text("No data available");
             return;
         }
@@ -91,13 +95,14 @@ const D3Treemap: React.FC<{
             .text(d => d.data.name)
             .attr("font-size", "12px")
             .attr("font-weight", "bold")
-            .attr("fill", "#fff")
+            .attr("fill", titleColor)
             .attr("opacity", 0.7)
             .style("pointer-events", "none");
 
-    }, [data, width, height, onLeafClick]);
+    }, [data, width, height, onLeafClick, isDarkMode]);
 
-    return <svg ref={svgRef} width={width} height={height} className="bg-gray-900 rounded" />;
+    const bgClass = isDarkMode ? "bg-gray-900" : "bg-white";
+    return <svg ref={svgRef} width={width} height={height} className={`${bgClass} rounded transition-colors`} />;
 };
 
 // --- Treemap Panel ---
@@ -105,9 +110,10 @@ interface TreemapPanelProps {
     elements: Element[];
     relationships: Relationship[];
     onNodeSelect: (elementId: string) => void;
+    isDarkMode: boolean;
 }
 
-export const TreemapPanel: React.FC<TreemapPanelProps> = ({ elements, relationships, onNodeSelect }) => {
+export const TreemapPanel: React.FC<TreemapPanelProps> = ({ elements, relationships, onNodeSelect, isDarkMode }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 400, height: 300 });
 
@@ -146,17 +152,24 @@ export const TreemapPanel: React.FC<TreemapPanelProps> = ({ elements, relationsh
         };
     }, [elements, relationships]);
 
+    const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+    const headerBg = isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-200';
+    const contentBg = isDarkMode ? 'bg-gray-900' : 'bg-white';
+    const titleColor = isDarkMode ? 'text-yellow-400' : 'text-yellow-600';
+    const borderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+
     return (
-        <div className="w-full h-full bg-gray-800 flex flex-col">
-            <div className="p-4 border-b border-gray-700 bg-gray-900">
-                <h2 className="text-xl font-bold text-yellow-400">Treemap</h2>
+        <div className={`w-full h-full flex flex-col ${bgClass}`}>
+            <div className={`p-4 border-b ${borderClass} ${headerBg}`}>
+                <h2 className={`text-xl font-bold ${titleColor}`}>Treemap</h2>
             </div>
-            <div className="flex-grow bg-gray-900 overflow-hidden p-2" ref={containerRef}>
+            <div className={`flex-grow overflow-hidden p-2 ${contentBg}`} ref={containerRef}>
                 <D3Treemap 
                     data={treemapData} 
                     width={dimensions.width} 
                     height={dimensions.height} 
                     onLeafClick={(d) => onNodeSelect(d.id)}
+                    isDarkMode={isDarkMode}
                 />
             </div>
         </div>
@@ -166,31 +179,39 @@ export const TreemapPanel: React.FC<TreemapPanelProps> = ({ elements, relationsh
 // --- Tag Distribution Panel ---
 interface TagDistributionPanelProps {
     elements: Element[];
+    isDarkMode: boolean;
 }
 
-export const TagDistributionPanel: React.FC<TagDistributionPanelProps> = ({ elements }) => {
+export const TagDistributionPanel: React.FC<TagDistributionPanelProps> = ({ elements, isDarkMode }) => {
     const tagStats = useMemo(() => {
         const counts = new Map<string, number>();
         elements.forEach(e => e.tags.forEach(t => counts.set(t, (counts.get(t) || 0) + 1)));
         return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
     }, [elements]);
 
+    const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+    const headerBg = isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-200';
+    const titleColor = isDarkMode ? 'text-blue-400' : 'text-blue-600';
+    const textColor = isDarkMode ? 'text-gray-300' : 'text-gray-700';
+    const barBg = isDarkMode ? 'bg-gray-900' : 'bg-gray-100';
+    const countColor = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+
     return (
-        <div className="w-full h-full bg-gray-800 flex flex-col">
-            <div className="p-4 border-b border-gray-700 bg-gray-900">
-                <h2 className="text-xl font-bold text-blue-400">Tag Frequency</h2>
+        <div className={`w-full h-full flex flex-col ${bgClass}`}>
+            <div className={`p-4 border-b ${headerBg}`}>
+                <h2 className={`text-xl font-bold ${titleColor}`}>Tag Frequency</h2>
             </div>
-            <div className="flex-grow p-4 overflow-y-auto">
+            <div className="flex-grow p-4 overflow-y-auto custom-scrollbar">
                 <div className="space-y-2">
                     {tagStats.map(([tag, count]) => (
                         <div key={tag} className="flex items-center gap-2 text-sm">
-                            <div className="w-32 text-right truncate text-gray-300 font-medium">{tag}</div>
-                            <div className="flex-grow bg-gray-900 rounded-full h-6 overflow-hidden relative">
+                            <div className={`w-32 text-right truncate font-medium ${textColor}`}>{tag}</div>
+                            <div className={`flex-grow ${barBg} rounded-full h-6 overflow-hidden relative`}>
                                 <div 
                                     className="h-full bg-blue-600 rounded-full transition-all duration-500" 
                                     style={{ width: `${Math.max(1, (count / (tagStats[0]?.[1] || 1)) * 100)}%` }}
                                 ></div>
-                                <span className="absolute right-3 top-1 text-xs text-gray-400 font-bold">{count}</span>
+                                <span className={`absolute right-3 top-1 text-xs font-bold ${countColor}`}>{count}</span>
                             </div>
                         </div>
                     ))}
@@ -204,31 +225,39 @@ export const TagDistributionPanel: React.FC<TagDistributionPanelProps> = ({ elem
 // --- Relationship Distribution Panel ---
 interface RelationshipDistributionPanelProps {
     relationships: Relationship[];
+    isDarkMode: boolean;
 }
 
-export const RelationshipDistributionPanel: React.FC<RelationshipDistributionPanelProps> = ({ relationships }) => {
+export const RelationshipDistributionPanel: React.FC<RelationshipDistributionPanelProps> = ({ relationships, isDarkMode }) => {
     const relStats = useMemo(() => {
         const counts = new Map<string, number>();
         relationships.forEach(r => counts.set(r.label, (counts.get(r.label) || 0) + 1));
         return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
     }, [relationships]);
 
+    const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+    const headerBg = isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-200';
+    const titleColor = isDarkMode ? 'text-green-400' : 'text-green-600';
+    const textColor = isDarkMode ? 'text-gray-300' : 'text-gray-700';
+    const barBg = isDarkMode ? 'bg-gray-900' : 'bg-gray-100';
+    const countColor = isDarkMode ? 'text-gray-400' : 'text-gray-600';
+
     return (
-        <div className="w-full h-full bg-gray-800 flex flex-col">
-            <div className="p-4 border-b border-gray-700 bg-gray-900">
-                <h2 className="text-xl font-bold text-green-400">Relationship Usage</h2>
+        <div className={`w-full h-full flex flex-col ${bgClass}`}>
+            <div className={`p-4 border-b ${headerBg}`}>
+                <h2 className={`text-xl font-bold ${titleColor}`}>Relationship Usage</h2>
             </div>
-            <div className="flex-grow p-4 overflow-y-auto">
+            <div className="flex-grow p-4 overflow-y-auto custom-scrollbar">
                 <div className="space-y-2">
                     {relStats.map(([label, count]) => (
                         <div key={label} className="flex items-center gap-2 text-sm">
-                            <div className="w-32 text-right truncate text-gray-300 font-medium">{label}</div>
-                            <div className="flex-grow bg-gray-900 rounded-full h-6 overflow-hidden relative">
+                            <div className={`w-32 text-right truncate font-medium ${textColor}`}>{label}</div>
+                            <div className={`flex-grow ${barBg} rounded-full h-6 overflow-hidden relative`}>
                                 <div 
                                     className="h-full bg-green-600 rounded-full transition-all duration-500" 
                                     style={{ width: `${Math.max(1, (count / (relStats[0]?.[1] || 1)) * 100)}%` }}
                                 ></div>
-                                <span className="absolute right-3 top-1 text-xs text-gray-400 font-bold">{count}</span>
+                                <span className={`absolute right-3 top-1 text-xs font-bold ${countColor}`}>{count}</span>
                             </div>
                         </div>
                     ))}
