@@ -116,6 +116,8 @@ interface TreemapPanelProps {
 export const TreemapPanel: React.FC<TreemapPanelProps> = ({ elements, relationships, onNodeSelect, isDarkMode }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [dimensions, setDimensions] = useState({ width: 400, height: 300 });
+    const [view, setView] = useState<'tags' | 'relationships' | 'attribute'>('tags');
+    const [groupByAttribute, setGroupByAttribute] = useState<string>('');
 
     useEffect(() => {
         if (containerRef.current) {
@@ -132,25 +134,81 @@ export const TreemapPanel: React.FC<TreemapPanelProps> = ({ elements, relationsh
         }
     }, []);
 
-    const treemapData = useMemo(() => {
-        const tagGroups: Record<string, any[]> = {};
+    // Extract all unique attribute keys available in the elements
+    const availableAttributes = useMemo(() => {
+        const keys = new Set<string>();
         elements.forEach(el => {
-            const tags = el.tags.length > 0 ? el.tags : ['Uncategorized'];
-            tags.forEach(tag => {
-                if (!tagGroups[tag]) tagGroups[tag] = [];
-                const degree = relationships.filter(r => r.source === el.id || r.target === el.id).length + 1;
-                tagGroups[tag].push({ name: el.name, value: degree, id: el.id });
-            });
+            if (el.attributes) {
+                Object.keys(el.attributes).forEach(k => keys.add(k));
+            }
         });
+        return Array.from(keys).sort();
+    }, [elements]);
 
-        return {
-            name: "Tags",
-            children: Object.entries(tagGroups).map(([tag, items]) => ({
-                name: tag,
-                children: items
-            }))
-        };
-    }, [elements, relationships]);
+    const treemapData = useMemo(() => {
+        if (view === 'tags') {
+            const tagGroups: Record<string, any[]> = {};
+            elements.forEach(el => {
+                const tags = el.tags.length > 0 ? el.tags : ['Uncategorized'];
+                tags.forEach(tag => {
+                    if (!tagGroups[tag]) tagGroups[tag] = [];
+                    // Calculate weight (e.g. degree of connections)
+                    const degree = relationships.filter(r => r.source === el.id || r.target === el.id).length + 1;
+                    tagGroups[tag].push({ name: el.name, value: degree, id: el.id });
+                });
+            });
+
+            return {
+                name: "Tags",
+                children: Object.entries(tagGroups).map(([tag, items]) => ({
+                    name: tag,
+                    children: items
+                }))
+            };
+        } else if (view === 'relationships') {
+            // View by Outgoing Relationships
+            const relGroups: Record<string, any[]> = {};
+            relationships.forEach(rel => {
+                if (!relGroups[rel.label]) relGroups[rel.label] = [];
+                // Find source element
+                const source = elements.find(e => e.id === rel.source);
+                if (source) {
+                    relGroups[rel.label].push({ name: source.name, value: 1, id: source.id });
+                }
+            });
+             return {
+                name: "Relationships",
+                children: Object.entries(relGroups).map(([label, items]) => ({
+                    name: label,
+                    children: items
+                }))
+            };
+        } else if (view === 'attribute') {
+             const groups: Record<string, any[]> = {};
+             
+             elements.forEach(el => {
+                let val = 'Undefined';
+                if (groupByAttribute && el.attributes && el.attributes[groupByAttribute]) {
+                    val = el.attributes[groupByAttribute];
+                }
+                
+                if (!groups[val]) groups[val] = [];
+                
+                // Calculate weight (degree)
+                const degree = relationships.filter(r => r.source === el.id || r.target === el.id).length + 1;
+                groups[val].push({ name: el.name, value: degree, id: el.id });
+             });
+
+             return {
+                name: groupByAttribute || "Attributes",
+                children: Object.entries(groups).map(([key, items]) => ({
+                    name: key,
+                    children: items
+                }))
+            };
+        }
+        return { name: "Root", children: [] };
+    }, [elements, relationships, view, groupByAttribute]);
 
     const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
     const headerBg = isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-200';
@@ -163,14 +221,47 @@ export const TreemapPanel: React.FC<TreemapPanelProps> = ({ elements, relationsh
             <div className={`p-4 border-b ${borderClass} ${headerBg}`}>
                 <h2 className={`text-xl font-bold ${titleColor}`}>Treemap</h2>
             </div>
-            <div className={`flex-grow overflow-hidden p-2 ${contentBg}`} ref={containerRef}>
-                <D3Treemap 
-                    data={treemapData} 
-                    width={dimensions.width} 
-                    height={dimensions.height} 
-                    onLeafClick={(d) => onNodeSelect(d.id)}
-                    isDarkMode={isDarkMode}
-                />
+            <div className={`flex-grow flex flex-col overflow-hidden p-2 ${contentBg}`}>
+                <div className="flex flex-wrap justify-center gap-2 mb-2 items-center">
+                    <button 
+                        onClick={() => setView('tags')}
+                        className={`px-3 py-1 rounded text-xs font-bold transition-colors ${view === 'tags' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'}`}
+                    >
+                        Tags
+                    </button>
+                    <button 
+                        onClick={() => setView('relationships')}
+                        className={`px-3 py-1 rounded text-xs font-bold transition-colors ${view === 'relationships' ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'}`}
+                    >
+                        Relationships
+                    </button>
+                    <button 
+                        onClick={() => setView('attribute')}
+                        className={`px-3 py-1 rounded text-xs font-bold transition-colors ${view === 'attribute' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'}`}
+                    >
+                        Attribute
+                    </button>
+                    
+                    {view === 'attribute' && (
+                        <select 
+                            value={groupByAttribute} 
+                            onChange={(e) => setGroupByAttribute(e.target.value)}
+                            className={`text-xs rounded border px-2 py-1 outline-none ${isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                        >
+                            <option value="">-- Select --</option>
+                            {availableAttributes.map(k => <option key={k} value={k}>{k}</option>)}
+                        </select>
+                    )}
+                </div>
+                <div className="flex-grow rounded border border-gray-700 overflow-hidden" ref={containerRef}>
+                    <D3Treemap 
+                        data={treemapData} 
+                        width={dimensions.width} 
+                        height={dimensions.height} 
+                        onLeafClick={(d) => onNodeSelect(d.id)}
+                        isDarkMode={isDarkMode}
+                    />
+                </div>
             </div>
         </div>
     );

@@ -195,16 +195,17 @@ export const usePersistence = ({
             const index = indexStr ? JSON.parse(indexStr) : []; 
             setModelsIndex(index); 
             
-            const lastId = localStorage.getItem(LAST_OPENED_MODEL_ID_KEY);
-            if (lastId && index.some((m: ModelMetadata) => m.id === lastId)) {
-                handleLoadModel(lastId);
-            } 
+            // Auto-load removed to enforce start screen
+            // const lastId = localStorage.getItem(LAST_OPENED_MODEL_ID_KEY);
+            // if (lastId && index.some((m: ModelMetadata) => m.id === lastId)) {
+            //     handleLoadModel(lastId);
+            // } 
         } catch (error) { 
             console.error("Failed to load models index:", error); 
             setModelsIndex([]); 
         } 
         setIsInitialLoad(false); 
-    }, [isInitialLoad, handleLoadModel]);
+    }, [isInitialLoad]);
 
     // Auto-save index
     useEffect(() => { 

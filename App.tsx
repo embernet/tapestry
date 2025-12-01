@@ -24,6 +24,7 @@ import TocToolbar from './components/TocToolbar';
 import TocModal from './components/TocModal';
 import SsmToolbar from './components/SsmToolbar';
 import SsmModal from './components/SsmModal';
+import MethodsToolbar from './components/MethodsToolbar';
 import ExplorerToolbar from './components/ExplorerToolbar';
 import TagCloudToolbar from './components/TagCloudToolbar';
 import SwotToolbar from './components/SwotToolbar';
@@ -41,8 +42,6 @@ import { useClickOutside } from './hooks/useClickOutside';
 import AppHeader from './components/AppHeader';
 import { useSelfTest } from './hooks/useSelfTest';
 import { usePersistence } from './hooks/usePersistence';
-import MiningToolbar from './components/MiningToolbar';
-import MiningModal from './components/MiningModal';
 import { GuidancePanel } from './components/GuidancePanel';
 import SearchToolbar from './components/SearchToolbar';
 import { DebugPanel } from './components/DebugPanel';
@@ -53,7 +52,7 @@ type Coords = { x: number; y: number };
 const GLOBAL_SETTINGS_KEY = 'tapestry_global_settings';
 
 // Tools that expand horizontally and should hide others when active
-const HORIZONTAL_TOOLS = ['search', 'schema', 'layout', 'analysis', 'bulk', 'command', 'mining', 'mermaid'];
+const HORIZONTAL_TOOLS = ['search', 'schema', 'layout', 'analysis', 'bulk', 'command', 'mermaid', 'methods', 'scamper', 'triz', 'lss', 'toc', 'ssm'];
 
 // --- Main App Component ---
 
@@ -161,7 +160,6 @@ export default function App() {
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isPatternGalleryModalOpen, setIsPatternGalleryModalOpen] = useState(false);
   const [isUserGuideModalOpen, setIsUserGuideModalOpen] = useState(false);
-  const [isMiningModalOpen, setIsMiningModalOpen] = useState(false);
   
   const [tagFilter, setTagFilter] = useState<{ included: Set<string>, excluded: Set<string> }>({ included: new Set(), excluded: new Set() });
   const [dateFilter, setDateFilter] = useState<DateFilterState>({ createdAfter: '', createdBefore: '', updatedAfter: '', updatedBefore: '' });
@@ -356,7 +354,6 @@ export default function App() {
   };
   const handleSwotToolSelect = (tool: SwotToolType) => { tools.setActiveSwotTool(tool); tools.setSwotInitialDoc(null); tools.setIsSwotModalOpen(true); tools.setActiveTool(null); };
   const handleMermaidToolSelect = (tool: MermaidToolType) => { if (tool === 'editor') panelState.setIsMermaidPanelOpen(true); tools.setActiveTool(null); };
-  const handleMiningToolSelect = () => { setIsMiningModalOpen(true); tools.setActiveTool(null); };
 
   useEffect(() => { if (tools.activeTool !== 'bulk') { setIsBulkEditActive(false); } }, [tools.activeTool]);
 
@@ -993,10 +990,22 @@ export default function App() {
                 {isToolVisible('analysis') && (
                     <AnalysisToolbar elements={elements} relationships={relationships} onBulkTag={handleBulkTagAction} onHighlight={handleAnalysisHighlight} onFilter={handleAnalysisFilter} isCollapsed={tools.activeTool !== 'analysis'} onToggle={() => tools.toggleTool('analysis')} isSimulationMode={isSimulationMode} onToggleSimulation={() => setIsSimulationMode(p => !p)} onResetSimulation={() => setSimulationState({})} isDarkMode={isDarkMode} />
                 )}
-                {isToolVisible('scamper') && (
+                
+                {/* Methods Tool - Always visible unless another tool hides it */}
+                {isToolVisible('methods') && (
+                    <MethodsToolbar 
+                        onSelectMethod={(method) => tools.setActiveTool(method)} 
+                        isCollapsed={tools.activeTool !== 'methods'} 
+                        onToggle={() => tools.toggleTool('methods')}
+                        isDarkMode={isDarkMode}
+                    />
+                )}
+
+                {/* Sub Tools - Only visible if they are the active tool */}
+                {tools.activeTool === 'scamper' && (
                     <ScamperToolbar selectedElementId={selectedElementId} onScamper={(operator, letter) => { tools.setScamperInitialDoc(null); tools.setScamperTrigger({ operator, letter }); tools.setIsScamperModalOpen(true); tools.setActiveTool(null); }} isCollapsed={tools.activeTool !== 'scamper'} onToggle={() => tools.toggleTool('scamper')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
                 )}
-                {isToolVisible('triz') && (
+                {tools.activeTool === 'triz' && (
                     <TrizToolbar 
                         activeTool={tools.activeTrizTool} 
                         onSelectTool={(tool) => { handleTrizToolSelect(tool); tools.setActiveTool(null); }}
@@ -1007,7 +1016,7 @@ export default function App() {
                         onOpenGuidance={() => tools.handleOpenGuidance('triz')}
                     />
                 )}
-                {isToolVisible('lss') && (
+                {tools.activeTool === 'lss' && (
                     <LssToolbar 
                         activeTool={tools.activeLssTool} 
                         onSelectTool={(tool) => { handleLssToolSelect(tool); tools.setActiveTool(null); }}
@@ -1017,7 +1026,7 @@ export default function App() {
                         isDarkMode={isDarkMode} 
                     />
                 )}
-                {isToolVisible('toc') && (
+                {tools.activeTool === 'toc' && (
                     <TocToolbar 
                         activeTool={tools.activeTocTool} 
                         onSelectTool={(tool) => { handleTocToolSelect(tool); tools.setActiveTool(null); }}
@@ -1027,7 +1036,7 @@ export default function App() {
                         isDarkMode={isDarkMode} 
                     />
                 )}
-                {isToolVisible('ssm') && (
+                {tools.activeTool === 'ssm' && (
                     <SsmToolbar 
                         activeTool={tools.activeSsmTool} 
                         onSelectTool={(tool) => { handleSsmToolSelect(tool); tools.setActiveTool(null); }}
@@ -1037,6 +1046,7 @@ export default function App() {
                         isDarkMode={isDarkMode} 
                     />
                 )}
+
                 {isToolVisible('swot') && (
                     <SwotToolbar 
                         activeTool={tools.activeSwotTool} 
@@ -1079,14 +1089,6 @@ export default function App() {
                 )}
                 {isToolVisible('command') && (
                     <CommandBar onExecute={handleCommandExecution} isCollapsed={tools.activeTool !== 'command'} onToggle={() => tools.toggleTool('command')} onOpenHistory={handleOpenCommandHistory} isDarkMode={isDarkMode} />
-                )}
-                {isToolVisible('mining') && (
-                    <MiningToolbar 
-                        onSelectTool={() => { handleMiningToolSelect(); tools.setActiveTool(null); }}
-                        isCollapsed={tools.activeTool !== 'mining'} 
-                        onToggle={() => tools.toggleTool('mining')} 
-                        isDarkMode={isDarkMode} 
-                    />
                 )}
             </div>
         </div>
@@ -1208,7 +1210,6 @@ export default function App() {
         onSaveCustomStrategies={handleCustomStrategiesChange} 
         onOpenGuidance={() => tools.handleOpenGuidance('strategy')}
       />
-      <MiningModal isOpen={isMiningModalOpen} elements={elements} relationships={relationships} onClose={() => setIsMiningModalOpen(false)} onNodeSelect={(id) => { setIsMiningModalOpen(false); handleNodeClick(id, new MouseEvent('click')); }} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onAnalyze={handleAnalyzeWithChat} />
       <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} initialTab={settingsInitialTab} globalSettings={globalSettings} onGlobalSettingsChange={handleGlobalSettingsChange} modelSettings={systemPromptConfig} onModelSettingsChange={setSystemPromptConfig} isDarkMode={isDarkMode} />
       {persistence.isSchemaUpdateModalOpen && <SchemaUpdateModal changes={persistence.schemaUpdateChanges} onClose={() => persistence.setIsSchemaUpdateModalOpen(false)} />}
       <SelfTestModal isOpen={isSelfTestModalOpen} onClose={() => setIsSelfTestModalOpen(false)} logs={testLogs} status={testStatus} isDarkMode={isDarkMode} />
