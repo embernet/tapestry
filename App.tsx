@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage } from './types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
@@ -50,6 +51,9 @@ import { DebugPanel } from './components/DebugPanel';
 type Coords = { x: number; y: number };
 
 const GLOBAL_SETTINGS_KEY = 'tapestry_global_settings';
+
+// Tools that expand horizontally and should hide others when active
+const HORIZONTAL_TOOLS = ['search', 'schema', 'layout', 'analysis', 'bulk', 'command', 'mining', 'mermaid'];
 
 // --- Main App Component ---
 
@@ -298,10 +302,36 @@ export default function App() {
       tools.setActiveTool(null); 
   };
   const handleTagCloudToolSelect = (tool: TagCloudToolType) => {
-      if (tool === 'tags') panelState.setIsConceptCloudOpen(prev => !prev);
-      if (tool === 'nodes') panelState.setIsInfluenceCloudOpen(prev => !prev);
-      if (tool === 'words') panelState.setIsTextAnalysisOpen(prev => !prev);
-      if (tool === 'full_text') panelState.setIsFullTextAnalysisOpen(prev => !prev);
+      // Create a large default centered layout for Cloud tools if not present
+      const width = Math.min(window.innerWidth * 0.8, 1000);
+      const height = Math.min(window.innerHeight * 0.8, 800);
+      const x = (window.innerWidth - width) / 2;
+      const y = (window.innerHeight - height) / 2;
+      
+      const defaultLayout = { 
+          x, 
+          y, 
+          w: width, 
+          h: height, 
+          zIndex: panelZIndex + 1, 
+          isFloating: true 
+      };
+
+      setPanelZIndex(prev => prev + 1);
+
+      if (tool === 'tags') {
+          panelState.setIsConceptCloudOpen(prev => !prev);
+          if (!panelLayouts['concept-cloud']) setPanelLayouts(prev => ({ ...prev, 'concept-cloud': defaultLayout }));
+      } else if (tool === 'nodes') {
+          panelState.setIsInfluenceCloudOpen(prev => !prev);
+          if (!panelLayouts['influence-cloud']) setPanelLayouts(prev => ({ ...prev, 'influence-cloud': defaultLayout }));
+      } else if (tool === 'words') {
+          panelState.setIsTextAnalysisOpen(prev => !prev);
+          if (!panelLayouts['text-cloud']) setPanelLayouts(prev => ({ ...prev, 'text-cloud': defaultLayout }));
+      } else if (tool === 'full_text') {
+          panelState.setIsFullTextAnalysisOpen(prev => !prev);
+          if (!panelLayouts['full-text-cloud']) setPanelLayouts(prev => ({ ...prev, 'full-text-cloud': defaultLayout }));
+      }
       tools.setActiveTool(null);
   };
   const handleSwotToolSelect = (tool: SwotToolType) => { tools.setActiveSwotTool(tool); tools.setSwotInitialDoc(null); tools.setIsSwotModalOpen(true); tools.setActiveTool(null); };
@@ -381,7 +411,7 @@ export default function App() {
   const handleDeleteElement = useCallback((elementId: string) => { setElements(prev => prev.filter(f => f.id !== elementId)); setRelationships(prev => prev.filter(r => r.source !== elementId && r.target !== elementId)); if (selectedElementId === elementId) { setSelectedElementId(null); } if (multiSelection.has(elementId)) { const next = new Set(multiSelection); next.delete(elementId); setMultiSelection(next); } }, [selectedElementId, multiSelection]);
   
   // --- Actions ---
-  const handleAddElement = useCallback((coords: { x: number; y: number }) => { const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.x, }; setElements(prev => [...prev, newElement]); setSelectedElementId(newElement.id); setMultiSelection(new Set([newElement.id])); setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); }, [defaultTags]);
+  const handleAddElement = useCallback((coords: { x: number; y: number }) => { const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.y, }; setElements(prev => [...prev, newElement]); setSelectedElementId(newElement.id); setMultiSelection(new Set([newElement.id])); setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); }, [defaultTags]);
   const handleAddElementFromName = useCallback((name: string) => { const centerX = window.innerWidth / 2; const centerY = window.innerHeight / 2; const randomOffset = () => (Math.random() - 0.5) * 100; const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: name, notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: centerX + randomOffset(), y: centerY + randomOffset(), fx: null, fy: null, }; setElements(prev => [...prev, newElement]); }, [defaultTags]);
   const handleUpdateElement = useCallback((updatedElement: Element) => { setElements(prev => prev.map(f => f.id === updatedElement.id ? { ...updatedElement, updatedAt: new Date().toISOString() } : f)); }, []);
   const handleBulkTagAction = useCallback((elementIds: string[], tag: string, mode: 'add' | 'remove') => { setElements(prev => prev.map(e => { if (elementIds.includes(e.id)) { let newTags = [...e.tags]; if (mode === 'add') { if (!newTags.includes(tag)) { newTags.push(tag); } else { return e; } } else { if (newTags.includes(tag)) { newTags = newTags.filter(t => t !== tag); } else { return e; } } return { ...e, tags: newTags, updatedAt: new Date().toISOString() }; } return e; })); }, []);
@@ -498,7 +528,31 @@ export default function App() {
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, elementId: string) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, elementId }); handleCloseCanvasContextMenu(); }, [handleCloseCanvasContextMenu]);
   const handleCanvasContextMenu = useCallback((event: React.MouseEvent) => { event.preventDefault(); setCanvasContextMenu({ x: event.clientX, y: event.clientY }); handleCloseContextMenu(); }, [handleCloseContextMenu]);
   const handleNodeConnect = useCallback((sourceId: string, targetId: string) => { const currentScheme = colorSchemes.find(s => s.id === activeSchemeId); let defaultLabel = ''; if (currentScheme && currentScheme.defaultRelationshipLabel) { defaultLabel = currentScheme.defaultRelationshipLabel; } const newRelId = generateUUID(); const newRel: Relationship = { id: newRelId, source: sourceId, target: targetId, label: defaultLabel, direction: RelationshipDirection.To, tags: [] }; setRelationships(prev => [...prev, newRel]); setSelectedRelationshipId(newRelId); setSelectedElementId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); }, [activeSchemeId, colorSchemes, handleCloseContextMenu]);
-  const handleNodeConnectToNew = useCallback((sourceId: string, coords: { x: number; y: number }) => { const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.x, }; setElements(prev => [...prev, newElement]); setPanelStateUI({ view: 'addRelationship', sourceElementId: sourceId, targetElementId: newElement.id, isNewTarget: true }); setSelectedElementId(null); setSelectedRelationshipId(null); handleCloseContextMenu(); }, [defaultTags, handleCloseContextMenu]);
+  const handleNodeConnectToNew = useCallback((sourceId: string, coords: { x: number; y: number }) => { 
+      const now = new Date().toISOString(); 
+      const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.y, }; 
+      setElements(prev => [...prev, newElement]); 
+      
+      // Auto-create relationship immediately
+      const currentScheme = colorSchemes.find(s => s.id === activeSchemeId);
+      const defaultLabel = currentScheme?.defaultRelationshipLabel || '';
+      
+      const newRel: Relationship = {
+          id: generateUUID(),
+          source: sourceId,
+          target: newElement.id,
+          label: defaultLabel,
+          direction: RelationshipDirection.To,
+          tags: []
+      };
+      setRelationships(prev => [...prev, newRel]);
+      
+      setPanelStateUI({ view: 'addRelationship', sourceElementId: sourceId, targetElementId: newElement.id, isNewTarget: true }); 
+      setSelectedElementId(null); 
+      setSelectedRelationshipId(null); 
+      handleCloseContextMenu(); 
+  }, [defaultTags, handleCloseContextMenu, colorSchemes, activeSchemeId]);
+
   const handleUpdateDefaultRelationship = (newLabel: string) => { if (!activeSchemeId) return; setColorSchemes(prev => prev.map(s => s.id === activeSchemeId ? { ...s, defaultRelationshipLabel: newLabel } : s)); };
   const handleToggleFocusMode = () => { setFocusMode(prev => { if (prev === 'narrow') return 'wide'; if (prev === 'wide') return 'zoom'; return 'narrow'; }); };
   
@@ -548,6 +602,33 @@ export default function App() {
   const handleAcceptLayout = () => { const finalPositions = graphCanvasRef.current?.getFinalNodePositions(); if (finalPositions) { const positionsMap = new Map(finalPositions.map((p: { id: string; x: number; y: number; }) => [p.id, p])); setElements(prev => prev.map(element => { const pos = positionsMap.get(element.id); const posEntry = pos as { x: number; y: number } | undefined; return posEntry ? { ...element, x: posEntry.x, y: posEntry.y, fx: posEntry.x, fy: posEntry.y } : element; })); } setIsPhysicsModeActive(false); setOriginalElements(null); };
   const handleRejectLayout = () => { if (originalElements) { setElements(originalElements); } setIsPhysicsModeActive(false); setOriginalElements(null); };
   const handleScaleLayout = useCallback((factor: number) => { if (isPhysicsModeActive) return; setElements(prev => { if (prev.length === 0) return prev; const xs = prev.map(e => e.x || 0); const ys = prev.map(e => e.y || 0); const avgX = xs.reduce((a,b) => a+b, 0) / prev.length; const avgY = ys.reduce((a,b) => a+b, 0) / prev.length; return prev.map(e => { const x = e.x || 0; const y = e.y || 0; const dx = x - avgX; const dy = y - avgY; const newX = avgX + dx * factor; const newY = avgY + dy * factor; return { ...e, x: newX, y: newY, fx: newX, fy: newY, updatedAt: new Date().toISOString() }; }); }); }, [isPhysicsModeActive]);
+  
+  const handleZoomIn = useCallback(() => {
+      if (graphCanvasRef.current) {
+          const { x, y, k } = graphCanvasRef.current.getCamera();
+          const factor = 1.2;
+          const newK = k * factor;
+          const cx = window.innerWidth / 2;
+          const cy = window.innerHeight / 2;
+          const newX = cx - (cx - x) * factor;
+          const newY = cy - (cy - y) * factor;
+          graphCanvasRef.current.setCamera(newX, newY, newK);
+      }
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+      if (graphCanvasRef.current) {
+          const { x, y, k } = graphCanvasRef.current.getCamera();
+          const factor = 1 / 1.2;
+          const newK = k * factor;
+          const cx = window.innerWidth / 2;
+          const cy = window.innerHeight / 2;
+          const newX = cx - (cx - x) * factor;
+          const newY = cy - (cy - y) * factor;
+          graphCanvasRef.current.setCamera(newX, newY, newK);
+      }
+  }, []);
+
   const handleZoomToFit = () => { graphCanvasRef.current?.zoomToFit(); };
 
   // --- Search Handlers ---
@@ -672,6 +753,26 @@ export default function App() {
     }
   }, [persistence.currentModelName, isDarkMode]);
 
+  // Helper to determine if a tool should hide others
+  const isToolVisible = (toolId: string) => {
+      if (!tools.activeTool) return true;
+      // If active tool is horizontal, hide all others except itself
+      if (HORIZONTAL_TOOLS.includes(tools.activeTool)) {
+          return tools.activeTool === toolId;
+      }
+      // If active tool is dropdown, show all
+      return true;
+  };
+
+  const handleCompleteAddRelationship = useCallback(() => {
+      if (panelStateUI.targetElementId) {
+          setSelectedElementId(panelStateUI.targetElementId);
+      } else {
+          setSelectedElementId(panelStateUI.sourceElementId || null);
+      }
+      setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
+  }, [panelStateUI]);
+
   // Construct dynamic panel definitions using props from usePanelState and local state
   const panelDefinitions = usePanelDefinitions({
     ...panelState,
@@ -790,96 +891,150 @@ export default function App() {
         <div className={`absolute left-4 z-[500] max-w-[90vw] pointer-events-none transition-all duration-500 ease-in-out ${tools.isToolsPanelOpen ? 'top-20 opacity-100' : 'top-4 opacity-0'}`}>
             <div className="flex flex-wrap items-start gap-2 pointer-events-auto">
                 <button 
-                    onClick={() => tools.setIsToolsPanelOpen(false)} 
+                    onClick={() => {
+                        tools.setIsToolsPanelOpen(false);
+                        tools.setActiveTool(null);
+                    }} 
                     className={`border shadow-lg rounded-lg w-20 flex flex-col items-center justify-center transition-colors h-20 flex-shrink-0 z-20 gap-1 ${isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-200'}`} 
                     title="Close Tools Panel"
                 >
-                     <div className="relative w-8 h-8"><svg xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-8 h-8 text-blue-400 transform -rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.9 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg></div>
-                     <span className={`text-[10px] font-bold tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>TOOLS</span>
+                        <div className="relative w-8 h-8"><svg xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-8 h-8 text-blue-400 transform -rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.9 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg></div>
+                        <span className={`text-[10px] font-bold tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>TOOLS</span>
                 </button>
-                <SearchToolbar 
-                    elements={elements} 
-                    onSearch={handleSearch} 
-                    onFocusSingle={handleFocusSingle} 
-                    isCollapsed={tools.activeTool !== 'search'} 
-                    onToggle={() => tools.toggleTool('search')} 
-                    isDarkMode={isDarkMode} 
-                    onReset={handleSearchReset}
-                />
-                <SchemaToolbar schemes={colorSchemes} activeSchemeId={activeSchemeId} onSchemeChange={setActiveSchemeId} activeColorScheme={activeColorScheme} onDefaultRelationshipChange={handleUpdateDefaultRelationship} defaultTags={defaultTags} onDefaultTagsChange={setDefaultTags} elements={elements} isCollapsed={tools.activeTool !== 'schema'} onToggle={() => tools.toggleTool('schema')} onUpdateSchemes={(newSchemes) => setColorSchemes(newSchemes)} isDarkMode={isDarkMode} />
-                <LayoutToolbar linkDistance={layoutParams.linkDistance} repulsion={layoutParams.repulsion} onLinkDistanceChange={(val) => setLayoutParams(p => ({...p, linkDistance: val}))} onRepulsionChange={(val) => setLayoutParams(p => ({...p, repulsion: val}))} onJiggle={() => setJiggleTrigger(prev => prev + 1)} onZoomToFit={handleZoomToFit} isPhysicsActive={isPhysicsModeActive} onStartAutoLayout={handleStartPhysicsLayout} onAcceptAutoLayout={handleAcceptLayout} onRejectAutoLayout={handleRejectLayout} onExpand={() => handleScaleLayout(1.1)} onContract={() => handleScaleLayout(0.9)} isCollapsed={tools.activeTool !== 'layout'} onToggle={() => tools.toggleTool('layout')} isDarkMode={isDarkMode} />
-                <AnalysisToolbar elements={elements} relationships={relationships} onBulkTag={handleBulkTagAction} onHighlight={handleAnalysisHighlight} onFilter={handleAnalysisFilter} isCollapsed={tools.activeTool !== 'analysis'} onToggle={() => tools.toggleTool('analysis')} isSimulationMode={isSimulationMode} onToggleSimulation={() => setIsSimulationMode(p => !p)} onResetSimulation={() => setSimulationState({})} isDarkMode={isDarkMode} />
-                <ScamperToolbar selectedElementId={selectedElementId} onScamper={(operator, letter) => { tools.setScamperInitialDoc(null); tools.setScamperTrigger({ operator, letter }); tools.setIsScamperModalOpen(true); tools.setActiveTool(null); }} isCollapsed={tools.activeTool !== 'scamper'} onToggle={() => tools.toggleTool('scamper')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
-                <TrizToolbar 
-                    activeTool={tools.activeTrizTool} 
-                    onSelectTool={(tool) => { handleTrizToolSelect(tool); tools.setActiveTool(null); }}
-                    isCollapsed={tools.activeTool !== 'triz'} 
-                    onToggle={() => tools.toggleTool('triz')} 
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
-                    isDarkMode={isDarkMode} 
-                    onOpenGuidance={() => tools.handleOpenGuidance('triz')}
-                />
-                <LssToolbar 
-                    activeTool={tools.activeLssTool} 
-                    onSelectTool={(tool) => { handleLssToolSelect(tool); tools.setActiveTool(null); }}
-                    isCollapsed={tools.activeTool !== 'lss'} 
-                    onToggle={() => tools.toggleTool('lss')} 
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
-                    isDarkMode={isDarkMode} 
-                />
-                <TocToolbar 
-                    activeTool={tools.activeTocTool} 
-                    onSelectTool={(tool) => { handleTocToolSelect(tool); tools.setActiveTool(null); }}
-                    isCollapsed={tools.activeTool !== 'toc'} 
-                    onToggle={() => tools.toggleTool('toc')} 
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
-                    isDarkMode={isDarkMode} 
-                />
-                <SsmToolbar 
-                    activeTool={tools.activeSsmTool} 
-                    onSelectTool={(tool) => { handleSsmToolSelect(tool); tools.setActiveTool(null); }}
-                    isCollapsed={tools.activeTool !== 'ssm'} 
-                    onToggle={() => tools.toggleTool('ssm')} 
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
-                    isDarkMode={isDarkMode} 
-                />
-                <SwotToolbar 
-                    activeTool={tools.activeSwotTool} 
-                    onSelectTool={(tool) => { handleSwotToolSelect(tool); tools.setActiveTool(null); }}
-                    isCollapsed={tools.activeTool !== 'swot'} 
-                    onToggle={() => tools.toggleTool('swot')} 
-                    onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
-                    isDarkMode={isDarkMode} 
-                    customStrategies={globalSettings.customStrategies} 
-                    onOpenGuidance={() => tools.handleOpenGuidance('strategy')}
-                />
-                <ExplorerToolbar 
-                    onSelectTool={(tool) => { handleExplorerToolSelect(tool); tools.setActiveTool(null); }}
-                    isCollapsed={tools.activeTool !== 'explorer'} 
-                    onToggle={() => tools.toggleTool('explorer')} 
-                    isDarkMode={isDarkMode} 
-                />
-                <TagCloudToolbar 
-                    onSelectTool={(tool) => { handleTagCloudToolSelect(tool); tools.setActiveTool(null); }} 
-                    isCollapsed={tools.activeTool !== 'tagcloud'} 
-                    onToggle={() => tools.toggleTool('tagcloud')} 
-                    isDarkMode={isDarkMode} 
-                    onOpenGuidance={() => tools.handleOpenGuidance('wordcloud')}
-                />
-                <MermaidToolbar 
-                    onSelectTool={(tool) => { handleMermaidToolSelect(tool); tools.setActiveTool(null); }}
-                    isCollapsed={tools.activeTool !== 'mermaid'} 
-                    onToggle={() => tools.toggleTool('mermaid')} 
-                    isDarkMode={isDarkMode} 
-                />
-                <BulkEditToolbar activeColorScheme={activeColorScheme} tagsToAdd={bulkTagsToAdd} tagsToRemove={bulkTagsToRemove} onTagsToAddChange={setBulkTagsToAdd} onTagsToRemoveChange={setBulkTagsToRemove} isActive={isBulkEditActive} onToggleActive={() => setIsBulkEditActive(p => !p)} isCollapsed={tools.activeTool !== 'bulk'} onToggle={() => tools.toggleTool('bulk')} isDarkMode={isDarkMode} />
-                <CommandBar onExecute={handleCommandExecution} isCollapsed={tools.activeTool !== 'command'} onToggle={() => tools.toggleTool('command')} onOpenHistory={handleOpenCommandHistory} isDarkMode={isDarkMode} />
-                <MiningToolbar 
-                    onSelectTool={() => { handleMiningToolSelect(); tools.setActiveTool(null); }}
-                    isCollapsed={tools.activeTool !== 'mining'} 
-                    onToggle={() => tools.toggleTool('mining')} 
-                    isDarkMode={isDarkMode} 
-                />
+
+                {isToolVisible('search') && (
+                    <SearchToolbar 
+                        elements={elements} 
+                        onSearch={handleSearch} 
+                        onFocusSingle={handleFocusSingle} 
+                        isCollapsed={tools.activeTool !== 'search'} 
+                        onToggle={() => tools.toggleTool('search')} 
+                        isDarkMode={isDarkMode} 
+                        onReset={handleSearchReset}
+                    />
+                )}
+                {isToolVisible('schema') && (
+                    <SchemaToolbar schemes={colorSchemes} activeSchemeId={activeSchemeId} onSchemeChange={setActiveSchemeId} activeColorScheme={activeColorScheme} onDefaultRelationshipChange={handleUpdateDefaultRelationship} defaultTags={defaultTags} onDefaultTagsChange={setDefaultTags} elements={elements} isCollapsed={tools.activeTool !== 'schema'} onToggle={() => tools.toggleTool('schema')} onUpdateSchemes={(newSchemes) => setColorSchemes(newSchemes)} isDarkMode={isDarkMode} />
+                )}
+                {isToolVisible('layout') && (
+                    <LayoutToolbar 
+                        linkDistance={layoutParams.linkDistance} 
+                        repulsion={layoutParams.repulsion} 
+                        onLinkDistanceChange={(val) => setLayoutParams(p => ({...p, linkDistance: val}))} 
+                        onRepulsionChange={(val) => setLayoutParams(p => ({...p, repulsion: val}))} 
+                        onJiggle={() => setJiggleTrigger(prev => prev + 1)} 
+                        onZoomToFit={handleZoomToFit}
+                        onZoomIn={handleZoomIn}
+                        onZoomOut={handleZoomOut} 
+                        isPhysicsActive={isPhysicsModeActive} 
+                        onStartAutoLayout={handleStartPhysicsLayout} 
+                        onAcceptAutoLayout={handleAcceptLayout} 
+                        onRejectAutoLayout={handleRejectLayout} 
+                        onExpand={() => handleScaleLayout(1.1)} 
+                        onContract={() => handleScaleLayout(0.9)} 
+                        isCollapsed={tools.activeTool !== 'layout'} 
+                        onToggle={() => tools.toggleTool('layout')} 
+                        isDarkMode={isDarkMode} 
+                    />
+                )}
+                {isToolVisible('analysis') && (
+                    <AnalysisToolbar elements={elements} relationships={relationships} onBulkTag={handleBulkTagAction} onHighlight={handleAnalysisHighlight} onFilter={handleAnalysisFilter} isCollapsed={tools.activeTool !== 'analysis'} onToggle={() => tools.toggleTool('analysis')} isSimulationMode={isSimulationMode} onToggleSimulation={() => setIsSimulationMode(p => !p)} onResetSimulation={() => setSimulationState({})} isDarkMode={isDarkMode} />
+                )}
+                {isToolVisible('scamper') && (
+                    <ScamperToolbar selectedElementId={selectedElementId} onScamper={(operator, letter) => { tools.setScamperInitialDoc(null); tools.setScamperTrigger({ operator, letter }); tools.setIsScamperModalOpen(true); tools.setActiveTool(null); }} isCollapsed={tools.activeTool !== 'scamper'} onToggle={() => tools.toggleTool('scamper')} onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
+                )}
+                {isToolVisible('triz') && (
+                    <TrizToolbar 
+                        activeTool={tools.activeTrizTool} 
+                        onSelectTool={(tool) => { handleTrizToolSelect(tool); tools.setActiveTool(null); }}
+                        isCollapsed={tools.activeTool !== 'triz'} 
+                        onToggle={() => tools.toggleTool('triz')} 
+                        onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
+                        isDarkMode={isDarkMode} 
+                        onOpenGuidance={() => tools.handleOpenGuidance('triz')}
+                    />
+                )}
+                {isToolVisible('lss') && (
+                    <LssToolbar 
+                        activeTool={tools.activeLssTool} 
+                        onSelectTool={(tool) => { handleLssToolSelect(tool); tools.setActiveTool(null); }}
+                        isCollapsed={tools.activeTool !== 'lss'} 
+                        onToggle={() => tools.toggleTool('lss')} 
+                        onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
+                        isDarkMode={isDarkMode} 
+                    />
+                )}
+                {isToolVisible('toc') && (
+                    <TocToolbar 
+                        activeTool={tools.activeTocTool} 
+                        onSelectTool={(tool) => { handleTocToolSelect(tool); tools.setActiveTool(null); }}
+                        isCollapsed={tools.activeTool !== 'toc'} 
+                        onToggle={() => tools.toggleTool('toc')} 
+                        onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
+                        isDarkMode={isDarkMode} 
+                    />
+                )}
+                {isToolVisible('ssm') && (
+                    <SsmToolbar 
+                        activeTool={tools.activeSsmTool} 
+                        onSelectTool={(tool) => { handleSsmToolSelect(tool); tools.setActiveTool(null); }}
+                        isCollapsed={tools.activeTool !== 'ssm'} 
+                        onToggle={() => tools.toggleTool('ssm')} 
+                        onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
+                        isDarkMode={isDarkMode} 
+                    />
+                )}
+                {isToolVisible('swot') && (
+                    <SwotToolbar 
+                        activeTool={tools.activeSwotTool} 
+                        onSelectTool={(tool) => { handleSwotToolSelect(tool); tools.setActiveTool(null); }}
+                        isCollapsed={tools.activeTool !== 'swot'} 
+                        onToggle={() => tools.toggleTool('swot')} 
+                        onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
+                        isDarkMode={isDarkMode} 
+                        customStrategies={globalSettings.customStrategies} 
+                        onOpenGuidance={() => tools.handleOpenGuidance('strategy')}
+                    />
+                )}
+                {isToolVisible('explorer') && (
+                    <ExplorerToolbar 
+                        onSelectTool={(tool) => { handleExplorerToolSelect(tool); tools.setActiveTool(null); }}
+                        isCollapsed={tools.activeTool !== 'explorer'} 
+                        onToggle={() => tools.toggleTool('explorer')} 
+                        isDarkMode={isDarkMode} 
+                    />
+                )}
+                {isToolVisible('tagcloud') && (
+                    <TagCloudToolbar 
+                        onSelectTool={(tool) => { handleTagCloudToolSelect(tool); tools.setActiveTool(null); }} 
+                        isCollapsed={tools.activeTool !== 'tagcloud'} 
+                        onToggle={() => tools.toggleTool('tagcloud')} 
+                        isDarkMode={isDarkMode} 
+                        onOpenGuidance={() => tools.handleOpenGuidance('wordcloud')}
+                    />
+                )}
+                {isToolVisible('mermaid') && (
+                    <MermaidToolbar 
+                        onSelectTool={(tool) => { handleMermaidToolSelect(tool); tools.setActiveTool(null); }}
+                        isCollapsed={tools.activeTool !== 'mermaid'} 
+                        onToggle={() => tools.toggleTool('mermaid')} 
+                        isDarkMode={isDarkMode} 
+                    />
+                )}
+                {isToolVisible('bulk') && (
+                    <BulkEditToolbar activeColorScheme={activeColorScheme} tagsToAdd={bulkTagsToAdd} tagsToRemove={bulkTagsToRemove} onTagsToAddChange={setBulkTagsToAdd} onTagsToRemoveChange={setBulkTagsToRemove} isActive={isBulkEditActive} onToggleActive={() => setIsBulkEditActive(p => !p)} isCollapsed={tools.activeTool !== 'bulk'} onToggle={() => tools.toggleTool('bulk')} isDarkMode={isDarkMode} />
+                )}
+                {isToolVisible('command') && (
+                    <CommandBar onExecute={handleCommandExecution} isCollapsed={tools.activeTool !== 'command'} onToggle={() => tools.toggleTool('command')} onOpenHistory={handleOpenCommandHistory} isDarkMode={isDarkMode} />
+                )}
+                {isToolVisible('mining') && (
+                    <MiningToolbar 
+                        onSelectTool={() => { handleMiningToolSelect(); tools.setActiveTool(null); }}
+                        isCollapsed={tools.activeTool !== 'mining'} 
+                        onToggle={() => tools.toggleTool('mining')} 
+                        isDarkMode={isDarkMode} 
+                    />
+                )}
             </div>
         </div>
       )}
@@ -918,7 +1073,22 @@ export default function App() {
                 </div>
                 <div className="rounded-b-lg overflow-hidden flex flex-col min-h-0 flex-grow">
                     {panelStateUI.view === 'addRelationship' && addRelationshipSourceElement ? (
-                        <AddRelationshipPanel sourceElement={addRelationshipSourceElement} targetElementId={panelStateUI.targetElementId} isNewTarget={panelStateUI.isNewTarget} allElements={elements} onCreate={handleAddRelationship} onUpdateElement={handleUpdateElement} onCancel={handleCancelAddRelationship} suggestedLabels={activeRelationshipLabels} defaultLabel={activeColorScheme?.defaultRelationshipLabel} colorSchemes={colorSchemes} activeSchemeId={activeSchemeId} isDarkMode={isDarkMode} />
+                        <AddRelationshipPanel 
+                            sourceElement={addRelationshipSourceElement} 
+                            targetElementId={panelStateUI.targetElementId} 
+                            isNewTarget={panelStateUI.isNewTarget} 
+                            allElements={elements} 
+                            onCreate={handleCompleteAddRelationship} // Renamed action for auto-save flow
+                            onUpdateElement={handleUpdateElement} 
+                            onCancel={handleCancelAddRelationship} 
+                            suggestedLabels={activeRelationshipLabels} 
+                            defaultLabel={activeColorScheme?.defaultRelationshipLabel} 
+                            colorSchemes={colorSchemes} 
+                            activeSchemeId={activeSchemeId} 
+                            isDarkMode={isDarkMode} 
+                            relationships={relationships} // New
+                            onUpdateRelationship={handleUpdateRelationship} // New
+                        />
                     ) : selectedRelationship ? (
                         <RelationshipDetailsPanel relationship={selectedRelationship} elements={elements} onUpdate={handleUpdateRelationship} onDelete={handleDeleteRelationship} suggestedLabels={activeRelationshipLabels} isDarkMode={isDarkMode} />
                     ) : selectedElement ? (

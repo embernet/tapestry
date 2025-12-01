@@ -79,6 +79,10 @@ const shuffleAndEnrich = (items: Omit<CloudItem, 'color' | 'rotation'>[], isDark
 export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, relationships, onNodeSelect, isDarkMode, aiConfig, onOpenGuidance, onLogHistory }) => {
     const [viewStack, setViewStack] = useState<ViewState[]>([]);
     
+    // UI State
+    const [zoom, setZoom] = useState(1);
+    const [rearrangeTrigger, setRearrangeTrigger] = useState(0);
+    
     // AI Transformation State
     const [activeMode, setActiveMode] = useState<string>('Original');
     const cachedTransformations = useRef<Record<string, Record<string, string>>>({});
@@ -240,7 +244,7 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
             items: shuffleAndEnrich(items, isDarkMode),
             max: baseData.max
         };
-    }, [baseData, activeMode, isDarkMode, currentView, elements, relationships, mode]);
+    }, [baseData, activeMode, isDarkMode, currentView, elements, relationships, mode, rearrangeTrigger]);
 
 
     const handleModeSelect = async (newMode: string) => {
@@ -378,7 +382,7 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
     const getFontSize = (count: number, max: number, minSize: number = 16, maxSize: number = 64) => {
         const scale = Math.log(count + 1) / Math.log(max + 1); 
         const size = minSize + scale * (maxSize - minSize);
-        return `${Math.round(size)}px`;
+        return `${Math.round(size * zoom)}px`;
     };
 
     const getHeaderTitle = () => {
@@ -427,17 +431,48 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
                     </div>
                 </div>
                 
-                {onOpenGuidance && (
-                    <button
-                        onClick={onOpenGuidance}
-                        className={`p-1.5 rounded-full ${iconHoverClass} transition`}
-                        title="Guidance & Tips"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
-                        </svg>
-                    </button>
-                )}
+                <div className="flex items-center gap-2">
+                    {/* Zoom & Rearrange Controls */}
+                    <div className={`flex items-center gap-1 border ${borderClass} rounded-lg p-1`}>
+                        <button 
+                            onClick={() => setZoom(z => Math.max(0.5, z - 0.1))} 
+                            className={`w-7 h-7 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700 ${textClass}`}
+                            title="Zoom Out"
+                        >
+                            -
+                        </button>
+                        <span className={`text-xs font-mono w-10 text-center ${subTextClass}`}>{Math.round(zoom * 100)}%</span>
+                        <button 
+                            onClick={() => setZoom(z => Math.min(3.0, z + 0.1))} 
+                            className={`w-7 h-7 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700 ${textClass}`}
+                            title="Zoom In"
+                        >
+                            +
+                        </button>
+                        <div className={`w-px h-4 mx-1 ${borderClass}`}></div>
+                        <button 
+                            onClick={() => setRearrangeTrigger(p => p + 1)}
+                            className={`w-7 h-7 flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700 ${textClass}`}
+                            title="Rearrange / Shuffle"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {onOpenGuidance && (
+                        <button
+                            onClick={onOpenGuidance}
+                            className={`p-1.5 rounded-full ${iconHoverClass} transition`}
+                            title="Guidance & Tips"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+                            </svg>
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div className="flex flex-grow overflow-hidden">

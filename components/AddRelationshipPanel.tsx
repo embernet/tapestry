@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Element, Relationship, RelationshipDirection, ColorScheme } from '../types';
 import ElementEditor from './ElementEditor';
@@ -18,6 +19,8 @@ interface AddRelationshipPanelProps {
   colorSchemes: ColorScheme[];
   activeSchemeId: string | null;
   isDarkMode: boolean;
+  relationships?: Relationship[];
+  onUpdateRelationship?: (relationship: Relationship) => void;
 }
 
 const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
@@ -32,7 +35,9 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   defaultLabel = '',
   colorSchemes,
   activeSchemeId,
-  isDarkMode
+  isDarkMode,
+  relationships = [],
+  onUpdateRelationship
 }) => {
   const [selectedTargetId, setSelectedTargetId] = useState<string>(targetElementId || 'NEW_ELEMENT');
   const [elementEditorData, setElementEditorData] = useState<Partial<Element>>({
@@ -40,6 +45,16 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
     notes: '',
     tags: []
   });
+  
+  // Try to find an existing relationship to edit (auto-save mode)
+  const existingRel = useMemo(() => {
+      if (!targetElementId) return null;
+      return relationships.find(r => 
+          (r.source === sourceElement.id && r.target === targetElementId) || 
+          (r.source === targetElementId && r.target === sourceElement.id)
+      );
+  }, [relationships, sourceElement.id, targetElementId]);
+
   const [label, setLabel] = useState(defaultLabel);
   const [direction, setDirection] = useState<RelationshipDirection>(RelationshipDirection.To);
   
@@ -47,6 +62,20 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   const newElementNameInputRef = useRef<HTMLInputElement>(null);
 
   const targetElement = useMemo(() => allElements.find(f => f.id === targetElementId), [allElements, targetElementId]);
+
+  // Sync state with existing relationship if found
+  useEffect(() => {
+      if (existingRel) {
+          setLabel(existingRel.label);
+          // If we are source, use stored direction. If target, flip it for display logic if needed, 
+          // but for now assume simple storage direction is fine or handled by parent.
+          // Let's assume standard direction stored relative to source/target IDs in the rel object.
+          // Note: The UI displays "Forward" relative to Source -> Target. 
+          // If existingRel has source==sourceElement.id, use direction as is.
+          // If swapped, we might need to interpret. For simplicity, just use stored direction.
+          setDirection(existingRel.direction);
+      }
+  }, [existingRel]);
 
   useEffect(() => {
     const focusTimeout = setTimeout(() => {
@@ -69,37 +98,55 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
     }
   }, [targetElementId, isNewTarget, targetElement, selectedTargetId]);
 
+  // Handler for Done/Create button
   const handleSubmit = () => {
-    if (!label.trim()) {
-        alert("Please provide a label for the relationship.");
-        return;
-    }
-
-    if (isNewTarget && targetElementId) {
-        if (!elementEditorData.name?.trim()) {
-            alert("Please provide a name for the new element.");
-            return;
-        }
-        onUpdateElement(elementEditorData as Element);
-        onCreate({ source: sourceElement.id, target: targetElementId, label: label.trim(), direction });
-    } else if (selectedTargetId === 'NEW_ELEMENT') {
-      if (!elementEditorData.name?.trim()) {
-        alert("Please provide a name for the new element.");
-        return;
-      }
-      onCreate(
-        { source: sourceElement.id, target: 'new-element-placeholder', label: label.trim(), direction },
-        { ...elementEditorData, name: elementEditorData.name.trim() } as NewElementData
-      );
+    if (existingRel && onUpdateRelationship) {
+        // In Edit Mode, "Done" just closes/finalizes
+        // We can just call onCreate to signal parent we are done, assuming parent handles it
+        // Or if parent expects a toggle, onCancel might delete it.
+        // We use onCreate as "Complete" signal.
+        onCreate({ source: sourceElement.id, target: targetElementId!, label: label.trim(), direction });
     } else {
-      onCreate(
-        { source: sourceElement.id, target: selectedTargetId, label: label.trim(), direction }
-      );
+        // Manual Create Mode
+        if (isNewTarget && targetElementId) {
+            if (!elementEditorData.name?.trim()) {
+                alert("Please provide a name for the new element.");
+                return;
+            }
+            onUpdateElement(elementEditorData as Element);
+            onCreate({ source: sourceElement.id, target: targetElementId, label: label.trim(), direction });
+        } else if (selectedTargetId === 'NEW_ELEMENT') {
+            if (!elementEditorData.name?.trim()) {
+                alert("Please provide a name for the new element.");
+                return;
+            }
+            onCreate(
+                { source: sourceElement.id, target: 'new-element-placeholder', label: label.trim(), direction },
+                { ...elementEditorData, name: elementEditorData.name.trim() } as NewElementData
+            );
+        } else {
+            onCreate(
+                { source: sourceElement.id, target: selectedTargetId, label: label.trim(), direction }
+            );
+        }
     }
   };
 
   const handleElementEditorChange = (updatedData: Partial<Element>, immediate?: boolean) => {
     setElementEditorData(prev => ({...prev, ...updatedData}));
+    // Auto-save element if we are editing an existing new target
+    if (isNewTarget && targetElement) {
+        onUpdateElement({ ...targetElement, ...updatedData });
+    }
+  };
+
+  const handleRelChange = (newLabel: string, newDir: RelationshipDirection) => {
+      setLabel(newLabel);
+      setDirection(newDir);
+      
+      if (existingRel && onUpdateRelationship) {
+          onUpdateRelationship({ ...existingRel, label: newLabel, direction: newDir });
+      }
   };
 
   const availableTargets = useMemo(() => allElements.filter(f => f.id !== sourceElement.id), [allElements, sourceElement.id]);
@@ -117,7 +164,7 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   };
   
   const handleLabelSelect = (l: string) => {
-      setLabel(l);
+      handleRelChange(l, direction);
   };
 
   const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
@@ -131,7 +178,9 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
     <div className={`${bgClass} border ${borderClass} w-96 flex flex-col h-full min-h-0 transition-colors`} onKeyDown={handleKeyDown}>
         {/* Header */}
         <div className={`p-6 pb-4 flex-shrink-0 ${bgClass} z-10 border-b ${borderClass}`}>
-            <h2 className={`text-2xl font-bold ${textClass}`}>Add Relationship</h2>
+            <h2 className={`text-2xl font-bold ${textClass}`}>
+                {existingRel ? 'Edit Relationship' : 'Add Relationship'}
+            </h2>
         </div>
 
         {/* Scrollable Content */}
@@ -146,8 +195,9 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
           <div>
             <label className={`block text-sm font-medium ${subTextClass}`}>Target Element</label>
             {isNewTarget ? (
-               <div className={`mt-1 block w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} font-semibold`}>
-                 New Element (Creating...)
+               // In drag-to-create mode, target name is handled by ElementEditor below
+               <div className={`mt-1 block w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} font-semibold opacity-50`}>
+                 {targetElement?.name || "New Element"}
                </div>
             ) : (
                 <select
@@ -185,7 +235,7 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
               ref={labelInputRef}
               type="text"
               value={label}
-              onChange={(e) => setLabel(e.target.value)}
+              onChange={(e) => handleRelChange(e.target.value, direction)}
               placeholder="e.g., causes, depends on"
               className={`mt-1 block w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
             />
@@ -219,7 +269,7 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
             <label className={`block text-sm font-medium ${subTextClass}`}>Direction</label>
             <select
               value={direction}
-              onChange={(e) => setDirection(e.target.value as RelationshipDirection)}
+              onChange={(e) => handleRelChange(label, e.target.value as RelationshipDirection)}
               className={`mt-1 block w-full ${inputBgClass} border ${inputBorderClass} rounded-md px-3 py-2 ${textClass} focus:outline-none focus:ring-2 focus:ring-blue-500`}
             >
               <option value={RelationshipDirection.To}>Forward (→)</option>
@@ -230,9 +280,13 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
         </div>
 
         {/* Footer */}
-        <div className={`p-6 pt-4 border-t ${borderClass} flex-shrink-0 flex justify-end space-x-4 ${bgClass} rounded-b-lg`}>
-          <button onClick={onCancel} className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Cancel</button>
-          <button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">Add Relationship</button>
+        <div className={`p-6 pt-4 border-t ${borderClass} flex-shrink-0 flex justify-between space-x-4 ${bgClass} rounded-b-lg`}>
+          <button onClick={onCancel} className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">
+              {existingRel ? 'Close / Delete' : 'Cancel'}
+          </button>
+          <button onClick={handleSubmit} className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md transition duration-150">
+              {existingRel ? 'Done' : 'Add Relationship'}
+          </button>
         </div>
     </div>
   );

@@ -8,6 +8,8 @@ interface LayoutToolbarProps {
   onRepulsionChange: (val: number) => void;
   onJiggle: () => void;
   onZoomToFit: () => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
   isPhysicsActive: boolean;
   onStartAutoLayout: () => void;
   onAcceptAutoLayout: () => void;
@@ -26,6 +28,8 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
   onRepulsionChange,
   onJiggle,
   onZoomToFit,
+  onZoomIn,
+  onZoomOut,
   isPhysicsActive,
   onStartAutoLayout,
   onAcceptAutoLayout,
@@ -161,6 +165,31 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
                                 </svg>
                             </button>
+                        </div>
+
+                        {/* Zoom Buttons */}
+                        <div className="flex flex-col justify-center items-center">
+                             <span className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${labelClass}`}>ZOOM</span>
+                             <div className="flex gap-1">
+                                <button 
+                                    onClick={onZoomOut}
+                                    className={`flex flex-col items-center justify-center p-1 rounded border transition-colors h-8 w-8 ${iconButtonBg}`}
+                                    title="Zoom Out"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M5 10a1 1 0 011-1h8a1 1 0 110 2H6a1 1 0 01-1-1z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
+                                <button 
+                                    onClick={onZoomIn}
+                                    className={`flex flex-col items-center justify-center p-1 rounded border transition-colors h-8 w-8 ${iconButtonBg}`}
+                                    title="Zoom In"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h5V6a1 1 0 011-1z" clipRule="evenodd" />
+                                    </svg>
+                                </button>
+                             </div>
                         </div>
 
                          {/* Shake Button */}
