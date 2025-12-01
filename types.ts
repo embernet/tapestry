@@ -7,6 +7,7 @@ export enum RelationshipDirection {
   None = 'NONE',
   To = 'TO', // Source -> Target
   From = 'FROM', // Target -> Source
+  Both = 'BOTH', // Source <-> Target
 }
 
 export interface Relationship {

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Relationship, Element, RelationshipDirection } from '../types';
 import AttributesEditor from './AttributesEditor';
@@ -146,6 +147,7 @@ const RelationshipDetailsPanel: React.FC<RelationshipDetailsPanelProps> = ({ rel
             >
               <option value={RelationshipDirection.To}>Forward (→)</option>
               <option value={RelationshipDirection.From}>Reverse (←)</option>
+              <option value={RelationshipDirection.Both}>Bi-directional (↔)</option>
               <option value={RelationshipDirection.None}>None (—)</option>
             </select>
           </div>

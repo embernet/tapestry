@@ -274,6 +274,7 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
             >
               <option value={RelationshipDirection.To}>Forward (→)</option>
               <option value={RelationshipDirection.From}>Reverse (←)</option>
+              <option value={RelationshipDirection.Both}>Bi-directional (↔)</option>
               <option value={RelationshipDirection.None}>None (—)</option>
             </select>
           </div>

@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Element, Relationship, RelationshipDirection, TapestryDocument, TapestryFolder } from '../types';
 import { generateElementMarkdown } from '../utils';
@@ -42,6 +43,7 @@ const RelationshipItem: React.FC<{ rel: Relationship; elementMap: Map<string, El
   let arrow = '';
   switch (rel.direction) {
     case RelationshipDirection.From: arrow = `<--[${rel.label}]--`; break;
+    case RelationshipDirection.Both: arrow = `<--[${rel.label}]-->`; break;
     case RelationshipDirection.None: arrow = `---[${rel.label}]---`; break;
     default: arrow = `--[${rel.label}]-->`; break;
   }

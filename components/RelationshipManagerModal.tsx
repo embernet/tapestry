@@ -56,11 +56,13 @@ const RelationshipManagerModal: React.FC<RelationshipManagerModalProps> = ({
         // We are source
         if (rel.direction === RelationshipDirection.To) return '→';
         if (rel.direction === RelationshipDirection.From) return '←';
+        if (rel.direction === RelationshipDirection.Both) return '↔';
         return '—';
     } else {
         // We are target
         if (rel.direction === RelationshipDirection.To) return '←';
         if (rel.direction === RelationshipDirection.From) return '→';
+        if (rel.direction === RelationshipDirection.Both) return '↔';
         return '—';
     }
   };
@@ -138,6 +140,7 @@ const RelationshipManagerModal: React.FC<RelationshipManagerModalProps> = ({
                         >
                             <option value={RelationshipDirection.To}>Output To (→)</option>
                             <option value={RelationshipDirection.From}>Input From (←)</option>
+                            <option value={RelationshipDirection.Both}>Bi-directional (↔)</option>
                             <option value={RelationshipDirection.None}>Link (—)</option>
                         </select>
                     </div>

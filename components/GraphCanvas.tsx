@@ -12,6 +12,7 @@ interface GraphCanvasProps {
   onCanvasClick: () => void;
   onCanvasDoubleClick: (coords: { x: number, y: number }) => void;
   onNodeContextMenu: (event: React.MouseEvent, elementId: string) => void;
+  onLinkContextMenu: (event: React.MouseEvent, relationshipId: string) => void;
   onCanvasContextMenu: (event: React.MouseEvent) => void;
   onNodeConnect: (sourceId: string, targetId: string) => void;
   onNodeConnectToNew: (sourceId: string, coords: { x: number, y: number }) => void;
@@ -25,6 +26,7 @@ interface GraphCanvasProps {
   layoutParams: { linkDistance: number; repulsion: number };
   onJiggleTrigger?: number;
   isBulkEditActive: boolean;
+  isSimulationMode?: boolean;
   simulationState?: Record<string, SimulationNodeState>;
   analysisHighlights?: Map<string, string>;
   isDarkMode?: boolean;
@@ -90,6 +92,12 @@ const createDragHandler = (
 
   function dragstarted(this: SVGGElement, event: any, d: D3Node) {
     const target = event.sourceEvent.target as SVGElement;
+    
+    // Check if dragging via a quick-add button - if so, stop drag immediately to let click handle it
+    if (target.closest('.quick-add-btn')) {
+        return; 
+    }
+
     isMoving = target.classList.contains('move-zone');
     
     hasMoved = false;
@@ -121,6 +129,9 @@ const createDragHandler = (
   }
 
   function dragged(this: SVGGElement, event: any, d: D3Node) {
+    const target = event.sourceEvent.target as SVGElement;
+    if (target.closest('.quick-add-btn')) return;
+
     const e = event as any;
     // Check for significant movement to determine if this is a drag or a click
     if (!hasMoved && (Math.abs(e.x - startX) > 3 || Math.abs(e.y - startY) > 3)) {
@@ -143,6 +154,9 @@ const createDragHandler = (
   }
 
   function dragended(this: SVGGElement, event: any, d: D3Node) {
+    const target = event.sourceEvent.target as SVGElement;
+    if (target.closest('.quick-add-btn')) return;
+
     setElementsState(prev => prev.map(e => e.id === d.id ? { ...e, fx: d.fx, fy: d.fy } : e));
     
     if (!isMoving) {
@@ -186,6 +200,9 @@ const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>, onN
   let hasMoved = false;
 
   function dragstarted(event: any, d: D3Node) {
+    const target = event.sourceEvent.target as SVGElement;
+    if (target.closest('.quick-add-btn')) return;
+
     if (!event.active) {
       simulation.alphaTarget(0.3);
       (simulation as any).restart();
@@ -199,6 +216,9 @@ const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>, onN
   }
 
   function dragged(event: any, d: D3Node) {
+    const target = event.sourceEvent.target as SVGElement;
+    if (target.closest('.quick-add-btn')) return;
+
     const e = event as any;
     d.fx = e.x;
     d.fy = e.y;
@@ -208,6 +228,9 @@ const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>, onN
   }
 
   function dragended(event: any, d: D3Node) {
+    const target = event.sourceEvent.target as SVGElement;
+    if (target.closest('.quick-add-btn')) return;
+
     if (!event.active) simulation.alphaTarget(0);
     
     // In physics mode, typical D3 drag swallows click events. 
@@ -233,6 +256,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   onCanvasClick,
   onCanvasDoubleClick,
   onNodeContextMenu,
+  onLinkContextMenu,
   onCanvasContextMenu,
   onNodeConnect,
   onNodeConnectToNew,
@@ -246,6 +270,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   layoutParams,
   onJiggleTrigger,
   isBulkEditActive,
+  isSimulationMode = false,
   simulationState,
   analysisHighlights,
   isDarkMode = true
@@ -509,8 +534,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .attr('stroke', d => (d.id === selectedRelationshipId ? selectedLinkColor : linkColor))
       .attr('stroke-width', d => (d.id === selectedRelationshipId ? 3 : 2))
       .attr('fill', 'none')
-      .attr('marker-end', d => (d.direction === RelationshipDirection.To ? (isDarkMode ? 'url(#arrow)' : 'url(#arrow-light)') : null))
-      .attr('marker-start', d => (d.direction === RelationshipDirection.From ? (isDarkMode ? 'url(#arrow-rev)' : 'url(#arrow-rev-light)') : null))
+      .attr('marker-end', d => (d.direction === RelationshipDirection.To || d.direction === RelationshipDirection.Both ? (isDarkMode ? 'url(#arrow)' : 'url(#arrow-light)') : null))
+      .attr('marker-start', d => (d.direction === RelationshipDirection.From || d.direction === RelationshipDirection.Both ? (isDarkMode ? 'url(#arrow-rev)' : 'url(#arrow-rev-light)') : null))
       .style('transition', 'opacity 0.3s ease, stroke 0.2s ease, stroke-width 0.2s ease')
       .attr('opacity', l => {
         if (focusMode === 'narrow') return 1.0;
@@ -527,6 +552,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .on('click', (event, d) => {
         event.stopPropagation();
         onLinkClick(d.id);
+      })
+      .on('contextmenu', (event, d) => {
+          onLinkContextMenu(event, d.id);
       })
       .style('cursor', 'pointer');
 
@@ -557,6 +585,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         event.stopPropagation();
         onLinkClick(d.id);
       })
+      .on('contextmenu', (event, d) => {
+          onLinkContextMenu(event, d.id);
+      })
       .style('cursor', 'pointer')
       .style('transition', 'opacity 0.3s ease')
       .style('fill', d => (d.id === selectedRelationshipId ? selectedLinkColor : textFillColor))
@@ -577,6 +608,92 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .join('g')
       .attr('class', 'node')
       .on('contextmenu', (event, d) => onNodeContextMenu(event, d.id))
+      .on('mouseenter', function(event, d) {
+          // Show Quick Add Buttons
+          if (isBulkEditActive || isPhysicsModeActive) return; // Don't show in special modes
+          
+          const group = d3.select(this);
+          const width = d.width || NODE_MAX_WIDTH;
+          const height = d.height || 80;
+          const w2 = width / 2;
+          const h2 = height / 2;
+          const pad = 15; // Distance from edge
+          const btnR = 7;
+          
+          // Gap buffer ensures mouse can travel to button without leaving the group
+          const gapBuffer = 15;
+          const extension = pad + btnR + gapBuffer;
+
+          // Remove existing if any (cleanup)
+          group.selectAll('.quick-add-group').remove();
+          group.selectAll('.bridge-group').remove();
+
+          // 1. Insert "Bridge" group at the bottom (first child) so it is behind the node
+          // This ensures the main node center is still clickable (via Move Zone or Text),
+          // but the "air" around the node captures mouse events to keep the menu open.
+          const bridgeGroup = group.insert('g', ':first-child').attr('class', 'bridge-group');
+          
+          bridgeGroup.append('rect')
+              .attr('width', width + extension * 2)
+              .attr('height', height + extension * 2)
+              .attr('x', -(width / 2) - extension)
+              .attr('y', -(height / 2) - extension)
+              .attr('rx', 20).attr('ry', 20)
+              .attr('fill', 'transparent') 
+              .style('pointer-events', 'all'); // Ensure it catches hover
+
+          // 2. Append Controls Group (on top)
+          const controls = group.append('g').attr('class', 'quick-add-group');
+          
+          // 8 Positions: N, NE, E, SE, S, SW, W, NW
+          const directions = [
+              { id: 'n',  x: 0, y: -h2 - pad, vx: 0, vy: -1 },
+              { id: 'ne', x: w2 + pad, y: -h2 - pad, vx: 1, vy: -1 },
+              { id: 'e',  x: w2 + pad, y: 0, vx: 1, vy: 0 },
+              { id: 'se', x: w2 + pad, y: h2 + pad, vx: 1, vy: 1 },
+              { id: 's',  x: 0, y: h2 + pad, vx: 0, vy: 1 },
+              { id: 'sw', x: -w2 - pad, y: h2 + pad, vx: -1, vy: 1 },
+              { id: 'w',  x: -w2 - pad, y: 0, vx: -1, vy: 0 },
+              { id: 'nw', x: -w2 - pad, y: -h2 - pad, vx: -1, vy: -1 },
+          ];
+
+          controls.selectAll('g')
+              .data(directions)
+              .enter()
+              .append('g')
+              .attr('class', 'quick-add-btn')
+              .attr('transform', p => `translate(${p.x}, ${p.y})`)
+              .style('cursor', 'pointer')
+              .style('opacity', 0)
+              .on('click', (e, p) => {
+                  e.stopPropagation();
+                  // Calculate new position (approx 200px away)
+                  const dist = 200;
+                  const newX = (d.x || 0) + (p.vx * dist);
+                  const newY = (d.y || 0) + (p.vy * dist);
+                  onNodeConnectToNew(d.id, { x: newX, y: newY });
+              })
+              .each(function() {
+                  const btn = d3.select(this);
+                  btn.append('circle')
+                      .attr('r', btnR)
+                      .attr('fill', isDarkMode ? '#1f2937' : '#ffffff')
+                      .attr('stroke', '#3b82f6')
+                      .attr('stroke-width', 1.5);
+                  
+                  // Plus sign
+                  btn.append('path')
+                      .attr('d', 'M-3 0 h6 M0 -3 v6')
+                      .attr('stroke', '#3b82f6')
+                      .attr('stroke-width', 1.5);
+              })
+              .transition().duration(200).style('opacity', 1);
+
+      })
+      .on('mouseleave', function() {
+          d3.select(this).selectAll('.quick-add-group').remove();
+          d3.select(this).selectAll('.bridge-group').remove();
+      })
       .style('transition', 'opacity 0.3s ease')
       .attr('opacity', d => {
           if (focusMode === 'narrow') return 1.0;
@@ -702,18 +819,22 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     const bulkCursorSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>`);
     const bulkCursor = `url("data:image/svg+xml;charset=utf-8,${bulkCursorSvg}") 12 12, auto`;
 
+    // Custom SVG Cursor for Connect Mode (blue plus circle)
+    const connectCursorSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="rgba(255,255,255,0.2)" stroke="#3b82f6" stroke-width="2" /><path d="M12 7v10M7 12h10" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" /></svg>`);
+    const connectCursor = `url("data:image/svg+xml;charset=utf-8,${connectCursorSvg}") 12 12, crosshair`;
+
     let moveZoneCursor = isPhysicsModeActive ? 'grab' : 'move';
 
     if (isBulkEditActive) {
         cursorStyle = bulkCursor;
         moveZoneCursor = bulkCursor;
-    } else if (simulationState) {
+    } else if (isSimulationMode) {
         cursorStyle = 'pointer'; // Click to stimulate
         moveZoneCursor = 'pointer';
     } else if (isPhysicsModeActive) {
         cursorStyle = 'grab';
     } else {
-        cursorStyle = 'crosshair'; // Default Connect Mode
+        cursorStyle = connectCursor; // Custom Connect Cursor
     }
 
     node.style('cursor', cursorStyle);
@@ -779,7 +900,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         }
       });
 
-  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, multiSelection, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState, analysisHighlights, isDarkMode]);
+  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, multiSelection, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, onLinkContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState, isSimulationMode, analysisHighlights, isDarkMode]);
 
   return (
     <div className={`w-full h-full flex-grow cursor-grab active:cursor-grabbing ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`} onContextMenu={handleCanvasContextMenu}>

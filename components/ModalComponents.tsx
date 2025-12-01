@@ -8,6 +8,7 @@ export * from './PatternGalleryModal';
 export * from './HelpMenu';
 export * from './ConflictResolutionModal';
 export * from './ContextMenu';
+export * from './RelationshipContextMenu';
 export * from './CanvasContextMenu';
 export * from './CreateModelModal';
 export * from './SaveAsModal';

@@ -34,7 +34,7 @@ import CommandBar from './components/CommandBar';
 import RightPanelContainer from './components/RightPanelContainer';
 import SettingsModal from './components/SettingsModal';
 import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe, generateSelectionReport, callAI, AIConfig, aiLogger } from './utils';
-import { TextAnimator, ConflictResolutionModal, ContextMenu, CanvasContextMenu, CreateModelModal, SaveAsModal, OpenModelModal, PatternGalleryModal, AboutModal, TapestryBanner, SchemaUpdateModal, SelfTestModal, UserGuideModal, AiDisclaimer, CreatorInfo } from './components/ModalComponents';
+import { TextAnimator, ConflictResolutionModal, ContextMenu, CanvasContextMenu, RelationshipContextMenu, CreateModelModal, SaveAsModal, OpenModelModal, PatternGalleryModal, AboutModal, TapestryBanner, SchemaUpdateModal, SelfTestModal, UserGuideModal, AiDisclaimer, CreatorInfo } from './components/ModalComponents';
 import { useModelActions } from './hooks/useModelActions';
 import { usePanelState } from './hooks/usePanelState';
 import { useTools } from './hooks/useTools';
@@ -153,6 +153,7 @@ export default function App() {
   const [selectedRelationshipId, setSelectedRelationshipId] = useState<string | null>(null);
   const [focusMode, setFocusMode] = useState<'narrow' | 'wide' | 'zoom'>('narrow');
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, elementId: string } | null>(null);
+  const [relationshipContextMenu, setRelationshipContextMenu] = useState<{ x: number, y: number, relationshipId: string } | null>(null);
   const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number, y: number } | null>(null);
   const [panelStateUI, setPanelStateUI] = useState<PanelState>({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
   
@@ -526,6 +527,7 @@ export default function App() {
 
   const handleCloseContextMenu = useCallback(() => setContextMenu(null), []);
   const handleCloseCanvasContextMenu = useCallback(() => setCanvasContextMenu(null), []);
+  const handleCloseRelationshipContextMenu = useCallback(() => setRelationshipContextMenu(null), []);
   
   const runImpactSimulation = (startNodeId: string) => {
       const newSimState: Record<string, SimulationNodeState> = {};
@@ -568,13 +570,25 @@ export default function App() {
       }
       if (isBulkEditActive) { if (bulkTagsToAdd.length === 0 && bulkTagsToRemove.length === 0) return; setElements(prev => prev.map(el => { if (el.id === elementId) { const currentTags = el.tags; let newTags = [...currentTags]; let changed = false; const lowerToRemove = bulkTagsToRemove.map(t => t.toLowerCase()); const filteredTags = newTags.filter(t => !lowerToRemove.includes(t.toLowerCase())); if (filteredTags.length !== newTags.length) { newTags = filteredTags; changed = true; } const lowerCurrent = newTags.map(t => t.toLowerCase()); const toAdd = bulkTagsToAdd.filter(t => !lowerCurrent.includes(t.toLowerCase())); if (toAdd.length > 0) { newTags = [...newTags, ...toAdd]; changed = true; } if (changed) { return { ...el, tags: newTags, updatedAt: new Date().toISOString() }; } } return el; })); return; } 
       if (event.ctrlKey || event.metaKey) { const newMulti = new Set(multiSelection); if (newMulti.has(elementId)) { newMulti.delete(elementId); } else { newMulti.add(elementId); } setMultiSelection(newMulti); if (newMulti.has(elementId)) { setSelectedElementId(elementId); } else if (selectedElementId === elementId) { setSelectedElementId(newMulti.size > 0 ? Array.from(newMulti).pop() || null : null); } } else { setMultiSelection(new Set([elementId])); setSelectedElementId(elementId); }
-      setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); 
-  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState, multiSelection, selectedElementId, panelState.isSunburstPanelOpen, panelState.sunburstState, elements, originalElements, panelState]);
+      setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseRelationshipContextMenu();
+  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState, multiSelection, selectedElementId, panelState.isSunburstPanelOpen, panelState.sunburstState, elements, originalElements, panelState, handleCloseRelationshipContextMenu]);
   
-  const handleLinkClick = useCallback((relationshipId: string) => { setSelectedRelationshipId(relationshipId); setSelectedElementId(null); setMultiSelection(new Set()); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); }, [handleCloseContextMenu]);
-  const handleCanvasClick = useCallback(() => { setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseCanvasContextMenu(); setAnalysisHighlights(new Map()); }, [handleCloseContextMenu, handleCloseCanvasContextMenu]);
-  const handleNodeContextMenu = useCallback((event: React.MouseEvent, elementId: string) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, elementId }); handleCloseCanvasContextMenu(); }, [handleCloseCanvasContextMenu]);
-  const handleCanvasContextMenu = useCallback((event: React.MouseEvent) => { event.preventDefault(); setCanvasContextMenu({ x: event.clientX, y: event.clientY }); handleCloseContextMenu(); }, [handleCloseContextMenu]);
+  const handleLinkClick = useCallback((relationshipId: string) => { setSelectedRelationshipId(relationshipId); setSelectedElementId(null); setMultiSelection(new Set()); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseRelationshipContextMenu(); }, [handleCloseContextMenu, handleCloseRelationshipContextMenu]);
+  const handleCanvasClick = useCallback(() => { setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseCanvasContextMenu(); handleCloseRelationshipContextMenu(); setAnalysisHighlights(new Map()); }, [handleCloseContextMenu, handleCloseCanvasContextMenu, handleCloseRelationshipContextMenu]);
+  const handleNodeContextMenu = useCallback((event: React.MouseEvent, elementId: string) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, elementId }); handleCloseCanvasContextMenu(); handleCloseRelationshipContextMenu(); }, [handleCloseCanvasContextMenu, handleCloseRelationshipContextMenu]);
+  
+  const handleLinkContextMenu = useCallback((event: React.MouseEvent, relationshipId: string) => {
+      event.preventDefault();
+      setRelationshipContextMenu({ x: event.clientX, y: event.clientY, relationshipId });
+      handleCloseContextMenu();
+      handleCloseCanvasContextMenu();
+  }, [handleCloseContextMenu, handleCloseCanvasContextMenu]);
+
+  const handleChangeRelationshipDirection = useCallback((relationshipId: string, direction: RelationshipDirection) => {
+      setRelationships(prev => prev.map(r => r.id === relationshipId ? { ...r, direction } : r));
+  }, []);
+
+  const handleCanvasContextMenu = useCallback((event: React.MouseEvent) => { event.preventDefault(); setCanvasContextMenu({ x: event.clientX, y: event.clientY }); handleCloseContextMenu(); handleCloseRelationshipContextMenu(); }, [handleCloseContextMenu, handleCloseRelationshipContextMenu]);
   const handleNodeConnect = useCallback((sourceId: string, targetId: string) => { const currentScheme = colorSchemes.find(s => s.id === activeSchemeId); let defaultLabel = ''; if (currentScheme && currentScheme.defaultRelationshipLabel) { defaultLabel = currentScheme.defaultRelationshipLabel; } const newRelId = generateUUID(); const newRel: Relationship = { id: newRelId, source: sourceId, target: targetId, label: defaultLabel, direction: RelationshipDirection.To, tags: [] }; setRelationships(prev => [...prev, newRel]); setSelectedRelationshipId(newRelId); setSelectedElementId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); }, [activeSchemeId, colorSchemes, handleCloseContextMenu]);
   const handleNodeConnectToNew = useCallback((sourceId: string, coords: { x: number; y: number }) => { 
       const now = new Date().toISOString(); 
@@ -639,7 +653,43 @@ export default function App() {
     const parsedRels: { sourceName: string, targetName: string, label: string, direction: RelationshipDirection }[] = []; 
     function parseElementStr(str: string) { let workStr = str.trim(); if (!workStr) return null; let name: string; let tags: string[] = []; const lastColonIndex = workStr.lastIndexOf(':'); const lastParenOpenIndex = workStr.lastIndexOf('('); if (lastColonIndex > -1 && lastColonIndex > lastParenOpenIndex) { const tagsStr = workStr.substring(lastColonIndex + 1); tags = tagsStr.split(',').map(t => t.trim()).filter(t => !!t); workStr = workStr.substring(0, lastColonIndex).trim(); } if (workStr.endsWith('+')) { workStr = workStr.slice(0, -1).trim(); tags.push('Useful'); } else if (workStr.endsWith('-')) { workStr = workStr.slice(0, -1).trim(); tags.push('Harmful'); } name = workStr; if (name.startsWith('"') && name.endsWith('"')) { name = name.substring(1, name.length - 1); } if (!name) return null; return { name, tags }; }
     function updateParsedElement(elementData: { name: string, tags: string[] }) { const existing = parsedElements.get(elementData.name); if (existing) { const newTags = [...new Set([...existing.tags, ...elementData.tags])]; parsedElements.set(elementData.name, { tags: newTags }); } else { parsedElements.set(elementData.name, { tags: elementData.tags }); } }
-    for (const line of lines) { const relSeparatorRegex = /(<?-\[.*?]->?)/g; const parts = line.split(relSeparatorRegex); const tokens = parts.map(p => p.trim()).filter(t => !!t); if (tokens.length === 0) continue; if (tokens.length === 1) { const element = parseElementStr(tokens[0]); if (element) { updateParsedElement(element); } continue; } let currentSourceElementStr = tokens.shift(); while (tokens.length > 0) { const relStr = tokens.shift(); const targetsStr = tokens.shift(); if (!currentSourceElementStr || !relStr || !targetsStr) break; const sourceElementData = parseElementStr(currentSourceElementStr); if (!sourceElementData) break; updateParsedElement(sourceElementData); const singleRelRegex = /<?-\[(.*?)]->?/; const relMatch = relStr.match(singleRelRegex); if (!relMatch) break; const label = relMatch[1]; let direction = RelationshipDirection.None; if (relStr.startsWith('<-')) direction = RelationshipDirection.From; else if (relStr.endsWith('->')) direction = RelationshipDirection.To; const targetElementStrs = targetsStr.split(';').map(t => t.trim()).filter(t => !!t); for (const targetElementStr of targetElementStrs) { const targetElementData = parseElementStr(targetElementStr); if (targetElementData) { updateParsedElement(targetElementData); parsedRels.push({ sourceName: sourceElementData.name, targetName: targetElementData.name, label, direction }); } } if (targetElementStrs.length === 1) { currentSourceElementStr = targetElementStrs[0]; } else { break; } } } 
+    for (const line of lines) { 
+        const relSeparatorRegex = /(<?-\[.*?]->?)/g; 
+        const parts = line.split(relSeparatorRegex); 
+        const tokens = parts.map(p => p.trim()).filter(t => !!t); 
+        if (tokens.length === 0) continue; 
+        if (tokens.length === 1) { 
+            const element = parseElementStr(tokens[0]); 
+            if (element) { updateParsedElement(element); } 
+            continue; 
+        } 
+        let currentSourceElementStr = tokens.shift(); 
+        while (tokens.length > 0) { 
+            const relStr = tokens.shift(); 
+            const targetsStr = tokens.shift(); 
+            if (!currentSourceElementStr || !relStr || !targetsStr) break; 
+            const sourceElementData = parseElementStr(currentSourceElementStr); 
+            if (!sourceElementData) break; 
+            updateParsedElement(sourceElementData); 
+            const singleRelRegex = /<?-\[(.*?)]->?/; 
+            const relMatch = relStr.match(singleRelRegex); 
+            if (!relMatch) break; 
+            const label = relMatch[1]; 
+            let direction = RelationshipDirection.None; 
+            if (relStr.startsWith('<-') && relStr.endsWith('->')) direction = RelationshipDirection.Both; // Handle Bi-directional
+            else if (relStr.startsWith('<-')) direction = RelationshipDirection.From; 
+            else if (relStr.endsWith('->')) direction = RelationshipDirection.To; 
+            const targetElementStrs = targetsStr.split(';').map(t => t.trim()).filter(t => !!t); 
+            for (const targetElementStr of targetElementStrs) { 
+                const targetElementData = parseElementStr(targetElementStr); 
+                if (targetElementData) { 
+                    updateParsedElement(targetElementData); 
+                    parsedRels.push({ sourceName: sourceElementData.name, targetName: targetElementData.name, label, direction }); 
+                } 
+            } 
+            if (targetElementStrs.length === 1) { currentSourceElementStr = targetElementStrs[0]; } else { break; } 
+        } 
+    } 
     let nextElements: Element[] = []; let nextRelationships: Relationship[] = []; const newElementNames = new Set<string>(); 
     if (shouldMerge) { nextElements = [...elements]; nextRelationships = [...relationships]; const existingMap = new Map<string, Element>(); const nameToIdMap = new Map<string, string>(); nextElements.forEach(e => { existingMap.set(e.name.toLowerCase(), e); nameToIdMap.set(e.name.toLowerCase(), e.id); }); parsedElements.forEach(({ tags }, name) => { const lowerName = name.toLowerCase(); const existing = existingMap.get(lowerName); if (existing) { const mergedTags = Array.from(new Set([...existing.tags, ...tags])); if (mergedTags.length !== existing.tags.length || !mergedTags.every(t => existing.tags.includes(t))) { const updated = { ...existing, tags: mergedTags, updatedAt: new Date().toISOString() }; const idx = nextElements.findIndex(e => e.id === existing.id); if (idx !== -1) nextElements[idx] = updated; existingMap.set(lowerName, updated); } } else { const now = new Date().toISOString(); const newId = generateUUID(); const newEl: Element = { id: newId, name, tags, notes: '', createdAt: now, updatedAt: now }; nextElements.push(newEl); existingMap.set(lowerName, newEl); nameToIdMap.set(lowerName, newId); newElementNames.add(name); } }); parsedRels.forEach(rel => { const sId = nameToIdMap.get(rel.sourceName.toLowerCase()); const tId = nameToIdMap.get(rel.targetName.toLowerCase()); if (sId && tId) { const exists = nextRelationships.some(r => r.source === sId && r.target === tId && r.label === rel.label && r.direction === rel.direction); if (!exists) { nextRelationships.push({ id: generateUUID(), source: sId, target: tId, label: rel.label, direction: rel.direction, tags: [] }); } } }); } else { const nameToIdMap = new Map<string, string>(); parsedElements.forEach(({ tags }, name) => { const existing = elements.find(e => e.name.toLowerCase() === name.toLowerCase()); if (existing) { const updated = { ...existing, tags, updatedAt: new Date().toISOString() }; nextElements.push(updated); nameToIdMap.set(name.toLowerCase(), existing.id); } else { const now = new Date().toISOString(); const newId = generateUUID(); const newEl: Element = { id: newId, name, tags, notes: '', createdAt: now, updatedAt: now }; nextElements.push(newEl); nameToIdMap.set(name.toLowerCase(), newId); newElementNames.add(name); } }); parsedRels.forEach(rel => { const sId = nameToIdMap.get(rel.sourceName.toLowerCase()); const tId = nameToIdMap.get(rel.targetName.toLowerCase()); if (sId && tId) { nextRelationships.push({ id: generateUUID(), source: sId, target: tId, label: rel.label, direction: rel.direction, tags: [] }); } }); } 
     let placedNewElementsCount = 0; const positionNewElements = () => { nextElements.forEach(element => { if (newElementNames.has(element.name) && element.x === undefined) { let connectedAnchor: Element | undefined; for (const rel of nextRelationships) { let anchorId: string | undefined; if (rel.source === element.id) anchorId = rel.target as string; else if (rel.target === element.id) anchorId = rel.source as string; if (anchorId) { const potentialAnchor = nextElements.find(f => f.id === anchorId && f.x !== undefined); if (potentialAnchor) { connectedAnchor = potentialAnchor; break; } } } if (connectedAnchor && connectedAnchor.x && connectedAnchor.y) { element.x = connectedAnchor.x + (Math.random() - 0.5) * 300; element.y = connectedAnchor.y + (Math.random() - 0.5) * 300; } else { element.x = 200 + (placedNewElementsCount * 50); element.y = 200 + (placedNewElementsCount * 50); placedNewElementsCount++; } element.fx = element.x; element.fy = element.y; } }); }; 
@@ -1216,7 +1266,34 @@ export default function App() {
       {isUserGuideModalOpen && <UserGuideModal onClose={() => setIsUserGuideModalOpen(false)} isDarkMode={isDarkMode} />}
 
       {persistence.currentModelId ? (
-        <GraphCanvas ref={graphCanvasRef} elements={filteredElements} relationships={filteredRelationships} onNodeClick={handleNodeClick} onLinkClick={handleLinkClick} onCanvasClick={handleCanvasClick} onCanvasDoubleClick={handleAddElement} onNodeContextMenu={handleNodeContextMenu} onCanvasContextMenu={handleCanvasContextMenu} onNodeConnect={handleNodeConnect} onNodeConnectToNew={handleNodeConnectToNew} activeColorScheme={activeColorScheme} selectedElementId={selectedElementId} multiSelection={multiSelection} selectedRelationshipId={selectedRelationshipId} focusMode={focusMode} setElements={setElements} isPhysicsModeActive={isPhysicsModeActive} layoutParams={layoutParams} onJiggleTrigger={jiggleTrigger} isBulkEditActive={isBulkEditActive} simulationState={simulationState} analysisHighlights={analysisHighlights} isDarkMode={isDarkMode} />
+        <GraphCanvas 
+            ref={graphCanvasRef} 
+            elements={filteredElements} 
+            relationships={filteredRelationships} 
+            onNodeClick={handleNodeClick} 
+            onLinkClick={handleLinkClick} 
+            onCanvasClick={handleCanvasClick} 
+            onCanvasDoubleClick={handleAddElement} 
+            onNodeContextMenu={handleNodeContextMenu} 
+            onLinkContextMenu={handleLinkContextMenu}
+            onCanvasContextMenu={handleCanvasContextMenu} 
+            onNodeConnect={handleNodeConnect} 
+            onNodeConnectToNew={handleNodeConnectToNew} 
+            activeColorScheme={activeColorScheme} 
+            selectedElementId={selectedElementId} 
+            multiSelection={multiSelection} 
+            selectedRelationshipId={selectedRelationshipId} 
+            focusMode={focusMode} 
+            setElements={setElements} 
+            isPhysicsModeActive={isPhysicsModeActive} 
+            layoutParams={layoutParams} 
+            onJiggleTrigger={jiggleTrigger} 
+            isBulkEditActive={isBulkEditActive} 
+            isSimulationMode={isSimulationMode}
+            simulationState={simulationState} 
+            analysisHighlights={analysisHighlights} 
+            isDarkMode={isDarkMode} 
+        />
       ) : (
         <div className={`w-full h-full flex-col items-center justify-center space-y-10 p-8 flex relative ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
              <div className="text-center space-y-2">
@@ -1260,6 +1337,18 @@ export default function App() {
 
       {contextMenu && persistence.currentModelId && (
         <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={handleCloseContextMenu} onDeleteElement={() => { handleDeleteElement(contextMenu.elementId); handleCloseContextMenu(); }} onAddRelationship={() => { setPanelStateUI({ view: 'addRelationship', sourceElementId: contextMenu.elementId, targetElementId: null, isNewTarget: false }); setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); handleCloseContextMenu(); }} />
+      )}
+
+      {relationshipContextMenu && persistence.currentModelId && (
+          <RelationshipContextMenu
+              x={relationshipContextMenu.x}
+              y={relationshipContextMenu.y}
+              relationship={relationships.find(r => r.id === relationshipContextMenu.relationshipId)!}
+              onClose={handleCloseRelationshipContextMenu}
+              onDelete={() => { handleDeleteRelationship(relationshipContextMenu.relationshipId); handleCloseRelationshipContextMenu(); }}
+              onChangeDirection={(dir) => handleChangeRelationshipDirection(relationshipContextMenu.relationshipId, dir)}
+              isDarkMode={isDarkMode}
+          />
       )}
 
       {canvasContextMenu && persistence.currentModelId && (

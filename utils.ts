@@ -87,6 +87,7 @@ export const generateMarkdownFromGraph = (elements: Element[], relationships: Re
         let connector = '';
         switch (rel.direction) {
             case RelationshipDirection.From: connector = ` <-[${rel.label}]- `; break;
+            case RelationshipDirection.Both: connector = ` <-[${rel.label}]-> `; break;
             case RelationshipDirection.None: connector = ` -[${rel.label}]- `; break;
             default: connector = ` -[${rel.label}]-> `; break;
         }
@@ -118,6 +119,9 @@ export const generateMarkdownFromGraph = (elements: Element[], relationships: Re
       switch (direction as RelationshipDirection) {
         case RelationshipDirection.From:
           connector = ` <-[${label}]- `;
+          break;
+        case RelationshipDirection.Both:
+          connector = ` <-[${label}]-> `;
           break;
         case RelationshipDirection.None:
           connector = ` -[${label}]- `;
@@ -169,6 +173,7 @@ export const generateElementMarkdown = (
       let arrow = '';
       switch (rel.direction) {
         case RelationshipDirection.From: arrow = `<--[${rel.label}]--`; break;
+        case RelationshipDirection.Both: arrow = `<--[${rel.label}]-->`; break;
         case RelationshipDirection.None: arrow = `---[${rel.label}]---`; break;
         default: arrow = `--[${rel.label}]-->`; break;
       }
