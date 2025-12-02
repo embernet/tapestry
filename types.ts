@@ -153,6 +153,7 @@ export interface GlobalSettings {
   activeProvider: AIProvider;
   aiConnections: Record<AIProvider, AIConnection>;
   customStrategies: CustomStrategyTool[];
+  language: string;
 }
 
 export interface ModelMetadata {

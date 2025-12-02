@@ -267,6 +267,121 @@ Response style: precise, context-aware, and deeply faithful to the graph. Cite e
 
 export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
   {
+    id: 'scheme-general',
+    name: 'General',
+    tagColors: {
+      'Question': '#8b5cf6', // violet-500
+      'Idea': '#fdf37a', // yellow-300
+      'Assumption': '#94a3b8', // slate-400
+      'Hypothesis': '#06b6d4', // cyan-500
+      'Process': '#3b82f6', // blue-500
+      'Decision': '#f97316', // orange-500
+      'Team': '#10b981', // emerald-500
+      'Role': '#eab308', // yellow-500
+      'Action': '#0ea5e9', // sky-500
+      'Task': '#60a5fa', // blue-400
+      'Project': '#7c3aed', // violet-600
+      'Initiative': '#d946ef', // fuchsia-500
+      'Stakeholder': '#f59e0b', // amber-500
+      'Person': '#fb923c', // orange-400
+      'Technology': '#64748b', // slate-500
+      'Organisation': '#6b21a8', // purple-700
+      'Goal': '#22c55e', // green-500
+      'Objective': '#84cc16', // lime-500
+      'Metric': '#06b6d4', // cyan-500
+      'Outcome': '#14b8a6', // teal-500
+      'Risk': '#ea5d5d', // red-500
+      'Issue': '#f43f5e', // rose-500
+      'Benefit': '#a3e635', // lime-400
+      'Resource': '#fbbf24', // amber-400
+      'Constraint': '#78716c', // stone-500
+      'Requirement': '#38bdf8', // sky-400
+      'Deliverable': '#6366f1', // indigo-500
+      'Knowledge': '#a855f7', // purple-500
+      'Tool': '#475569', // slate-600
+      'Capability': '#2563eb', // blue-600
+      'Event': '#ec4899', // pink-500
+      'Useful': '#86efac', // green-300
+      'Harmful': '#ef4444', // red-300
+      'Potential': '#fde047', // yellow-300
+      'Insufficient': '#fdba74', // orange-300
+      'Excessive': '#f87171', // red-400
+      'Efficient': '#34d399', // emerald-400
+      'Inefficient': '#d6d3d1', // stone-300
+      'Reliable': '#93c5fd', // blue-300
+      'Unreliable': '#fda4af', // rose-300
+    },
+    tagDescriptions: {
+      'Question': 'An inquiry or area of uncertainty.',
+      'Idea': 'A thought or concept that may lead to action or further development.',
+      'Assumption': 'A belief accepted as true without proof.',
+      'Hypothesis': 'A proposed explanation to be tested.',
+      'Process': 'A series of actions or steps.',
+      'Decision': 'A conclusion or resolution reached.',
+      'Team': 'A group of people working together.',
+      'Role': 'A specific position or function.',
+      'Action': 'Something done to achieve an aim.',
+      'Task': 'A specific piece of work.',
+      'Project': 'A collaborative enterprise.',
+      'Initiative': 'A strategy or plan.',
+      'Stakeholder': 'A person with an interest in the outcome.',
+      'Person': 'An individual human being.',
+      'Technology': 'Machinery, equipment, or digital tools.',
+      'Organisation': 'An organized body of people.',
+      'Goal': 'The desired result.',
+      'Objective': 'A specific step towards a goal.',
+      'Metric': 'A standard of measurement.',
+      'Outcome': 'The consequence of an action.',
+      'Risk': 'Potential for loss or failure.',
+      'Issue': 'A subject of concern or problem.',
+      'Benefit': 'An advantage or profit.',
+      'Resource': 'A stock or supply of assets.',
+      'Constraint': 'A limitation or restriction.',
+      'Requirement': 'A necessary condition.',
+      'Deliverable': 'A tangible or intangible good produced.',
+      'Knowledge': 'Facts, information, and skills.',
+      'Tool': 'A device used to carry out a function.',
+      'Capability': 'The power or ability to do something.',
+      'Event': 'A thing that happens.',
+      'Useful': 'Able to be used for a practical purpose.',
+      'Harmful': 'Causing or likely to cause harm.',
+      'Potential': 'Having or showing the capacity to develop.',
+      'Insufficient': 'Not enough; inadequate.',
+      'Excessive': 'More than is necessary.',
+      'Efficient': 'Achieving maximum productivity.',
+      'Inefficient': 'Wasting time or resources.',
+      'Reliable': 'Consistently good in quality.',
+      'Unreliable': 'Not able to be relied upon.',
+    },
+    relationshipDefinitions: [
+      { label: 'Increases', description: 'Makes greater in size or amount.' },
+      { label: 'Decreases', description: 'Makes smaller in size or amount.' },
+      { label: 'Improves', description: 'Makes or becomes better.' },
+      { label: 'Worsens', description: 'Makes or becomes worse.' },
+      { label: 'Influences', description: 'Has an effect on character or behavior.' },
+      { label: 'Enables', description: 'Gives authority or means to do something.' },
+      { label: 'Disables', description: 'Limits or prohibits function.' },
+      { label: 'Causes', description: 'Makes something happen.' },
+      { label: 'Leads to', description: 'Results in a specific outcome.' },
+      { label: 'Prevents', description: 'Keeps something from happening.' },
+      { label: 'Mitigates', description: 'Makes less severe or painful.' },
+      { label: 'Requires', description: 'Needs for a particular purpose.' },
+      { label: 'Triggers', description: 'Causes an event or situation to happen.' },
+      { label: 'Part of', description: 'Is a piece or segment of a whole.' },
+      { label: 'Contains', description: 'Have or hold within.' },
+      { label: 'Associated with', description: 'Connected with something else.' },
+      { label: 'Owned by', description: 'Possessed by an entity.' },
+      { label: 'Assigned to', description: 'Allocated to a specific person/team.' },
+      { label: 'Accountable for', description: 'Responsible for the outcome.' },
+      { label: 'Consulted by', description: 'Sought for advice or information.' },
+      { label: 'Informs', description: 'Gives facts or information.' },
+      { label: 'Depends on', description: 'Determined or controlled by something else.' },
+      { label: 'Conflicts with', description: 'Be incompatible or at variance.' },
+      { label: 'Relates to', description: 'Make or show a connection between.' },
+    ],
+    defaultRelationshipLabel: 'Relates to'
+  },
+  {
     id: 'scheme-useful-harmful',
     name: 'Useful Harmful',
     tagColors: {

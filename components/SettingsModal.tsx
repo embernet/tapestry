@@ -344,6 +344,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             </select>
                         </div>
 
+                        <div className="space-y-2">
+                            <label className={`block text-sm font-bold uppercase tracking-wide ${textMain}`}>Response Language</label>
+                            <input 
+                                type="text" 
+                                value={globalSettings.language || 'British English'} 
+                                onChange={(e) => handleGlobalSettingChange('language', e.target.value)}
+                                className={`w-full rounded p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 border ${inputBg}`}
+                                placeholder="e.g. British English, French, Spanish"
+                            />
+                        </div>
+
                         <div className={`p-4 rounded-lg border space-y-4 ${sectionBg}`}>
                             {/* Specific Provider Guidance */}
                             {globalSettings.activeProvider === 'gemini' && (

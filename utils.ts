@@ -224,6 +224,7 @@ export interface AIConfig {
     apiKey: string;
     modelId: string;
     baseUrl?: string;
+    language?: string;
 }
 
 export const aiLogger = {
@@ -248,6 +249,14 @@ export const callAI = async (
     skipLog?: boolean
 ): Promise<{ text: string, functionCalls?: any[] }> => {
     
+    // Append language instruction
+    let effectiveSystemInstruction = systemInstruction;
+    if (config.language) {
+        effectiveSystemInstruction = effectiveSystemInstruction 
+            ? `${effectiveSystemInstruction}\nProvide all responses in ${config.language}.`
+            : `Provide all responses in ${config.language}.`;
+    }
+
     if (!skipLog) {
         let requestText = '';
         if (typeof prompt === 'string') requestText = prompt;
@@ -264,7 +273,7 @@ export const callAI = async (
             requestPayload: {
                 modelId: config.modelId,
                 prompt,
-                systemInstruction,
+                systemInstruction: effectiveSystemInstruction,
                 tools,
                 responseSchema
             }
@@ -274,7 +283,7 @@ export const callAI = async (
     if (config.provider === 'gemini') {
         const ai = new GoogleGenAI({ apiKey: config.apiKey || process.env.API_KEY });
         const geminiConfig: any = {};
-        if (systemInstruction) geminiConfig.systemInstruction = systemInstruction;
+        if (effectiveSystemInstruction) geminiConfig.systemInstruction = effectiveSystemInstruction;
         if (tools) geminiConfig.tools = [{ functionDeclarations: tools }];
         if (responseSchema) {
             geminiConfig.responseMimeType = "application/json";
@@ -312,7 +321,7 @@ export const callAI = async (
         if (!config.apiKey && config.provider !== 'ollama') throw new Error(`${config.provider} API Key is missing in settings.`);
         
         const messages = [];
-        if (systemInstruction) messages.push({ role: "system", content: systemInstruction });
+        if (effectiveSystemInstruction) messages.push({ role: "system", content: effectiveSystemInstruction });
         
         // Map content
         if (typeof prompt === 'string') {

@@ -76,7 +76,8 @@ export default function App() {
           ollama: { provider: 'ollama', apiKey: 'ollama', baseUrl: 'http://localhost:11434', modelId: 'llama3' },
           custom: { provider: 'custom', apiKey: '', baseUrl: '', modelId: '' }
       },
-      customStrategies: []
+      customStrategies: [],
+      language: 'British English'
   });
   const [systemPromptConfig, setSystemPromptConfig] = useState<SystemPromptConfig>(DEFAULT_SYSTEM_PROMPT_CONFIG);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -214,6 +215,7 @@ export default function App() {
               // Ensure customStrategies is initialized even if not in old save
               if (!parsed.customStrategies) parsed.customStrategies = [];
               if (!parsed.theme) parsed.theme = 'dark'; // Ensure theme exists
+              if (!parsed.language) parsed.language = 'British English'; // Ensure language exists
               setGlobalSettings(prev => ({ ...prev, ...parsed }));
               tools.setIsToolsPanelOpen(parsed.toolsBarOpenByDefault ?? true);
               setIsDarkMode(parsed.theme === 'dark');
@@ -246,7 +248,8 @@ export default function App() {
           provider,
           apiKey: conn?.apiKey || '',
           modelId: conn?.modelId || 'gemini-2.5-flash',
-          baseUrl: conn?.baseUrl
+          baseUrl: conn?.baseUrl,
+          language: globalSettings.language || 'British English'
       };
   }, [globalSettings]);
 
