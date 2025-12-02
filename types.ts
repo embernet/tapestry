@@ -268,4 +268,4 @@ export type ExplorerToolType = 'treemap' | 'tags' | 'relationships' | 'sunburst'
 export type TagCloudToolType = 'tags' | 'nodes' | 'words' | 'full_text' | null;
 export type MiningToolType = 'dashboard' | null;
 export type MermaidToolType = 'editor' | null;
-export type VisualiseToolType = 'grid' | 'sketch' | null;
+export type VisualiseToolType = 'grid' | 'sketch' | 'random_walk' | null;

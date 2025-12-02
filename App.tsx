@@ -48,6 +48,7 @@ import { GuidancePanel } from './components/GuidancePanel';
 import SearchToolbar from './components/SearchToolbar';
 import { DebugPanel } from './components/DebugPanel';
 import { SketchPanel } from './components/SketchPanel';
+import { RandomWalkPanel } from './components/RandomWalkPanel';
 
 // Explicitly define coordinate type to fix type inference issues
 type Coords = { x: number; y: number };
@@ -119,6 +120,30 @@ export default function App() {
   
   // --- Sketch Panel State ---
   const [isSketchPanelOpen, setIsSketchPanelOpen] = useState(false);
+  
+  // --- Random Walk State ---
+  const [isRandomWalkOpen, setIsRandomWalkOpen] = useState(false);
+  const [walkState, setWalkState] = useState<{
+      currentNodeId: string | null;
+      pathHistory: string[]; // Track history of walk
+      historyIndex: number; // Current position in history
+      visitedIds: Set<string>;
+      isPaused: boolean;
+      waitTime: number;
+      hideDetails: boolean;
+      direction: 'forward' | 'backward';
+      speedMultiplier: number;
+  }>({
+      currentNodeId: null,
+      pathHistory: [],
+      historyIndex: -1,
+      visitedIds: new Set(),
+      isPaused: true,
+      waitTime: 3,
+      hideDetails: false,
+      direction: 'forward',
+      speedMultiplier: 1
+  });
 
   // --- Tools State Hook ---
   const tools = useTools(panelState);
@@ -161,6 +186,8 @@ export default function App() {
   const [multiSelection, setMultiSelection] = useState<Set<string>>(new Set()); 
   const [selectedRelationshipId, setSelectedRelationshipId] = useState<string | null>(null);
   const [focusMode, setFocusMode] = useState<'narrow' | 'wide' | 'zoom'>('narrow');
+  const [preWalkFocusMode, setPreWalkFocusMode] = useState<'narrow' | 'wide' | 'zoom'>('narrow');
+
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, elementId: string } | null>(null);
   const [relationshipContextMenu, setRelationshipContextMenu] = useState<{ x: number, y: number, relationshipId: string } | null>(null);
   const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number, y: number } | null>(null);
@@ -338,6 +365,27 @@ export default function App() {
           panelState.setIsGridPanelOpen(prev => !prev);
       } else if (tool === 'sketch') {
           setIsSketchPanelOpen(prev => !prev);
+      } else if (tool === 'random_walk') {
+          if (!isRandomWalkOpen) {
+               // Opening: Capture focus, reset state
+               setPreWalkFocusMode(focusMode);
+               setIsRandomWalkOpen(true);
+               setWalkState(prev => ({ 
+                   ...prev, 
+                   visitedIds: new Set(), 
+                   pathHistory: [], 
+                   historyIndex: -1, 
+                   currentNodeId: null, 
+                   isPaused: true,
+                   direction: 'forward',
+                   speedMultiplier: 1,
+                   hideDetails: false // Reset to showing details by default
+               }));
+          } else {
+               // Closing
+               setIsRandomWalkOpen(false);
+               setFocusMode(preWalkFocusMode);
+          }
       }
       tools.setActiveTool(null);
   };
@@ -600,6 +648,26 @@ export default function App() {
   const handleAnalysisFilter = useCallback((mode: 'hide' | 'hide_others' | 'none', ids: Set<string>) => { setAnalysisFilterState({ mode, ids }); }, []);
 
   const handleNodeClick = useCallback((elementId: string, event: MouseEvent) => { 
+      // Random Walk Logic
+      if (isRandomWalkOpen) {
+          // If manually clicking, treat as starting a new walk or jumping
+          setWalkState(prev => ({
+              ...prev,
+              currentNodeId: elementId,
+              pathHistory: [...prev.pathHistory, elementId],
+              historyIndex: prev.historyIndex + 1,
+              visitedIds: new Set([...prev.visitedIds, elementId]),
+              isPaused: false, // Auto-start
+              direction: 'forward',
+              speedMultiplier: 1
+          }));
+          
+          const el = elements.find(e => e.id === elementId);
+          if (el && graphCanvasRef.current) {
+              graphCanvasRef.current.setCamera(-(el.x || 0) + window.innerWidth/2, -(el.y || 0) + window.innerHeight/2, 1.5);
+          }
+      }
+
       if (isSimulationMode) { runImpactSimulation(elementId); return; }
       if (panelState.isSunburstPanelOpen && panelState.sunburstState.active) {
           if (!originalElements && !panelState.sunburstState.centerId) { setOriginalElements(elements); }
@@ -615,7 +683,7 @@ export default function App() {
       if (isBulkEditActive) { if (bulkTagsToAdd.length === 0 && bulkTagsToRemove.length === 0) return; setElements(prev => prev.map(el => { if (el.id === elementId) { const currentTags = el.tags; let newTags = [...currentTags]; let changed = false; const lowerToRemove = bulkTagsToRemove.map(t => t.toLowerCase()); const filteredTags = newTags.filter(t => !lowerToRemove.includes(t.toLowerCase())); if (filteredTags.length !== newTags.length) { newTags = filteredTags; changed = true; } const lowerCurrent = newTags.map(t => t.toLowerCase()); const toAdd = bulkTagsToAdd.filter(t => !lowerCurrent.includes(t.toLowerCase())); if (toAdd.length > 0) { newTags = [...newTags, ...toAdd]; changed = true; } if (changed) { return { ...el, tags: newTags, updatedAt: new Date().toISOString() }; } } return el; })); return; } 
       if (event.ctrlKey || event.metaKey) { const newMulti = new Set(multiSelection); if (newMulti.has(elementId)) { newMulti.delete(elementId); } else { newMulti.add(elementId); } setMultiSelection(newMulti); if (newMulti.has(elementId)) { setSelectedElementId(elementId); } else if (selectedElementId === elementId) { setSelectedElementId(newMulti.size > 0 ? Array.from(newMulti).pop() || null : null); } } else { setMultiSelection(new Set([elementId])); setSelectedElementId(elementId); }
       setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseRelationshipContextMenu();
-  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState, multiSelection, selectedElementId, panelState.isSunburstPanelOpen, panelState.sunburstState, elements, originalElements, panelState, handleCloseRelationshipContextMenu]);
+  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState, multiSelection, selectedElementId, panelState.isSunburstPanelOpen, panelState.sunburstState, elements, originalElements, panelState, handleCloseRelationshipContextMenu, isRandomWalkOpen]);
   
   const handleLinkClick = useCallback((relationshipId: string) => { setSelectedRelationshipId(relationshipId); setSelectedElementId(null); setMultiSelection(new Set()); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseRelationshipContextMenu(); }, [handleCloseContextMenu, handleCloseRelationshipContextMenu]);
   const handleCanvasClick = useCallback(() => { setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseCanvasContextMenu(); handleCloseRelationshipContextMenu(); setAnalysisHighlights(new Map()); }, [handleCloseContextMenu, handleCloseCanvasContextMenu, handleCloseRelationshipContextMenu]);
@@ -806,6 +874,141 @@ export default function App() {
           graphCanvasRef.current.setCamera(-element.x + window.innerWidth/2, -element.y + window.innerHeight/2, 1.5);
       }
   }, [elements, handleNodeClick]);
+
+  // --- Random Walk Effect ---
+  useEffect(() => {
+      if (!isRandomWalkOpen || walkState.isPaused) return;
+
+      // Apply speed multiplier (lower interval for higher speed)
+      // Default multiplier is 1. Fast forward is 4.
+      // Base interval is waitTime * 1000
+      const interval = (walkState.waitTime * 1000) / walkState.speedMultiplier;
+
+      const timer = setTimeout(() => {
+          const { historyIndex, pathHistory, visitedIds, direction } = walkState;
+
+          if (direction === 'backward') {
+              // Rewind Logic
+              const prevIndex = historyIndex - 1;
+              
+              if (prevIndex >= 0) {
+                  const prevNodeId = pathHistory[prevIndex];
+                  setWalkState(prev => ({
+                      ...prev,
+                      currentNodeId: prevNodeId,
+                      historyIndex: prevIndex
+                  }));
+              } else {
+                  // Reached start of history
+                  setWalkState(prev => ({ ...prev, isPaused: true }));
+              }
+          } else {
+              // Forward Logic
+              // 1. Check if we can move forward in history
+              const nextIndex = historyIndex + 1;
+              
+              if (nextIndex < pathHistory.length) {
+                  // Replaying history
+                  const nextNodeId = pathHistory[nextIndex];
+                  setWalkState(prev => ({
+                      ...prev,
+                      currentNodeId: nextNodeId,
+                      historyIndex: nextIndex
+                  }));
+              } else {
+                  // Generating new step
+                  const currentNodeId = walkState.currentNodeId;
+                  if (!currentNodeId) return;
+
+                  // Find potential next steps (neighbors)
+                  const outgoing = relationships.filter(r => r.source === currentNodeId);
+                  const candidates = outgoing.map(r => r.target as string);
+                  
+                  // Prioritize unvisited neighbors
+                  const unvisitedCandidates = candidates.filter(id => !visitedIds.has(id));
+                  
+                  let nextNodeId;
+                  
+                  if (unvisitedCandidates.length > 0) {
+                      // Pick random unvisited neighbor
+                      const randomIndex = Math.floor(Math.random() * unvisitedCandidates.length);
+                      nextNodeId = unvisitedCandidates[randomIndex];
+                  } else {
+                      // All neighbors visited (or dead end), pick random unvisited node from ANYWHERE in graph
+                      const allUnvisited = elements.filter(e => !visitedIds.has(e.id));
+                      
+                      if (allUnvisited.length > 0) {
+                          const randomIndex = Math.floor(Math.random() * allUnvisited.length);
+                          nextNodeId = allUnvisited[randomIndex].id;
+                      } else {
+                          // All nodes visited! Reset and restart from random
+                          // (Or just stop?) Let's restart
+                          const randomIndex = Math.floor(Math.random() * elements.length);
+                          if (elements[randomIndex]) {
+                              nextNodeId = elements[randomIndex].id;
+                              // Reset visited but keep path history?
+                              // Prompt said "Once all nodes visited, it starts again."
+                              // We'll clear visitedIds but keep walking.
+                              setWalkState(prev => ({ ...prev, visitedIds: new Set() }));
+                          } else {
+                              // Empty graph? Stop.
+                              setWalkState(prev => ({ ...prev, isPaused: true }));
+                              return;
+                          }
+                      }
+                  }
+
+                  if (nextNodeId) {
+                      setWalkState(prev => ({
+                          ...prev,
+                          currentNodeId: nextNodeId,
+                          visitedIds: new Set([...prev.visitedIds, nextNodeId]),
+                          pathHistory: [...prev.pathHistory, nextNodeId],
+                          historyIndex: nextIndex
+                      }));
+                  }
+              }
+          }
+
+      }, interval);
+
+      return () => clearTimeout(timer);
+  }, [walkState, isRandomWalkOpen, elements, relationships]);
+
+  // --- Effect to sync UI with Walk Step ---
+  useEffect(() => {
+      if (isRandomWalkOpen && walkState.currentNodeId) {
+           const el = elements.find(e => e.id === walkState.currentNodeId);
+           if (el) {
+               // 1. Select Node
+               setSelectedElementId(walkState.currentNodeId);
+               setMultiSelection(new Set([walkState.currentNodeId]));
+               
+               // 2. Focus Camera
+               if (graphCanvasRef.current) {
+                   graphCanvasRef.current.setCamera(-(el.x || 0) + window.innerWidth/2, -(el.y || 0) + window.innerHeight/2, 1.5);
+               }
+               
+               // 3. Open Details if not hidden
+               if (!walkState.hideDetails) {
+                   setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
+               }
+           }
+      }
+  }, [walkState.currentNodeId, isRandomWalkOpen, walkState.hideDetails]);
+
+  // --- Random Walk Focus Mode Effect ---
+  // Force 'zoom' when walking, restore previous mode when stopped/closed
+  useEffect(() => {
+    if (isRandomWalkOpen) {
+        if (!walkState.isPaused) {
+            setFocusMode('zoom');
+        } else {
+            setFocusMode(preWalkFocusMode);
+        }
+    }
+  }, [walkState.isPaused, isRandomWalkOpen, preWalkFocusMode]);
+
 
   // --- Presentation Handlers ---
   const handleCaptureSlide = () => { const camera = graphCanvasRef.current?.getCamera() || { x: 0, y: 0, k: 1 }; const newSlide: StorySlide = { id: generateUUID(), title: `Slide ${slides.length + 1}`, description: '', camera, selectedElementId: selectedElementId }; setSlides(prev => [...prev, newSlide]); };
@@ -1279,11 +1482,151 @@ export default function App() {
           />
       )}
 
+      {/* Random Walk Panel */}
+      {isRandomWalkOpen && persistence.currentModelId && !isPresenting && (
+          <RandomWalkPanel 
+             currentNodeName={walkState.currentNodeId ? (elements.find(e => e.id === walkState.currentNodeId)?.name || null) : null}
+             visitedCount={walkState.visitedIds.size}
+             totalCount={elements.length}
+             waitTime={walkState.waitTime}
+             setWaitTime={(t) => setWalkState(prev => ({...prev, waitTime: t}))}
+             isPaused={walkState.isPaused}
+             togglePause={() => setWalkState(prev => ({...prev, isPaused: !prev.isPaused, direction: 'forward', speedMultiplier: 1}))}
+             
+             onStepBack={() => setWalkState(prev => {
+                 // Step back logic: Go to previous history index
+                 const prevIdx = prev.historyIndex - 1;
+                 if (prevIdx >= 0) {
+                      return { 
+                          ...prev, 
+                          isPaused: true, 
+                          historyIndex: prevIdx, 
+                          currentNodeId: prev.pathHistory[prevIdx] 
+                      };
+                 }
+                 return { ...prev, isPaused: true };
+             })}
+             
+             onPlayReverse={() => setWalkState(prev => ({ ...prev, isPaused: false, direction: 'backward', speedMultiplier: 4 }))}
+             
+             onStepForward={() => setWalkState(prev => {
+                 // Step forward logic: Move index, or unpause briefly (for simplicity, just unpause 1 tick then pause again? No, easier to just advance index if history exists, else unpause)
+                 // If history exists forward
+                 const nextIdx = prev.historyIndex + 1;
+                 if (nextIdx < prev.pathHistory.length) {
+                      return { 
+                          ...prev, 
+                          isPaused: true, 
+                          historyIndex: nextIdx, 
+                          currentNodeId: prev.pathHistory[nextIdx] 
+                      };
+                 }
+                 // Else needs generation, just unpause forward
+                 return { ...prev, isPaused: false, direction: 'forward', speedMultiplier: 1 };
+             })}
+             
+             onFastForward={() => setWalkState(prev => ({ ...prev, isPaused: false, direction: 'forward', speedMultiplier: 4 }))}
+             
+             onRandomStart={() => {
+                 if (elements.length > 0) {
+                     const randomEl = elements[Math.floor(Math.random() * elements.length)];
+                     // Reset History on Random Start
+                     setWalkState(prev => ({
+                         ...prev,
+                         currentNodeId: randomEl.id,
+                         pathHistory: [randomEl.id],
+                         historyIndex: 0,
+                         visitedIds: new Set([randomEl.id]),
+                         isPaused: false,
+                         direction: 'forward',
+                         speedMultiplier: 1,
+                         hideDetails: false
+                     }));
+                 }
+             }}
+             
+             onSprint={() => {
+                 // Move 5 steps instantly logic
+                 let currentId = walkState.currentNodeId;
+                 // If no start node, pick one
+                 if (!currentId && elements.length > 0) currentId = elements[Math.floor(Math.random() * elements.length)].id;
+                 if (!currentId) return;
+                 
+                 const newPath = [...walkState.pathHistory];
+                 // If starting fresh
+                 if (newPath.length === 0) newPath.push(currentId);
+
+                 let currentHistoryIndex = walkState.historyIndex === -1 ? 0 : walkState.historyIndex;
+                 
+                 // If we are in history, truncate future history or branch? 
+                 // Standard browser behavior is branch, but here let's just append if at end, or jump to end?
+                 // Let's assume sprint always generates NEW steps from current position.
+                 
+                 // Prune history if we sprinted from the middle? No, simpler to just append.
+                 // But we need to sync index.
+                 
+                 let visited = new Set(walkState.visitedIds);
+                 visited.add(currentId);
+
+                 let tempId = currentId;
+                 
+                 // If we are backtracking, jump to end of history first? Or branch?
+                 // Let's branch: cut history after current index.
+                 if (currentHistoryIndex < newPath.length - 1) {
+                     newPath.length = currentHistoryIndex + 1; 
+                 }
+
+                 for(let i=0; i<5; i++) {
+                     const outgoing = relationships.filter(r => r.source === tempId);
+                     const candidates = outgoing.map(r => r.target as string);
+                     // Filter visited in current sprint to avoid loops immediately?
+                     const unvisited = candidates.filter(id => !visited.has(id));
+                     
+                     let nextId;
+                     if (unvisited.length > 0) nextId = unvisited[Math.floor(Math.random() * unvisited.length)];
+                     else if (candidates.length > 0) nextId = candidates[Math.floor(Math.random() * candidates.length)];
+                     else {
+                         // Dead end - jump
+                         const allUnvisited = elements.filter(e => !visited.has(e.id));
+                         if (allUnvisited.length > 0) nextId = allUnvisited[Math.floor(Math.random() * allUnvisited.length)].id;
+                         else nextId = elements[Math.floor(Math.random() * elements.length)].id;
+                     }
+                     
+                     if (nextId) {
+                         tempId = nextId;
+                         visited.add(nextId);
+                         newPath.push(nextId);
+                         currentHistoryIndex++;
+                     }
+                 }
+
+                 setWalkState(prev => ({
+                     ...prev,
+                     currentNodeId: tempId,
+                     pathHistory: newPath,
+                     historyIndex: currentHistoryIndex,
+                     visitedIds: visited,
+                     isPaused: true // Pause after sprint
+                 }));
+             }}
+             
+             hideDetails={walkState.hideDetails}
+             setHideDetails={(s) => setWalkState(prev => ({...prev, hideDetails: s}))}
+             onClose={() => {
+                 setIsRandomWalkOpen(false);
+                 setFocusMode(preWalkFocusMode);
+             }}
+             isDarkMode={isDarkMode}
+             direction={walkState.direction}
+             speedMultiplier={walkState.speedMultiplier}
+          />
+      )}
+
       {persistence.currentModelId && !isPresenting && (
         <RightPanelContainer panels={panelDefinitions} layouts={panelLayouts} onLayoutChange={setPanelLayouts} activeDockedId={activeDockedPanelId} onActiveDockedIdChange={setActiveDockedPanelId} globalZIndex={panelZIndex} onGlobalZIndexChange={setPanelZIndex} isDarkMode={isDarkMode} />
       )}
 
-      {persistence.currentModelId && !isPresenting && ((panelStateUI.view === 'addRelationship' && addRelationshipSourceElement) || selectedRelationship || selectedElement) && (
+      {persistence.currentModelId && !isPresenting && ((panelStateUI.view === 'addRelationship' && addRelationshipSourceElement) || selectedRelationship || (selectedElement && (!isRandomWalkOpen || !walkState.hideDetails))) && (
         <div ref={panelRef} className={`z-[70] flex flex-col pointer-events-none ${detailsPanelPosition ? 'fixed shadow-2xl rounded-lg' : 'absolute top-24'}`} style={detailsPanelPosition ? { left: detailsPanelPosition.x, top: detailsPanelPosition.y, maxHeight: 'calc(100vh - 2rem)' } : { right: isRightPanelOpen ? '620px' : '16px', maxHeight: 'calc(100vh - 8rem)' }}>
             <div className={`pointer-events-auto flex flex-col h-auto max-h-full shadow-2xl rounded-lg border min-h-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
                 <div className={`h-6 rounded-t-lg flex items-center justify-center cursor-move border-b group relative flex-shrink-0 ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-200'}`} onMouseDown={handlePanelDragStart}>

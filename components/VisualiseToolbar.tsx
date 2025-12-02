@@ -63,7 +63,7 @@ const VisualiseToolbar: React.FC<VisualiseToolbarProps> = ({
                {/* Sketch Button */}
                <button
                   onClick={() => onSelectTool('sketch')}
-                  className={`flex items-start text-left p-3 transition-colors group ${itemHover}`}
+                  className={`flex items-start text-left p-3 border-b transition-colors group ${itemHover}`}
                >
                    <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110 text-rose-400">
                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -74,6 +74,25 @@ const VisualiseToolbar: React.FC<VisualiseToolbarProps> = ({
                        <div className={`font-bold text-sm mb-0.5 ${textItem}`}>Sketch View</div>
                        <p className={`text-xs leading-tight ${textDesc}`}>
                            Hand-drawn style visualization.
+                       </p>
+                   </div>
+               </button>
+
+               {/* Random Walk Button */}
+               <button
+                  onClick={() => onSelectTool('random_walk')}
+                  className={`flex items-start text-left p-3 transition-colors group ${itemHover}`}
+               >
+                   <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110 text-rose-400">
+                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
+                      </svg>
+                   </div>
+                   <div>
+                       <div className={`font-bold text-sm mb-0.5 ${textItem}`}>Random Walk</div>
+                       <p className={`text-xs leading-tight ${textDesc}`}>
+                           Auto-navigate graph connections.
                        </p>
                    </div>
                </button>

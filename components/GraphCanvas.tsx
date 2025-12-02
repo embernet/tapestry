@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
 import * as d3 from 'd3';
 import { Element, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection, SimulationNodeState, NodeShape } from '../types';
@@ -764,7 +763,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         return { w: NODE_MAX_WIDTH, h: 80 }; // Rect/Oval default
     };
 
-    const currentShapeSize = getShapeSize(nodeShape);
+    const currentShapeSize = getShapeSize(nodeShape as NodeShape);
     const isCompact = nodeShape === 'circle' || nodeShape === 'point';
 
     // --- Highlighter "Scribble" Path ---
