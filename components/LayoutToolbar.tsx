@@ -47,6 +47,13 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
       }
   };
 
+  const handleToggle = () => {
+      if (!isCollapsed && isPhysicsActive) {
+          onAcceptAutoLayout();
+      }
+      onToggle();
+  };
+
   const bgClass = isDarkMode ? 'bg-gray-800 bg-opacity-90 border-gray-600' : 'bg-white bg-opacity-95 border-gray-200';
   const buttonBgClass = isDarkMode ? 'bg-gray-700 hover:bg-gray-600 border-gray-600 text-orange-400' : 'bg-white hover:bg-gray-50 border-gray-200 text-orange-600';
   const controlBgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
@@ -61,7 +68,7 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
         <div className={`flex items-stretch gap-0 rounded-lg border shadow-lg pointer-events-auto overflow-hidden ${bgClass}`}>
             {/* Collapse Toggle */}
             <button 
-                onClick={onToggle}
+                onClick={handleToggle}
                 className={`border-r w-20 flex flex-col items-center justify-center transition-colors h-20 gap-1 flex-shrink-0 ${buttonBgClass}`}
                 title={isCollapsed ? "Expand Layout Controls" : "Collapse Layout Controls"}
             >

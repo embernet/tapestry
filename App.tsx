@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, NodeFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage } from './types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
@@ -31,6 +30,7 @@ import SwotToolbar from './components/SwotToolbar';
 import SwotModal from './components/SwotModal';
 import MermaidToolbar from './components/MermaidToolbar';
 import CommandBar from './components/CommandBar';
+import AiToolbar from './components/AiToolbar';
 import RightPanelContainer from './components/RightPanelContainer';
 import SettingsModal from './components/SettingsModal';
 import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe, generateSelectionReport, callAI, AIConfig, aiLogger } from './utils';
@@ -52,7 +52,7 @@ type Coords = { x: number; y: number };
 const GLOBAL_SETTINGS_KEY = 'tapestry_global_settings';
 
 // Tools that expand horizontally and should hide others when active
-const HORIZONTAL_TOOLS = ['search', 'schema', 'layout', 'analysis', 'bulk', 'command', 'mermaid', 'methods', 'scamper', 'triz', 'lss', 'toc', 'ssm'];
+const HORIZONTAL_TOOLS = ['ai', 'search', 'schema', 'layout', 'analysis', 'bulk', 'command', 'mermaid', 'methods', 'scamper', 'triz', 'lss', 'toc', 'ssm'];
 
 // --- Main App Component ---
 
@@ -361,6 +361,29 @@ export default function App() {
   const handleSwotToolSelect = (tool: SwotToolType) => { tools.setActiveSwotTool(tool); tools.setSwotInitialDoc(null); tools.setIsSwotModalOpen(true); tools.setActiveTool(null); };
   const handleMermaidToolSelect = (tool: MermaidToolType) => { if (tool === 'editor') panelState.setIsMermaidPanelOpen(true); tools.setActiveTool(null); };
 
+  const handleAiToolSelect = useCallback((toolId: string) => {
+    tools.setActiveTool(null); // Close dropdown
+    
+    if (toolId === 'chat') {
+        panelState.setIsChatPanelOpen(true);
+    } else if (toolId === 'expand') {
+        if (selectedElementId) {
+             const el = elements.find(e => e.id === selectedElementId);
+             if (el) setChatDraftMessage(`Suggest 5 related concepts to "${el.name}" and add them to the graph.`);
+        } else {
+             setChatDraftMessage(`Suggest 5 new concepts related to the current graph and add them.`);
+        }
+        panelState.setIsChatPanelOpen(true);
+    } else if (toolId === 'connect') {
+        setChatDraftMessage(`Analyze the current graph nodes and suggest meaningful relationships between them that are currently missing.`);
+        panelState.setIsChatPanelOpen(true);
+    } else if (toolId === 'critique') {
+        setChatDraftMessage(`Critique the current graph model. Identify logical gaps, circular reasoning, ambiguities, or missing key perspectives.`);
+        panelState.setIsChatPanelOpen(true);
+    }
+}, [elements, selectedElementId, panelState, tools]);
+
+
   useEffect(() => { if (tools.activeTool !== 'bulk') { setIsBulkEditActive(false); } }, [tools.activeTool]);
 
   // --- Use Hooks ---
@@ -465,7 +488,7 @@ export default function App() {
   const handleDeleteElement = useCallback((elementId: string) => { setElements(prev => prev.filter(f => f.id !== elementId)); setRelationships(prev => prev.filter(r => r.source !== elementId && r.target !== elementId)); if (selectedElementId === elementId) { setSelectedElementId(null); } if (multiSelection.has(elementId)) { const next = new Set(multiSelection); next.delete(elementId); setMultiSelection(next); } }, [selectedElementId, multiSelection]);
   
   // --- Actions ---
-  const handleAddElement = useCallback((coords: { x: number; y: number }) => { const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.y, }; setElements(prev => [...prev, newElement]); setSelectedElementId(newElement.id); setMultiSelection(new Set([newElement.id])); setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); }, [defaultTags]);
+  const handleAddElement = useCallback((coords: { x: number; y: number }) => { const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.x, }; setElements(prev => [...prev, newElement]); setSelectedElementId(newElement.id); setMultiSelection(new Set([newElement.id])); setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); }, [defaultTags]);
   const handleAddElementFromName = useCallback((name: string) => { const centerX = window.innerWidth / 2; const centerY = window.innerHeight / 2; const randomOffset = () => (Math.random() - 0.5) * 100; const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: name, notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: centerX + randomOffset(), y: centerY + randomOffset(), fx: null, fy: null, }; setElements(prev => [...prev, newElement]); }, [defaultTags]);
   const handleUpdateElement = useCallback((updatedElement: Element) => { setElements(prev => prev.map(f => f.id === updatedElement.id ? { ...updatedElement, updatedAt: new Date().toISOString() } : f)); }, []);
   const handleBulkTagAction = useCallback((elementIds: string[], tag: string, mode: 'add' | 'remove') => { setElements(prev => prev.map(e => { if (elementIds.includes(e.id)) { let newTags = [...e.tags]; if (mode === 'add') { if (!newTags.includes(tag)) { newTags.push(tag); } else { return e; } } else { if (newTags.includes(tag)) { newTags = newTags.filter(t => t !== tag); } else { return e; } } return { ...e, tags: newTags, updatedAt: new Date().toISOString() }; } return e; })); }, []);
@@ -1035,6 +1058,15 @@ export default function App() {
                         <div className="relative w-8 h-8"><svg xmlns="http://www.w3.org/2000/svg" className="absolute inset-0 w-8 h-8 text-blue-400 transform -rotate-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.9 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /></svg></div>
                         <span className={`text-[10px] font-bold tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>TOOLS</span>
                 </button>
+
+                {isToolVisible('ai') && (
+                    <AiToolbar 
+                        onSelectTool={handleAiToolSelect}
+                        isCollapsed={tools.activeTool !== 'ai'}
+                        onToggle={() => tools.toggleTool('ai')}
+                        isDarkMode={isDarkMode}
+                    />
+                )}
 
                 {isToolVisible('search') && (
                     <SearchToolbar 
