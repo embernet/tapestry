@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, NodeFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage, VisualiseToolType } from './types';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, NodeFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage, VisualiseToolType, NodeShape } from './types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
 import { TOOL_DOCUMENTATION } from './documentation';
 import { usePanelDefinitions } from './components/usePanelDefinitions';
@@ -111,6 +111,7 @@ export default function App() {
   // --- Layout Parameters State ---
   const [layoutParams, setLayoutParams] = useState({ linkDistance: 250, repulsion: -400 });
   const [jiggleTrigger, setJiggleTrigger] = useState(0);
+  const [nodeShape, setNodeShape] = useState<NodeShape>('rectangle');
 
   // --- Panel State Hook ---
   const panelState = usePanelState();
@@ -1124,6 +1125,8 @@ export default function App() {
                         isCollapsed={tools.activeTool !== 'layout'} 
                         onToggle={() => tools.toggleTool('layout')} 
                         isDarkMode={isDarkMode} 
+                        nodeShape={nodeShape}
+                        onNodeShapeChange={setNodeShape}
                     />
                 )}
                 {isToolVisible('analysis') && (
@@ -1393,7 +1396,8 @@ export default function App() {
             isSimulationMode={isSimulationMode}
             simulationState={simulationState} 
             analysisHighlights={analysisHighlights} 
-            isDarkMode={isDarkMode} 
+            isDarkMode={isDarkMode}
+            nodeShape={nodeShape}
         />
       ) : (
         <div className={`w-full h-full flex-col items-center justify-center space-y-10 p-8 flex relative ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>

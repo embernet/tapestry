@@ -10,6 +10,8 @@ export enum RelationshipDirection {
   Both = 'BOTH', // Source <-> Target
 }
 
+export type NodeShape = 'rectangle' | 'oval' | 'circle' | 'point';
+
 export interface Relationship {
   id: string;
   source: string; // Element ID

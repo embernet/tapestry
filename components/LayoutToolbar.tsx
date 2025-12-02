@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { NodeShape } from '../types';
 
 interface LayoutToolbarProps {
   linkDistance: number;
@@ -19,6 +20,8 @@ interface LayoutToolbarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   isDarkMode: boolean;
+  nodeShape: NodeShape;
+  onNodeShapeChange: (shape: NodeShape) => void;
 }
 
 const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
@@ -38,7 +41,9 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
   onContract,
   isCollapsed,
   onToggle,
-  isDarkMode
+  isDarkMode,
+  nodeShape,
+  onNodeShapeChange
 }) => {
   
   const handleInteractionStart = () => {
@@ -62,6 +67,7 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
   const iconButtonBg = isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-white border-gray-600' : 'bg-white hover:bg-gray-100 text-gray-700 border-gray-300';
   const labelClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
   const valueClass = isDarkMode ? 'text-gray-500' : 'text-gray-400';
+  const selectBgClass = isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-800';
 
   return (
     <div className="flex flex-col gap-2 pointer-events-none transition-all duration-300">
@@ -223,6 +229,8 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
 
                     {/* Static Controls Section - Visually Differentiated */}
                     <div className={`flex items-center gap-3 px-4 h-full border-l shadow-[inset_6px_0_10px_-8px_rgba(0,0,0,0.5)] ${staticControlBg}`}>
+                        
+                        {/* Spread Controls */}
                         <div className="flex flex-col justify-center items-center">
                             <span className={`text-[9px] font-bold uppercase tracking-wider mb-2 ${labelClass}`}>SPREAD</span>
                             <div className="flex gap-2">
@@ -251,6 +259,22 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
                                 </button>
                             </div>
                         </div>
+
+                         {/* Node Shape Control */}
+                         <div className="flex flex-col justify-center items-center ml-2">
+                            <span className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${labelClass}`}>SHAPE</span>
+                            <select
+                                value={nodeShape}
+                                onChange={(e) => onNodeShapeChange(e.target.value as NodeShape)}
+                                className={`border rounded px-1 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 h-8 w-24 ${selectBgClass}`}
+                            >
+                                <option value="rectangle">Rectangle</option>
+                                <option value="oval">Oval</option>
+                                <option value="circle">Circle</option>
+                                <option value="point">Point</option>
+                            </select>
+                        </div>
+
                     </div>
 
                 </div>

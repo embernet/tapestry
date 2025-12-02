@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
 import * as d3 from 'd3';
-import { Element, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection, SimulationNodeState } from '../types';
+import { Element, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection, SimulationNodeState, NodeShape } from '../types';
 import { LINK_DISTANCE, NODE_MAX_WIDTH, NODE_PADDING, DEFAULT_NODE_COLOR } from '../constants';
 
 interface GraphCanvasProps {
@@ -30,6 +30,7 @@ interface GraphCanvasProps {
   simulationState?: Record<string, SimulationNodeState>;
   analysisHighlights?: Map<string, string>;
   isDarkMode?: boolean;
+  nodeShape?: NodeShape;
 }
 
 export interface GraphCanvasRef {
@@ -325,7 +326,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   isSimulationMode = false,
   simulationState,
   analysisHighlights,
-  isDarkMode = true
+  isDarkMode = true,
+  nodeShape = 'rectangle'
 }, ref) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
@@ -752,7 +754,18 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
           return ((multiSelection.size === 0 && !selectedRelationshipId) || highlightedNodeIds.has(d.id)) ? 1.0 : 0.2;
       });
 
+    // --- Node Shape Rendering Logic ---
     (node.selectAll('*') as any).remove(); 
+
+    // Determine shape dimensions based on mode
+    const getShapeSize = (nodeShape: NodeShape) => {
+        if (nodeShape === 'circle') return { w: 60, h: 60 }; // R = 30
+        if (nodeShape === 'point') return { w: 12, h: 12 };  // R = 6
+        return { w: NODE_MAX_WIDTH, h: 80 }; // Rect/Oval default
+    };
+
+    const currentShapeSize = getShapeSize(nodeShape);
+    const isCompact = nodeShape === 'circle' || nodeShape === 'point';
 
     // --- Highlighter "Scribble" Path ---
     node.append('path')
@@ -762,19 +775,39 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .attr('stroke-linejoin', 'round')
         // We hide it initially or use display: none if not highlighted, logic below handles d/stroke
         .attr('d', '')
-        .attr('stroke-width', 5)
+        .attr('stroke-width', 3) // Thinner for smaller shapes
         .attr('stroke-opacity', 0.6)
         .attr('filter', 'url(#marker-blur)')
         .style('pointer-events', 'none'); // Let clicks pass through
 
-    node.append('rect')
+    // --- Main Shape ---
+    if (nodeShape === 'oval') {
+        node.append('ellipse')
+            .attr('rx', d => (d.width || NODE_MAX_WIDTH)/2)
+            .attr('ry', d => (d.height || 80)/2);
+    } else if (nodeShape === 'circle') {
+        node.append('circle')
+            .attr('r', 30);
+    } else if (nodeShape === 'point') {
+        node.append('circle')
+            .attr('r', 6);
+    } else {
+        // Rectangle (Default)
+        node.append('rect')
+            .attr('width', d => d.width || NODE_MAX_WIDTH)
+            .attr('height', d => d.height || 80)
+            .attr('x', d => -(d.width || NODE_MAX_WIDTH)/2)
+            .attr('y', d => -(d.height || 80)/2)
+            .attr('rx', 8).attr('ry', 8);
+    }
+
+    // Apply styling to the shape (whether rect, circle, or ellipse)
+    node.select(nodeShape === 'oval' ? 'ellipse' : (isCompact ? 'circle' : 'rect'))
         .attr('fill', d => {
             if (!activeColorScheme) return DEFAULT_NODE_COLOR;
             for (const tag of d.tags) {
                 const color = lowerCaseTagColors[tag.toLowerCase()];
-                if (color) {
-                    return color;
-                }
+                if (color) return color;
             }
             return DEFAULT_NODE_COLOR;
         })
@@ -784,17 +817,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
                 if (state === 'increased') return '#22c55e'; // Green
                 if (state === 'decreased') return '#ef4444'; // Red
             }
-            // Note: Analysis highlights are now handled by the scribble path,
-            // but we keep old logic as backup or if user wants box border too?
-            // Let's rely primarily on the scribble for analysis, so remove the analysis check here 
-            // to declutter, OR keep it subtle. 
-            // For "Artistic" request, let's remove the border change for analysis here
-            // so the scribble is the main cue.
-            // if (analysisHighlights && analysisHighlights.has(d.id)) { ... } -> Removed
-            
-            // Multi-selection highlight
             if (multiSelection.has(d.id)) return '#eab308'; // Yellow-500
-            
             return '#cbd5e1'; // Default border
         })
         .style('transition', 'stroke 0.2s ease, stroke-width 0.2s ease, filter 0.2s ease')
@@ -806,55 +829,93 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .attr('filter', d => {
             if (simulationState && simulationState[d.id] === 'increased') return 'url(#glow-green)';
             if (simulationState && simulationState[d.id] === 'decreased') return 'url(#glow-red)';
-            // Remove glow for analysis to let scribble shine
             if (multiSelection.has(d.id)) return 'url(#glow-yellow)';
             return null;
-        })
-        .attr('rx', 8).attr('ry', 8);
+        });
 
-    node.append('foreignObject')
-        .attr('width', NODE_MAX_WIDTH)
-        .attr('pointer-events', 'none')
-        .append('xhtml:div')
+    // --- Text Content ---
+    const fo = node.append('foreignObject')
+        .attr('pointer-events', 'none');
+        
+    const div = fo.append('xhtml:div')
         .style('width', '100%')
         .style('height', '100%')
-        .style('min-height', '80px')
-        .style('display', 'flex').style('justify-content', 'center').style('align-items', 'center')
-        .style('padding', `${NODE_PADDING * 1.5}px ${NODE_PADDING}px`)
+        .style('display', 'flex')
+        .style('justify-content', isCompact ? 'flex-start' : 'center')
+        .style('align-items', 'center')
         .style('box-sizing', 'border-box')
-        .style('color', '#1f2937').style('font-weight', '600').style('font-size', '14px')
-        .style('text-align', 'center').style('word-break', 'break-word')
+        .style('font-weight', '600')
+        .style('font-size', '14px')
+        .style('word-break', 'break-word')
         .html(d => d.name);
 
+    if (isCompact) {
+        // Text OUTSIDE to the right
+        const offsetX = nodeShape === 'circle' ? 35 : 12;
+        fo.attr('width', 200)
+          .attr('height', 40)
+          .attr('x', offsetX)
+          .attr('y', -20); // Centered vertically relative to circle center
+          
+        div.style('color', isDarkMode ? '#ffffff' : '#000000')
+           .style('text-shadow', isDarkMode ? '0px 0px 4px #000' : '0px 0px 4px #fff')
+           .style('text-align', 'left')
+           .style('padding', '0');
+    } else {
+        // Text INSIDE
+        fo.attr('width', NODE_MAX_WIDTH);
+        
+        div.style('color', '#1f2937')
+           .style('text-align', 'center')
+           .style('min-height', '80px')
+           .style('padding', `${NODE_PADDING * 1.5}px ${NODE_PADDING}px`);
+    }
+
+    // --- Move Zone (Interaction Layer) ---
     node.append('rect')
         .attr('class', 'move-zone')
         .attr('fill', 'transparent');
-        // Cursor style set dynamically below
 
+    // --- Size Calculation Loop ---
     node.each(function (d) {
         const nodeElement = d3.select(this);
-        const foDiv = nodeElement.select<HTMLDivElement>('div').node();
-        if (!foDiv) return;
-
-        const height = foDiv.scrollHeight;
-        const width = NODE_MAX_WIDTH;
+        
+        // Determine logical dimensions for connections
+        let width = NODE_MAX_WIDTH;
+        let height = 80;
+        
+        if (isCompact) {
+            // Fixed size for connections
+            width = currentShapeSize.w;
+            height = currentShapeSize.h;
+        } else {
+            // Dynamic size based on text
+            const foDiv = nodeElement.select<HTMLDivElement>('div').node();
+            if (foDiv) {
+                height = foDiv.scrollHeight;
+                width = NODE_MAX_WIDTH;
+                
+                // Update FO size/pos for internal text
+                nodeElement.select('foreignObject')
+                    .attr('width', width).attr('height', height)
+                    .attr('x', -width / 2).attr('y', -height / 2);
+                
+                // Update Shape size
+                if (nodeShape === 'oval') {
+                    nodeElement.select('ellipse')
+                        .attr('rx', width/2)
+                        .attr('ry', height/2);
+                } else {
+                    nodeElement.select('rect:not(.move-zone)')
+                        .attr('width', width).attr('height', height)
+                        .attr('x', -width / 2).attr('y', -height / 2);
+                }
+            }
+        }
 
         const dNode = d as D3Node;
         dNode.width = width;
         dNode.height = height;
-
-        nodeElement.select('foreignObject')
-            .attr('width', width).attr('height', height)
-            .attr('x', -width / 2).attr('y', -height / 2);
-
-        // Highlight resizing logic: Increase rect size if highlighted to let border poke out
-        let rectWidth = width;
-        let rectHeight = height;
-        
-        // Standard Rect update
-        nodeElement.select('rect:not(.move-zone)')
-            .attr('width', rectWidth).attr('height', rectHeight)
-            .attr('x', -rectWidth / 2).attr('y', -rectHeight / 2);
             
         // Scribble Path update
         if (analysisHighlights && analysisHighlights.has(d.id)) {
@@ -870,7 +931,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
                 .style('display', 'none');
         }
         
-        const CONNECT_BORDER_WIDTH = 20;
+        const CONNECT_BORDER_WIDTH = isCompact ? 5 : 20;
         const moveZoneWidth = Math.max(0, width - 2 * CONNECT_BORDER_WIDTH);
         const moveZoneHeight = Math.max(0, height - 2 * CONNECT_BORDER_WIDTH);
         
@@ -969,7 +1030,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         }
       });
 
-  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, multiSelection, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, onLinkContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState, isSimulationMode, analysisHighlights, isDarkMode]);
+  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, multiSelection, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, onLinkContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState, isSimulationMode, analysisHighlights, isDarkMode, nodeShape]);
 
   return (
     <div className={`w-full h-full flex-grow cursor-grab active:cursor-grabbing ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`} onContextMenu={handleCanvasContextMenu}>
