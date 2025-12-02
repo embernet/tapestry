@@ -40,6 +40,58 @@ export interface GraphCanvasRef {
   exportAsImage: (filename: string, bgColor: string) => void;
 }
 
+// --- Helper: Seeded Random for Consistent Scribbles ---
+const hashCode = (str: string) => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0; 
+  }
+  return hash;
+};
+
+const pseudoRandom = (seed: number) => {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+};
+
+// --- Helper: Generate Hand-Drawn Loop Path ---
+const generateScribblePath = (width: number, height: number, seedStr: string) => {
+    let seed = hashCode(seedStr);
+    const padding = 15; // Extend beyond the node
+    const w = width / 2 + padding;
+    const h = height / 2 + padding;
+    
+    // Generate roughly elliptical points
+    // We'll do 2 loops (approx 720 degrees)
+    const points: [number, number][] = [];
+    const steps = 16; // Points per loop
+    const loops = 2;
+    const totalSteps = steps * loops;
+    
+    for (let i = 0; i <= totalSteps; i++) {
+        const angle = (i / steps) * 2 * Math.PI;
+        // Add noise to radius
+        const noise = (pseudoRandom(seed++) - 0.5) * 10; 
+        const rw = w + noise;
+        const rh = h + noise;
+        
+        // Add slight wobble to center to make it look spirally/messy
+        const cx = (pseudoRandom(seed++) - 0.5) * 5;
+        const cy = (pseudoRandom(seed++) - 0.5) * 5;
+
+        points.push([
+            cx + rw * Math.cos(angle),
+            cy + rh * Math.sin(angle)
+        ]);
+    }
+
+    // Use D3 to create a smooth closed curve through these messy points
+    const lineGen = d3.line().curve(d3.curveBasis);
+    return lineGen(points) || "";
+};
+
 /**
  * Calculates the intersection point of a line (from source to target) with the
  * bounding box of the source node.
@@ -702,6 +754,19 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
 
     (node.selectAll('*') as any).remove(); 
 
+    // --- Highlighter "Scribble" Path ---
+    node.append('path')
+        .attr('class', 'highlight-scribble')
+        .attr('fill', 'none')
+        .attr('stroke-linecap', 'round')
+        .attr('stroke-linejoin', 'round')
+        // We hide it initially or use display: none if not highlighted, logic below handles d/stroke
+        .attr('d', '')
+        .attr('stroke-width', 5)
+        .attr('stroke-opacity', 0.6)
+        .attr('filter', 'url(#marker-blur)')
+        .style('pointer-events', 'none'); // Let clicks pass through
+
     node.append('rect')
         .attr('fill', d => {
             if (!activeColorScheme) return DEFAULT_NODE_COLOR;
@@ -719,9 +784,14 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
                 if (state === 'increased') return '#22c55e'; // Green
                 if (state === 'decreased') return '#ef4444'; // Red
             }
-            if (analysisHighlights && analysisHighlights.has(d.id)) {
-                return analysisHighlights.get(d.id)!;
-            }
+            // Note: Analysis highlights are now handled by the scribble path,
+            // but we keep old logic as backup or if user wants box border too?
+            // Let's rely primarily on the scribble for analysis, so remove the analysis check here 
+            // to declutter, OR keep it subtle. 
+            // For "Artistic" request, let's remove the border change for analysis here
+            // so the scribble is the main cue.
+            // if (analysisHighlights && analysisHighlights.has(d.id)) { ... } -> Removed
+            
             // Multi-selection highlight
             if (multiSelection.has(d.id)) return '#eab308'; // Yellow-500
             
@@ -730,23 +800,13 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .style('transition', 'stroke 0.2s ease, stroke-width 0.2s ease, filter 0.2s ease')
         .attr('stroke-width', d => {
             if (simulationState && simulationState[d.id] !== 'neutral') return 4;
-            if (analysisHighlights && analysisHighlights.has(d.id)) return 6; // Distinct stroke width for highlights
             if (multiSelection.has(d.id)) return 4;
             return 1.5;
         })
         .attr('filter', d => {
             if (simulationState && simulationState[d.id] === 'increased') return 'url(#glow-green)';
             if (simulationState && simulationState[d.id] === 'decreased') return 'url(#glow-red)';
-            if (analysisHighlights && analysisHighlights.has(d.id)) {
-                const color = analysisHighlights.get(d.id);
-                if (color === '#ef4444') return 'url(#glow-red)';
-                if (color === '#f97316') return 'url(#glow-orange)';
-                if (color === '#3b82f6') return 'url(#glow-blue)';
-                if (color === '#22c55e') return 'url(#glow-green)';
-                if (color === '#a855f7') return 'url(#glow-purple)';
-                if (color === '#eab308') return 'url(#glow-yellow)';
-                if (color === '#fcd34d') return 'url(#glow-yellow)';
-            }
+            // Remove glow for analysis to let scribble shine
             if (multiSelection.has(d.id)) return 'url(#glow-yellow)';
             return null;
         })
@@ -791,15 +851,24 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         let rectWidth = width;
         let rectHeight = height;
         
-        if (analysisHighlights && analysisHighlights.has(d.id)) {
-            const highlightPadding = 16; // Add extra padding for highlight state
-            rectWidth += highlightPadding;
-            rectHeight += highlightPadding;
-        }
-
+        // Standard Rect update
         nodeElement.select('rect:not(.move-zone)')
             .attr('width', rectWidth).attr('height', rectHeight)
             .attr('x', -rectWidth / 2).attr('y', -rectHeight / 2);
+            
+        // Scribble Path update
+        if (analysisHighlights && analysisHighlights.has(d.id)) {
+             const color = analysisHighlights.get(d.id);
+             const scribblePath = generateScribblePath(width, height, d.id);
+             
+             nodeElement.select('.highlight-scribble')
+                .attr('d', scribblePath)
+                .attr('stroke', color || '#facc15') // Default neon yellow
+                .style('display', 'block');
+        } else {
+             nodeElement.select('.highlight-scribble')
+                .style('display', 'none');
+        }
         
         const CONNECT_BORDER_WIDTH = 20;
         const moveZoneWidth = Math.max(0, width - 2 * CONNECT_BORDER_WIDTH);
@@ -947,6 +1016,10 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
             orient="auto">
             <path d="M10,-5L0,0L10,5" fill="#4b5563"></path>
           </marker>
+
+          <filter id="marker-blur">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" />
+          </filter>
 
           <filter id="glow-green" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
