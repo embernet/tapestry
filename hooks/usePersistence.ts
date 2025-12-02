@@ -351,18 +351,27 @@ export const usePersistence = ({
             let existingId: string | null = null;
             let importedHash: string = '';
             
-            if (imported.metadata && imported.data && Array.isArray(imported.data.elements)) { 
+            // Check for standard Tapestry export format (metadata + data envelope)
+            if (imported.metadata && imported.data) { 
                 dataToImport = imported.data; 
                 nameToUse = imported.metadata.name || nameToUse; 
                 descToUse = imported.metadata.description || ''; 
                 existingId = imported.metadata.id; 
+                
+                // Ensure critical arrays exist (fix for "Invalid file format" on empty models)
+                if (!Array.isArray(dataToImport.elements)) dataToImport.elements = [];
+                if (!Array.isArray(dataToImport.relationships)) dataToImport.relationships = [];
+
                 importedHash = computeContentHash(dataToImport); 
-            } else if (imported.elements && Array.isArray(imported.elements)) { 
+            } 
+            // Check for raw data dump format (root object is the model data)
+            else if (Array.isArray(imported.elements) || Array.isArray(imported.relationships)) { 
                 dataToImport = imported; 
+                if (!Array.isArray(dataToImport.elements)) dataToImport.elements = [];
                 importedHash = computeContentHash(dataToImport); 
             }
             
-            if (!dataToImport) { throw new Error('Invalid file format.'); }
+            if (!dataToImport) { throw new Error('Invalid file format. JSON structure not recognized.'); }
             if (!dataToImport.relationships) dataToImport.relationships = [];
             
             if (existingId) { 

@@ -300,16 +300,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             </svg>
         </button>
 
-        <button onClick={() => panelState.setIsTablePanelOpen((prev: boolean) => !prev)} title="Table View" className={`p-2 rounded-md transition ${textClass}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" />
-            </svg>
-        </button>
-        <button onClick={() => panelState.setIsMatrixPanelOpen((prev: boolean) => !prev)} title="Matrix View" className={`p-2 rounded-md transition ${textClass}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z M12 3v18 M3 12h18" />
-            </svg>
-        </button>
         <button onClick={() => panelState.setIsGridPanelOpen((prev: boolean) => !prev)} title="Attribute Grid View" className={`p-2 rounded-md transition ${textClass}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" />
@@ -370,7 +360,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         <button onClick={onToggleTheme} title={isDarkMode ? "Light Mode" : "Dark Mode"} className={`p-2 rounded-md transition ${textClass}`}>
             {isDarkMode ? (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
             ) : (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

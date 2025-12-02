@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Element, Relationship, RelationshipDirection, ModelActions, TapestryDocument, TapestryFolder } from '../types';
 import { generateUUID } from '../utils';
@@ -145,13 +146,32 @@ export const useModelActions = ({
             readDocument: (title) => { const doc = findDocumentByTitle(title); return doc ? doc.content : null; },
             createDocument: (title, content = '', type = 'text', data = null) => { 
                 const now = new Date().toISOString(); 
-                const newDoc: TapestryDocument = { id: generateUUID(), title, content, folderId: null, createdAt: now, updatedAt: now, type, data }; 
+                const newDoc: TapestryDocument = { id: generateUUID(), title, content: content || '', folderId: null, createdAt: now, updatedAt: now, type, data }; 
                 documentsRef.current = [...documentsRef.current, newDoc]; 
                 setDocuments(prev => [...prev, newDoc]); 
                 if (!openDocIds.includes(newDoc.id)) { setOpenDocIds(prev => [...prev, newDoc.id]); } 
                 return newDoc.id; 
             },
-            updateDocument: (title, content, mode) => { const doc = findDocumentByTitle(title); if (!doc) return false; let newContent = content; if (mode === 'append') { newContent = doc.content ? `${doc.content}\n\n${content}` : content; } const updatedDoc = { ...doc, content: newContent, updatedAt: new Date().toISOString() }; documentsRef.current = documentsRef.current.map(d => d.id === doc.id ? updatedDoc : d); setDocuments(prev => prev.map(d => d.id === doc.id ? updatedDoc : d)); return true; },
+            updateDocument: (title, content, mode) => { 
+                const doc = findDocumentByTitle(title); 
+                if (!doc) return false; 
+                
+                const safeContent = content || '';
+                let newContent = safeContent;
+                
+                // If replacing, we just use safeContent.
+                // If appending/prepending, we need to be careful about empty existing content.
+                if (mode === 'append') { 
+                    newContent = doc.content ? `${doc.content}\n\n${safeContent}` : safeContent; 
+                } else if (mode === 'prepend') {
+                    newContent = doc.content ? `${safeContent}\n\n${doc.content}` : safeContent;
+                }
+                
+                const updatedDoc = { ...doc, content: newContent, updatedAt: new Date().toISOString() }; 
+                documentsRef.current = documentsRef.current.map(d => d.id === doc.id ? updatedDoc : d); 
+                setDocuments(prev => prev.map(d => d.id === doc.id ? updatedDoc : d)); 
+                return true; 
+            },
             createFolder: (name, parentId) => {
                 const id = generateUUID();
                 const newFolder: TapestryFolder = { id, name, parentId: parentId || null, createdAt: new Date().toISOString() };

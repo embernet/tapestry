@@ -11,6 +11,7 @@ interface ElementEditorProps {
   colorSchemes: ColorScheme[];
   activeSchemeId: string | null;
   hideName?: boolean;
+  isDarkMode?: boolean;
 }
 
 const ElementEditor: React.FC<ElementEditorProps> = ({ 
@@ -20,7 +21,8 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
   nameInputRef, 
   colorSchemes, 
   activeSchemeId,
-  hideName = false
+  hideName = false,
+  isDarkMode = true
 }) => {
   const [manualTagInput, setManualTagInput] = useState('');
   const [otherSchemaView, setOtherSchemaView] = useState<string>('none');
@@ -31,7 +33,7 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
   );
 
   const activeSchemeTags = useMemo(() => 
-    activeScheme ? Object.keys(activeScheme.tagColors) : [], 
+    activeScheme ? Object.keys(activeScheme.tagColors).sort() : [], 
     [activeScheme]
   );
 
@@ -45,10 +47,10 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
     if (otherSchemaView === 'all') {
       const tags = new Set<string>();
       otherSchemes.forEach(s => Object.keys(s.tagColors).forEach(t => tags.add(t)));
-      return Array.from(tags);
+      return Array.from(tags).sort();
     }
     const scheme = colorSchemes.find(s => s.id === otherSchemaView);
-    return scheme ? Object.keys(scheme.tagColors) : [];
+    return scheme ? Object.keys(scheme.tagColors).sort() : [];
   }, [otherSchemaView, otherSchemes, colorSchemes]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -94,10 +96,10 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
       onDataChange({ ...elementData, attributes: newAttributes }, true); 
   };
 
-  const currentTags = elementData.tags || [];
+  const currentTags = useMemo(() => [...(elementData.tags || [])].sort((a, b) => a.localeCompare(b)), [elementData.tags]);
 
   return (
-    <div className="space-y-4 text-gray-300">
+    <div className={`space-y-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
       {!hideName && (
         <div>
             <label className="block text-sm font-medium">Name</label>
@@ -108,7 +110,7 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
             value={elementData.name || ''}
             onChange={handleInputChange}
             onBlur={onBlur}
-            className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`mt-1 block w-full rounded-md px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
             />
         </div>
       )}
@@ -146,21 +148,21 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
                 onKeyDown={handleManualTagKeyDown}
                 onBlur={handleManualTagBlur}
                 placeholder="+ Add tag"
-                className="inline-block bg-transparent border-none text-sm text-gray-300 placeholder-gray-500 focus:ring-0 focus:outline-none min-w-[80px]"
+                className={`inline-block bg-transparent border-none text-sm placeholder-gray-500 focus:ring-0 focus:outline-none min-w-[80px] ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}
             />
         </div>
 
-        <div className="h-px bg-gray-700 w-full my-3"></div>
+        <div className={`h-px w-full my-3 ${isDarkMode ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
 
         {/* Active Schema Tags */}
         <div className="mb-3">
-            <p className="text-xs text-gray-400 mb-1.5 font-bold uppercase tracking-wider">
+            <p className={`text-xs mb-1.5 font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                 {activeScheme?.name || 'Schema'} Tags:
             </p>
             <div className="flex flex-wrap gap-1.5">
                 {activeSchemeTags.map(tag => {
                     const isApplied = currentTags.some(t => t.toLowerCase() === tag.toLowerCase());
-                    const color = activeScheme?.tagColors[tag];
+                    const color = activeScheme?.tagColors[tag] || '#4b5563';
                     if (isApplied) return null;
                     
                     return (
@@ -168,14 +170,14 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
                             key={tag}
                             type="button"
                             onClick={() => addTag(tag)}
-                            className="text-xs px-2 py-1 rounded-full border border-gray-600 bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white hover:scale-105 transition-all"
-                            style={{ borderLeft: `3px solid ${color}` }}
+                            className="text-xs px-2.5 py-1 rounded-full text-white hover:scale-105 transition-all shadow-sm border border-black/10 hover:shadow-md"
+                            style={{ backgroundColor: color, textShadow: '0px 1px 1px rgba(0,0,0,0.3)' }}
                         >
                             {tag}
                         </button>
                     );
                 })}
-                {activeSchemeTags.length === 0 && <span className="text-xs text-gray-600 italic">No tags in this schema.</span>}
+                {activeSchemeTags.length === 0 && <span className="text-xs text-gray-500 italic">No tags in this schema.</span>}
             </div>
         </div>
 
@@ -186,7 +188,7 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
                 <select 
                     value={otherSchemaView} 
                     onChange={(e) => setOtherSchemaView(e.target.value)}
-                    className="bg-gray-800 border border-gray-600 rounded text-xs text-gray-300 px-2 py-0.5 focus:outline-none"
+                    className={`rounded text-xs px-2 py-0.5 focus:outline-none border ${isDarkMode ? 'bg-gray-800 border-gray-600 text-gray-300' : 'bg-white border-gray-300 text-gray-700'}`}
                 >
                     <option value="none">None</option>
                     <option value="all">All Other Schemas</option>
@@ -195,16 +197,16 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
             </div>
             
             {otherSchemaView !== 'none' && (
-                <div className="flex flex-wrap gap-1.5 p-2 bg-gray-800/50 rounded border border-gray-700/50">
+                <div className={`flex flex-wrap gap-1.5 p-2 rounded border ${isDarkMode ? 'bg-gray-800/50 border-gray-700/50' : 'bg-gray-50 border-gray-200'}`}>
                     {displayedOtherTags.map(tag => {
                          const isApplied = currentTags.some(t => t.toLowerCase() === tag.toLowerCase());
                          if (isApplied) return null;
                          
                          // Find color
-                         let color = undefined;
+                         let color = '#4b5563';
                          if (otherSchemaView !== 'all' && otherSchemaView !== 'none') {
                              const s = colorSchemes.find(sc => sc.id === otherSchemaView);
-                             if (s) color = s.tagColors[tag];
+                             if (s && s.tagColors[tag]) color = s.tagColors[tag];
                          } else {
                              // Find first match in any schema
                              for (const s of colorSchemes) {
@@ -217,8 +219,8 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
                                 key={tag}
                                 type="button"
                                 onClick={() => addTag(tag)}
-                                className="text-xs px-2 py-1 rounded-full border border-gray-600 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white transition-colors"
-                                style={{ borderLeft: color ? `3px solid ${color}` : undefined }}
+                                className="text-xs px-2.5 py-1 rounded-full text-white hover:scale-105 transition-all shadow-sm border border-black/10 hover:shadow-md"
+                                style={{ backgroundColor: color, textShadow: '0px 1px 1px rgba(0,0,0,0.3)' }}
                             >
                                 {tag}
                             </button>
@@ -239,13 +241,14 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
           value={elementData.notes || ''}
           onChange={handleInputChange}
           onBlur={onBlur}
-          className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`mt-1 block w-full rounded-md px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
         ></textarea>
       </div>
 
       <AttributesEditor 
         attributes={elementData.attributes || {}} 
-        onChange={handleAttributesChange} 
+        onChange={handleAttributesChange}
+        isDarkMode={isDarkMode}
       />
     </div>
   );

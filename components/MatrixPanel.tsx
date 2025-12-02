@@ -6,10 +6,11 @@ interface MatrixPanelProps {
   elements: Element[];
   relationships: Relationship[];
   onClose: () => void;
+  onNodeClick?: (id: string) => void;
   isDarkMode: boolean;
 }
 
-const MatrixPanel: React.FC<MatrixPanelProps> = ({ elements, relationships, onClose, isDarkMode }) => {
+const MatrixPanel: React.FC<MatrixPanelProps> = ({ elements, relationships, onClose, onNodeClick, isDarkMode }) => {
   const [hoveredCell, setHoveredCell] = useState<{ source: string, target: string } | null>(null);
 
   // Sort elements alphabetically for the matrix axes
@@ -52,7 +53,7 @@ const MatrixPanel: React.FC<MatrixPanelProps> = ({ elements, relationships, onCl
   return (
     <div className={`w-full h-full flex flex-col ${bgClass}`}>
         <div className={`p-4 flex-shrink-0 flex justify-between items-center border-b ${borderClass}`}>
-            <h2 className={`text-xl font-bold ${textClass}`}>Matrix View</h2>
+            <h2 className={`text-xl font-bold ${textClass}`}>Adjacency Matrix</h2>
             <button onClick={onClose} className={`${labelTextClass} hover:text-blue-500`}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -73,7 +74,8 @@ const MatrixPanel: React.FC<MatrixPanelProps> = ({ elements, relationships, onCl
                     {sortedElements.map((el, i) => (
                         <div 
                             key={`col-${el.id}`}
-                            className={`absolute origin-bottom-left transform -rotate-45 text-xs whitespace-nowrap ${labelTextClass}`}
+                            onClick={() => onNodeClick && onNodeClick(el.id)}
+                            className={`absolute origin-bottom-left transform -rotate-45 text-xs whitespace-nowrap ${labelTextClass} cursor-pointer hover:text-blue-500 transition-colors`}
                             style={{ 
                                 left: PADDING + i * CELL_SIZE + 12, 
                                 top: PADDING - 5,
@@ -89,7 +91,8 @@ const MatrixPanel: React.FC<MatrixPanelProps> = ({ elements, relationships, onCl
                         <React.Fragment key={`row-${rowEl.id}`}>
                             {/* Row Header */}
                             <div 
-                                className={`absolute text-xs text-right whitespace-nowrap overflow-hidden ${labelTextClass}`}
+                                onClick={() => onNodeClick && onNodeClick(rowEl.id)}
+                                className={`absolute text-xs text-right whitespace-nowrap overflow-hidden ${labelTextClass} cursor-pointer hover:text-blue-500 transition-colors`}
                                 style={{ 
                                     left: 0, 
                                     top: PADDING + i * CELL_SIZE, 

@@ -1,5 +1,10 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { TapestryDocument, TapestryFolder } from '../types';
+import { marked } from 'marked';
+
+// Configure marked options
+marked.use({ breaks: true });
 
 // --- Document Manager Panel ---
 
@@ -348,6 +353,15 @@ export const DocumentEditorPanel: React.FC<DocumentEditorPanelProps> = ({ docume
     const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
     const contentTextClass = isDarkMode ? 'text-gray-300' : 'text-gray-800';
 
+    const renderMarkdown = (text: string) => {
+        try {
+            return marked.parse(text) as string;
+        } catch (e) {
+            console.error('Markdown rendering error:', e);
+            return text;
+        }
+    };
+
     return (
         <div className={`flex flex-col h-full ${bgClass} border-l ${borderClass}`}>
             <div className={`p-4 border-b ${borderClass} ${headerBgClass} flex justify-between items-center shrink-0`}>
@@ -383,9 +397,10 @@ export const DocumentEditorPanel: React.FC<DocumentEditorPanelProps> = ({ docume
                         placeholder="Start typing..."
                     />
                 ) : (
-                    <div className={`w-full h-full ${bgClass} ${contentTextClass} p-4 overflow-y-auto prose ${isDarkMode ? 'prose-invert' : ''} prose-sm max-w-none whitespace-pre-wrap`}>
-                        {content}
-                    </div>
+                    <div 
+                        className={`w-full h-full ${bgClass} ${contentTextClass} p-4 overflow-y-auto prose ${isDarkMode ? 'prose-invert' : ''} prose-sm max-w-none`}
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
+                    />
                 )}
             </div>
         </div>

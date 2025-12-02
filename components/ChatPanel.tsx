@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Content, FunctionCall, FunctionResponse, Type } from '@google/genai';
-import { Element, Relationship, ModelActions, ColorScheme, SystemPromptConfig, TapestryDocument, TapestryFolder, ChatMessage } from '../types';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Content, FunctionCall, FunctionResponse, Type, Schema } from '@google/genai';
+import { Element, Relationship, ModelActions, ColorScheme, SystemPromptConfig, TapestryDocument, TapestryFolder, ChatMessage, PlanStep } from '../types';
 import { generateMarkdownFromGraph, callAI, AIConfig, generateUUID } from '../utils';
 
 interface ChatPanelProps {
@@ -30,59 +30,208 @@ interface ChatPanelProps {
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }
 
-// Schema to enforce structured output from the AI
-const CHAT_RESPONSE_SCHEMA = {
+// --- Tool Registry & Schema Definitions ---
+
+interface ToolDefinition {
+  description: string;
+  parameters: {
+    type: Type;
+    properties: Record<string, Schema>;
+    required?: string[];
+  };
+}
+
+const TOOL_REGISTRY: Record<string, ToolDefinition> = {
+  addElement: {
+    description: "Add a new node to the graph.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING, description: "Name of the element" },
+        tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of tags" },
+        notes: { type: Type.STRING, description: "Additional details" },
+        rationale: { type: Type.STRING, description: "Why this element is being added" }
+      },
+      required: ["name"]
+    }
+  },
+  updateElement: {
+    description: "Update an existing node's properties.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING, description: "Name of the element to update" },
+        tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+        notes: { type: Type.STRING },
+        rationale: { type: Type.STRING }
+      },
+      required: ["name"]
+    }
+  },
+  deleteElement: {
+    description: "Delete a node from the graph.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING, description: "Name of the element to delete" },
+        rationale: { type: Type.STRING }
+      },
+      required: ["name"]
+    }
+  },
+  addRelationship: {
+    description: "Connect two nodes with a relationship.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        sourceName: { type: Type.STRING, description: "Name of the source element" },
+        targetName: { type: Type.STRING, description: "Name of the target element" },
+        label: { type: Type.STRING, description: "Label for the connection (e.g. 'causes')" },
+        direction: { type: Type.STRING, enum: ["TO", "FROM", "BOTH", "NONE"], description: "Direction of the relationship" },
+        rationale: { type: Type.STRING }
+      },
+      required: ["sourceName", "targetName", "label"]
+    }
+  },
+  deleteRelationship: {
+    description: "Remove a connection between two nodes.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        sourceName: { type: Type.STRING },
+        targetName: { type: Type.STRING },
+        rationale: { type: Type.STRING }
+      },
+      required: ["sourceName", "targetName"]
+    }
+  },
+  setElementAttribute: {
+    description: "Set a key-value pair attribute on a node.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        elementName: { type: Type.STRING },
+        key: { type: Type.STRING },
+        value: { type: Type.STRING },
+        rationale: { type: Type.STRING }
+      },
+      required: ["elementName", "key", "value"]
+    }
+  },
+  deleteElementAttribute: {
+    description: "Remove a key-value attribute from a node.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        elementName: { type: Type.STRING },
+        key: { type: Type.STRING },
+        rationale: { type: Type.STRING }
+      },
+      required: ["elementName", "key"]
+    }
+  },
+  setRelationshipAttribute: {
+    description: "Set a key-value pair attribute on a relationship.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        sourceName: { type: Type.STRING },
+        targetName: { type: Type.STRING },
+        key: { type: Type.STRING },
+        value: { type: Type.STRING },
+        rationale: { type: Type.STRING }
+      },
+      required: ["sourceName", "targetName", "key", "value"]
+    }
+  },
+  deleteRelationshipAttribute: {
+    description: "Remove a key-value attribute from a relationship.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        sourceName: { type: Type.STRING },
+        targetName: { type: Type.STRING },
+        key: { type: Type.STRING },
+        rationale: { type: Type.STRING }
+      },
+      required: ["sourceName", "targetName", "key"]
+    }
+  },
+  readDocument: {
+    description: "Read the content of a document.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        title: { type: Type.STRING }
+      },
+      required: ["title"]
+    }
+  },
+  createDocument: {
+    description: "Create a new document. Content is mandatory.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        title: { type: Type.STRING },
+        content: { type: Type.STRING, description: "The full Markdown text content of the document." }
+      },
+      required: ["title", "content"]
+    }
+  },
+  updateDocument: {
+    description: "Update an existing document.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        title: { type: Type.STRING },
+        content: { type: Type.STRING, description: "The full Markdown text content to add or replace." },
+        mode: { type: Type.STRING, enum: ["replace", "append", "prepend"], description: "How to apply the content." }
+      },
+      required: ["title", "content"]
+    }
+  },
+  openTool: {
+    description: "Open a specific UI tool in the application.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        tool: { type: Type.STRING, enum: ["triz", "lss", "toc", "ssm", "scamper", "mining", "tagcloud", "swot", "explorer"] },
+        subTool: { type: Type.STRING }
+      },
+      required: ["tool"]
+    }
+  }
+};
+
+// Construct the tool schemas for the 'anyOf' array
+const ACTION_SCHEMAS: Schema[] = Object.entries(TOOL_REGISTRY).map(([toolName, def]) => ({
   type: Type.OBJECT,
   properties: {
-    analysis: { type: Type.STRING, description: "Internal reasoning about the user's request, the graph state, and why specific actions are chosen." },
-    message: { type: Type.STRING, description: "The conversational response to show to the user. CRITICAL: If you are providing a list, plan, or detailed explanation, put the FULL text here using Markdown formatting. Do not truncate." },
+    tool: { type: Type.STRING, enum: [toolName] },
+    parameters: def.parameters
+  },
+  required: ["tool", "parameters"]
+}));
+
+const CHAT_RESPONSE_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    analysis: { type: Type.STRING, description: "Internal reasoning about the user's request." },
+    message: { type: Type.STRING, description: "The conversational response to show to the user." },
+    plan: {
+      type: Type.ARRAY,
+      description: "List of sequential steps for complex tasks.",
+      items: { type: Type.STRING }
+    },
     actions: {
       type: Type.ARRAY,
-      description: "List of actions to perform on the graph.",
+      description: "List of actions to perform.",
       items: {
-        type: Type.OBJECT,
-        properties: {
-          tool: { 
-            type: Type.STRING, 
-            enum: [
-              "addElement", "updateElement", "deleteElement", 
-              "addRelationship", "deleteRelationship", 
-              "setElementAttribute", "deleteElementAttribute", 
-              "setRelationshipAttribute", "deleteRelationshipAttribute", 
-              "readDocument", "createDocument", "updateDocument", "openTool"
-            ] 
-          },
-          parameters: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-              notes: { type: Type.STRING },
-              rationale: { type: Type.STRING },
-              sourceName: { type: Type.STRING },
-              targetName: { type: Type.STRING },
-              label: { type: Type.STRING },
-              direction: { type: Type.STRING },
-              elementName: { type: Type.STRING },
-              key: { type: Type.STRING },
-              value: { type: Type.STRING },
-              title: { type: Type.STRING },
-              content: { type: Type.STRING },
-              mode: { type: Type.STRING },
-              tool: { type: Type.STRING },
-              subTool: { type: Type.STRING },
-              source: { type: Type.STRING }, // Fallback for relationship
-              target: { type: Type.STRING }, // Fallback for relationship
-              from: { type: Type.STRING }, // Fallback for relationship
-              to: { type: Type.STRING } // Fallback for relationship
-            }
-          }
-        },
-        required: ["tool", "parameters"]
+        anyOf: ACTION_SCHEMAS
       }
     }
   },
-  required: ["message", "actions"]
+  required: ["message"]
 };
 
 const ChatPanel: React.FC<ChatPanelProps> = ({ 
@@ -97,6 +246,20 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [isCreativeMode, setIsCreativeMode] = useState(true);
   const [showErrorModal, setShowErrorModal] = useState(false);
   
+  // Plan State
+  const [activePlan, setActivePlan] = useState<PlanStep[] | null>(null);
+  const [planStatus, setPlanStatus] = useState<'proposed' | 'executing' | 'completed' | 'paused'>('proposed');
+  const [executionStats, setExecutionStats] = useState<{ actions: number }>({ actions: 0 });
+  
+  // Accumulate intermediate context during plan execution
+  const planContextRef = useRef<Content[]>([]);
+  
+  // Ref to track latest documents state for the async planner loop
+  const documentsRef = useRef<TapestryDocument[]>([]);
+  useEffect(() => {
+      if (documents) documentsRef.current = documents;
+  }, [documents]);
+
   // Track decisions for pending actions: index -> status
   const [actionDecisions, setActionDecisions] = useState<Record<number, 'pending' | 'accepted' | 'rejected'>>({});
   
@@ -125,7 +288,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  useEffect(scrollToBottom, [messages, actionDecisions]);
+  useEffect(scrollToBottom, [messages, actionDecisions, activePlan]);
 
   // Initialize decisions when a new pending message arrives
   useEffect(() => {
@@ -145,6 +308,168 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [input, isOpen]);
+
+  // Generate tool documentation string from registry
+  const toolsContextString = useMemo(() => {
+      return Object.entries(TOOL_REGISTRY).map(([name, def]) => {
+          const required = def.parameters.required?.join(", ") || "none";
+          const paramKeys = Object.keys(def.parameters.properties).join(", ");
+          return `- ${name}: ${def.description} (Params: ${paramKeys}. Required: ${required})`;
+      }).join('\n');
+  }, []);
+
+  // --- Plan Execution Loop ---
+  useEffect(() => {
+      if (planStatus === 'executing' && activePlan) {
+          // CRITICAL: Check if any step is currently in progress to strictly serialize operations.
+          const inProgress = activePlan.some(s => s.status === 'in_progress');
+          if (inProgress) return;
+
+          const nextStepIdx = activePlan.findIndex(s => s.status === 'pending');
+          
+          if (nextStepIdx !== -1) {
+              const executeStep = async () => {
+                  const step = activePlan[nextStepIdx];
+                  
+                  // Update UI to in_progress
+                  setActivePlan(prev => prev ? prev.map((s, i) => i === nextStepIdx ? { ...s, status: 'in_progress' } : s) : null);
+                  
+                  try {
+                      // Construct prompt for this specific step
+                      const stepPrompt = `EXECUTE PLAN STEP ${nextStepIdx + 1}/${activePlan.length}: "${step.description}". 
+                      
+                      Instructions:
+                      1. Review the current documents and graph state.
+                      2. Generate the specific JSON actions required to complete this step.
+                      3. CRITICAL: You MUST generate an action in the 'actions' array. Do not just narrate.
+                      4. CRITICAL: Adhere strictly to the schema for 'createDocument' (requires 'content') if creating docs.
+                      5. Return actions in the 'actions' array of the JSON response.`;
+
+                      // Build context: Chat history + Accumulated Plan Execution History
+                      const contents = [...buildApiHistory(messages), ...planContextRef.current];
+                      
+                      // Add current step prompt to context for this call
+                      contents.push({ role: 'user', parts: [{ text: stepPrompt }] });
+
+                      // Construct dynamic system instructions with FRESH graph/doc state
+                      const modelMarkdown = generateMarkdownFromGraph(elements, relationships);
+                      
+                      let docContext = "";
+                      // Use Ref for latest docs to avoid closure staleness
+                      if (documentsRef.current && documentsRef.current.length > 0) {
+                          docContext = `CURRENT DOCUMENTS:\n${documentsRef.current.map(d => `- "${d.title}" (Length: ${d.content.length} chars)`).join('\n')}`;
+                      }
+
+                      const systemInstruction = `
+                      ${systemPromptConfig.defaultPrompt}
+
+                      ${docContext}
+                      
+                      GRAPH DATA:
+                      ${modelMarkdown}
+                      
+                      AVAILABLE TOOLS:
+                      ${toolsContextString}
+                      
+                      CONTEXT: You are executing a multi-step plan. Focus ONLY on the current step.
+                      `;
+
+                      // First Attempt
+                      let result = await callAI(
+                          aiConfig,
+                          contents,
+                          systemInstruction,
+                          undefined,
+                          CHAT_RESPONSE_SCHEMA,
+                          false
+                      );
+
+                      let responseJson;
+                      try {
+                        responseJson = JSON.parse(result.text);
+                      } catch (e) {
+                        responseJson = { actions: [] };
+                      }
+                      let toolRequests = responseJson.actions || [];
+
+                      // RETRY LOGIC: If no actions generated but step likely implies action
+                      if (toolRequests.length === 0) {
+                          console.warn("Plan execution: No actions generated. Retrying with stronger prompt.");
+                          const retryPrompt = "SYSTEM ALERT: You did not generate any actions. You MUST generate a JSON object with an 'actions' array containing the tool calls. Do not just narrate completion. Generate the code now.";
+                          contents.push({ role: 'model', parts: [{ text: result.text }] }); // Push previous response
+                          contents.push({ role: 'user', parts: [{ text: retryPrompt }] }); // Push retry demand
+                          
+                          result = await callAI(
+                              aiConfig,
+                              contents,
+                              systemInstruction,
+                              undefined,
+                              CHAT_RESPONSE_SCHEMA, // Enforce JSON
+                              false
+                          );
+                          try {
+                             responseJson = JSON.parse(result.text);
+                          } catch(e) {
+                             responseJson = { actions: [] };
+                          }
+                          toolRequests = responseJson.actions || [];
+                      }
+                      
+                      // Update Plan Context
+                      planContextRef.current.push({ role: 'user', parts: [{ text: stepPrompt }] });
+                      planContextRef.current.push({ role: 'model', parts: [{ text: result.text }] });
+
+                      if (toolRequests.length > 0) {
+                          // Automatically execute actions for the plan step
+                          const calls = toolRequests.map((req: any) => ({
+                              name: req.tool,
+                              args: req.parameters,
+                              id: generateUUID()
+                          }));
+                          
+                          const responses = executeFunctionCalls(calls);
+
+                          // Update Plan Context with Tool Results
+                          const toolResultText = `Tool Outputs for Step ${nextStepIdx + 1}:\n${responses.map(r => JSON.stringify(r.response.result)).join('\n')}`;
+                          planContextRef.current.push({ role: 'user', parts: [{ text: toolResultText }] });
+                          
+                          // Update stats
+                          setExecutionStats(prev => ({ actions: prev.actions + calls.length }));
+                          
+                          // Wait for state to settle before next step (Give React time to process setDocuments etc)
+                          await new Promise(resolve => setTimeout(resolve, 1500));
+                          
+                          // Mark complete
+                          setActivePlan(prev => prev ? prev.map((s, i) => i === nextStepIdx ? { ...s, status: 'completed', result: `Executed ${calls.length} actions.` } : s) : null);
+                      } else {
+                          // FAILURE MODE: If no actions after retry, pause the plan
+                          planContextRef.current.push({ role: 'user', parts: [{ text: `Step ${nextStepIdx + 1} failed to generate actions.` }] });
+                          
+                          // We pause here so the user can intervene
+                          setActivePlan(prev => prev ? prev.map((s, i) => i === nextStepIdx ? { ...s, status: 'error', result: "No actions generated. Plan paused." } : s) : null);
+                          setPlanStatus('paused');
+                      }
+
+                  } catch (e) {
+                      console.error("Plan execution error", e);
+                      setActivePlan(prev => prev ? prev.map((s, i) => i === nextStepIdx ? { ...s, status: 'error', result: "Failed to execute." } : s) : null);
+                      setPlanStatus('paused'); // Pause on error
+                  }
+              };
+              
+              executeStep();
+          } else {
+              // All steps done
+              setPlanStatus('completed');
+              // Add a completion message to chat
+              setMessages(prev => [...prev, { 
+                  role: 'model', 
+                  text: `**Plan Completed.**\n\nExecuted ${activePlan.length} steps with ${executionStats.actions} total actions.` 
+              }]);
+          }
+      }
+  }, [planStatus, activePlan, aiConfig, messages, systemPromptConfig, executionStats, documents, elements, relationships]);
+
 
   // --- Drag & Resize Handlers ---
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -190,28 +515,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       };
   }, [isDragging, isResizing]);
 
-  // Tool Definitions for Documentation generation
-  const TOOL_DEFINITIONS = [
-      { name: "addElement", description: "Add a new node.", parameters: "name (required), tags (array), notes, rationale" },
-      { name: "updateElement", description: "Update existing node.", parameters: "name (required target), tags, notes, rationale" },
-      { name: "deleteElement", description: "Delete a node.", parameters: "name (required), rationale" },
-      { name: "addRelationship", description: "Connect two nodes.", parameters: "sourceName, targetName, label, direction ('TO', 'FROM', 'NONE'), rationale" },
-      { name: "deleteRelationship", description: "Remove connection.", parameters: "sourceName, targetName, rationale" },
-      { name: "setElementAttribute", description: "Set key-value pair on node.", parameters: "elementName, key, value, rationale" },
-      { name: "deleteElementAttribute", description: "Remove attribute from node.", parameters: "elementName, key, rationale" },
-      { name: "setRelationshipAttribute", description: "Set key-value pair on link.", parameters: "sourceName, targetName, key, value, rationale" },
-      { name: "deleteRelationshipAttribute", description: "Remove attribute from link.", parameters: "sourceName, targetName, key, rationale" },
-      { name: "readDocument", description: "Read doc content.", parameters: "title" },
-      { name: "createDocument", description: "Create new doc.", parameters: "title, content" },
-      { name: "updateDocument", description: "Update doc content.", parameters: "title, content, mode ('replace'|'append')" },
-      { name: "openTool", description: "Open UI tool.", parameters: "tool ('triz','lss','toc','ssm','scamper','mining','tagcloud'), subTool" }
-  ];
-
   const executeFunctionCalls = (functionCalls: FunctionCall[]) => {
       const responses: FunctionResponse[] = [];
       
       functionCalls.forEach((call, index) => {
-          const decision = actionDecisions[index];
+          // If running a plan, assume accepted. If pending UI, check decisions.
+          const decision = planStatus === 'executing' ? 'accepted' : (actionDecisions[index] || 'accepted');
           let result: any;
           const args = call.args as any;
 
@@ -219,6 +528,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
               result = { skipped: true, message: "User rejected this action." };
           } else {
               try {
+                  // Note: Input validation is now handled by the Schema in the AI request.
+                  // We assume args match the schema defined in TOOL_REGISTRY.
+                  
                   switch (call.name) {
                       case 'addElement':
                           const id = modelActions.addElement(args);
@@ -233,26 +545,22 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           result = { success: deleted, message: deleted ? `Deleted '${args.name}'` : `Could not find element '${args.name}'` };
                           break;
                       case 'addRelationship':
-                          // Handle inconsistent naming from LLM (sourceName vs source)
-                          const src = args.sourceName || args.source || args.from;
-                          const tgt = args.targetName || args.target || args.to;
-                          
-                          if (src && tgt) {
+                          // Some AI models might still output alias keys despite schema, but Schema should prevent it.
+                          // Sticking to schema keys: sourceName, targetName
+                          if (args.sourceName && args.targetName) {
                               const relAdded = modelActions.addRelationship(
-                                  src, 
-                                  tgt, 
+                                  args.sourceName, 
+                                  args.targetName, 
                                   args.label || '', 
                                   args.direction
                               );
-                              result = { success: relAdded, message: relAdded ? `Connected '${src}' to '${tgt}'` : `Failed to connect '${src}' to '${tgt}'. Check if both nodes exist.` };
+                              result = { success: relAdded, message: relAdded ? `Connected '${args.sourceName}' to '${args.targetName}'` : `Failed to connect. Check nodes.` };
                           } else {
-                              result = { success: false, message: "Missing source or target name" };
+                              result = { success: false, message: "Missing sourceName or targetName" };
                           }
                           break;
                       case 'deleteRelationship':
-                          const delSrc = args.sourceName || args.source;
-                          const delTgt = args.targetName || args.target;
-                          const relDeleted = modelActions.deleteRelationship(delSrc, delTgt);
+                          const relDeleted = modelActions.deleteRelationship(args.sourceName, args.targetName);
                           result = { success: relDeleted, message: relDeleted ? `Removed connection.` : `Connection not found.` };
                           break;
                       case 'setElementAttribute':
@@ -276,12 +584,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           result = { success: content !== null, content: content !== null ? content : "Document not found." };
                           break;
                       case 'createDocument':
+                          // Schema enforces 'content' existence
                           const newDocId = modelActions.createDocument(args.title, args.content);
-                          result = { success: true, message: `Created document.`, docId: newDocId };
+                          result = { success: true, message: `Created document '${args.title}' (ID: ${newDocId}).`, docId: newDocId };
                           break;
                       case 'updateDocument':
+                          // Schema enforces 'content' existence
                           const docUpdated = modelActions.updateDocument(args.title, args.content, args.mode);
-                          result = { success: docUpdated, message: docUpdated ? `Updated document.` : "Document not found." };
+                          result = { success: docUpdated, message: docUpdated ? `Updated document '${args.title}'.` : "Document not found." };
                           break;
                       case 'openTool':
                           if (onOpenTool) {
@@ -346,9 +656,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           case 'addRelationship': return `Add Connection`;
           case 'deleteElement': return `Delete Element: "${args.name}"`;
           case 'updateElement': return `Update Element: "${args.name}"`;
-          case 'deleteRelationship': return `Disconnect: "${args.sourceName || args.source}" & "${args.targetName || args.target}"`;
+          case 'deleteRelationship': return `Disconnect: "${args.sourceName}" & "${args.targetName}"`;
           case 'readDocument': return `Read Document: "${args.title}"`;
           case 'createDocument': return `Create Document: "${args.title}"`;
+          case 'updateDocument': return `Update Document: "${args.title}" (${args.mode || 'replace'})`;
           case 'openTool': return `Open Tool: ${args.tool}`;
           default: return fc.name;
       }
@@ -364,11 +675,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             <div className="mt-1 space-y-1 text-xs">
                 <div className="flex gap-2">
                     <span className={`${labelClass} font-semibold w-10`}>From:</span>
-                    <span className={`${textClass} font-mono`}>{args.sourceName || args.source}</span>
+                    <span className={`${textClass} font-mono`}>{args.sourceName}</span>
                 </div>
                 <div className="flex gap-2">
                     <span className={`${labelClass} font-semibold w-10`}>To:</span>
-                    <span className={`${textClass} font-mono`}>{args.targetName || args.target}</span>
+                    <span className={`${textClass} font-mono`}>{args.targetName}</span>
                 </div>
                 <div className="flex gap-2">
                     <span className={`${labelClass} font-semibold w-10`}>Label:</span>
@@ -378,6 +689,29 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     <div className="flex gap-2 mt-1 border-t border-gray-700/50 pt-1">
                         <span className={`${labelClass} font-semibold w-10`}>Why:</span>
                         <span className={`${textClass} opacity-80`}>{args.rationale}</span>
+                    </div>
+                )}
+            </div>
+          );
+      }
+
+      if (fc.name === 'createDocument' || fc.name === 'updateDocument') {
+          const contentPreview = args.content;
+          return (
+            <div className="mt-1 space-y-1 text-xs">
+                <div className="flex gap-1">
+                    <span className={`${labelClass} font-semibold`}>Title:</span>
+                    <span className={textClass}>{args.title}</span>
+                </div>
+                {args.mode && (
+                    <div className="flex gap-1">
+                        <span className={`${labelClass} font-semibold`}>Mode:</span>
+                        <span className={textClass}>{args.mode}</span>
+                    </div>
+                )}
+                {contentPreview && (
+                    <div className="mt-1 p-2 bg-black/10 rounded border border-white/5 font-mono max-h-20 overflow-y-auto">
+                        {contentPreview.length > 100 ? contentPreview.substring(0, 100) + '...' : contentPreview}
                     </div>
                 )}
             </div>
@@ -402,6 +736,46 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const handleSendMessage = async (customPrompt?: string) => {
     if ((!input.trim() && !customPrompt) || isLoading) return;
 
+    // Handle modification of proposed plan
+    if (planStatus === 'proposed' && activePlan) {
+        const userModification = input.trim();
+        const modificationPrompt = `The user wants to modify the proposed plan.
+        Current Plan:
+        ${JSON.stringify(activePlan.map(p => p.description))}
+        
+        User Request: "${userModification}"
+        
+        Generate a new updated plan based on this request. Return the new plan array in the JSON response.`;
+        
+        setInput('');
+        setIsLoading(true);
+        // ... (call AI with modification prompt)
+        try {
+             const contents = buildApiHistory(messages);
+             const systemInstruction = `You are a planning assistant. Update the plan based on user feedback.
+             OUTPUT FORMAT: JSON with a 'plan' array of strings.`;
+             
+             const result = await callAI(aiConfig, [{role: 'user', parts: [{text: modificationPrompt}]}], systemInstruction, undefined, CHAT_RESPONSE_SCHEMA, false);
+             const responseJson = JSON.parse(result.text);
+             
+             if (responseJson.plan) {
+                 const newPlan: PlanStep[] = responseJson.plan.map((desc: string) => ({
+                    id: generateUUID(),
+                    description: desc,
+                    status: 'pending'
+                }));
+                setActivePlan(newPlan);
+                setMessages(prev => [...prev, { role: 'user', text: `Modify plan: ${userModification}` }, { role: 'model', text: responseJson.message || "Plan updated." }]);
+             }
+        } catch (e) {
+            console.error("Plan modification failed", e);
+            setError("Failed to modify plan.");
+        } finally {
+            setIsLoading(false);
+        }
+        return;
+    }
+
     const userMessageText = customPrompt || input.trim();
     const userMessage: ChatMessage = { role: 'user', text: userMessageText };
     const newMessages = [...messages, userMessage];
@@ -415,8 +789,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     try {
         const modelMarkdown = generateMarkdownFromGraph(elements, relationships);
         
-        const toolsContext = TOOL_DEFINITIONS.map(t => `- ${t.name}: ${t.description} Params: {${t.parameters}}`).join('\n');
-
         let schemaContext = "No specific schema defined.";
         const activeScheme = colorSchemes.find(s => s.id === activeSchemeId);
         if (activeScheme) {
@@ -439,24 +811,24 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         ${docContext}
 
         AVAILABLE TOOLS:
-        You have access to the following tools. You must output a JSON object to use them.
-        ${toolsContext}
+        You must output a JSON object to use tools.
+        ${toolsContextString}
 
         OUTPUT FORMAT:
         You must respond with a JSON object strictly adhering to this schema:
         {
           "analysis": "Your internal thought process...",
           "message": "The text response to show the user...",
-          "actions": [ { "tool": "toolName", "parameters": { ...args } }, ... ]
+          "plan": ["Step 1", "Step 2", ...], // OPTIONAL: For multi-step tasks
+          "actions": [ { "tool": "toolName", "parameters": { ... } }, ... ] // OPTIONAL: For immediate actions
         }
 
         CRITICAL RULES:
         1. Always return valid JSON.
-        2. If you want to modify the graph or open a tool, add an item to the "actions" array.
-        3. If you just want to talk, leave "actions" empty.
-        4. Refer to nodes by their exact names.
-        5. Use 'rationale' parameter to explain why an action is taken.
-        6. IMPORTANT: For lists, long explanations, or detailed answers, put the ENTIRE content in the "message" field. Do not truncate.
+        2. Use 'actions' array for immediate changes.
+        3. Use 'plan' array for complex multi-step workflows.
+        4. STRICT SCHEMA COMPLIANCE: When creating documents, you MUST provide the 'content' field.
+        5. Use 'rationale' parameter to explain actions.
 
         GRAPH DATA:
         ${modelMarkdown}
@@ -471,12 +843,25 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             schema: CHAT_RESPONSE_SCHEMA
         };
 
-        // Pass schema to force JSON output
-        // skipLog is set to FALSE so that AI Assistant interactions appear in the Debug Panel
+        // Pass generated schema to force strictly typed JSON output
         const result = await callAI(aiConfig, contents, systemInstruction, undefined, CHAT_RESPONSE_SCHEMA, false);
 
         const responseJson = JSON.parse(result.text);
         
+        // Handle Plan
+        let planSteps: PlanStep[] | undefined = undefined;
+        if (responseJson.plan && Array.isArray(responseJson.plan) && responseJson.plan.length > 0) {
+            planSteps = responseJson.plan.map((desc: string) => ({
+                id: generateUUID(),
+                description: desc,
+                status: 'pending'
+            }));
+            setActivePlan(planSteps);
+            setPlanStatus('proposed');
+            setExecutionStats({ actions: 0 });
+            planContextRef.current = []; // Reset accumulated history for new plan
+        }
+
         const toolRequests = responseJson.actions || [];
         const functionCalls = toolRequests.map((req: any) => ({
             name: req.tool,
@@ -490,7 +875,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             functionCalls: functionCalls.length > 0 ? functionCalls : undefined,
             isPending: functionCalls.length > 0,
             rawJson: responseJson,
-            requestPayload: requestPayload
+            requestPayload: requestPayload,
+            plan: planSteps
         };
 
         setMessages(prev => [...prev, modelMsg]);
@@ -526,9 +912,6 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       // Execute accepted calls
       const functionResponses = executeFunctionCalls(msg.functionCalls);
       
-      // We don't send back to model immediately in this flow unless we want a confirmation message.
-      // For now, we just mark as processed and show results in history if user continues chatting.
-      
       setMessages(prev => {
           const newMsgs = [...prev];
           newMsgs[msgIndex] = { ...msg, isPending: false, functionResponses: functionResponses.map(r => r.response as FunctionResponse) };
@@ -547,6 +930,16 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           newDecisions[i] = select ? 'accepted' : 'rejected';
       });
       setActionDecisions(newDecisions);
+  };
+
+  const handleExecutePlan = () => {
+      setPlanStatus('executing');
+      planContextRef.current = []; // Ensure context is clean when execution starts
+  };
+
+  const handleDiscardPlan = () => {
+      setActivePlan(null);
+      setPlanStatus('proposed');
   };
 
   const bgClass = isDarkMode ? 'bg-gray-900' : 'bg-white';
@@ -595,7 +988,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         </div>
 
         {/* Messages */}
-        <div className="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar">
+        <div className="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar flex flex-col">
             {messages.map((msg, idx) => (
                 <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                     {msg.text && (
@@ -603,6 +996,26 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             {msg.text}
                         </div>
                     )}
+                    
+                    {/* Plan Render within message context (if newly proposed) */}
+                    {msg.plan && planStatus === 'proposed' && activePlan === msg.plan && (
+                        <div className={`mt-2 ${actionBg} border rounded-lg p-3 w-full max-w-[95%] shadow-lg border-l-4 border-l-purple-500`}>
+                            <h4 className="text-xs font-bold text-purple-500 uppercase tracking-wider mb-2">Proposed Plan</h4>
+                            <div className="space-y-2">
+                                {msg.plan.map((step, i) => (
+                                    <div key={i} className="flex gap-2 text-xs text-gray-300">
+                                        <span className="font-mono text-gray-500">{i + 1}.</span>
+                                        <span>{step.description}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-3 flex gap-2 justify-end">
+                                <button onClick={handleDiscardPlan} className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1">Discard</button>
+                                <button onClick={handleExecutePlan} className="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1 rounded text-xs font-bold">Execute Plan</button>
+                            </div>
+                        </div>
+                    )}
+
                     {msg.functionCalls && (
                         <div className={`mt-2 ${actionBg} border rounded-lg p-2 w-full max-w-[95%] shadow-lg`}>
                             <div className="flex justify-between items-center mb-2 px-1">
@@ -657,6 +1070,33 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     Thinking...
                 </div>
             )}
+            
+            {/* Active Plan Execution UI (Sticky at bottom of messages) */}
+            {activePlan && (planStatus === 'executing' || planStatus === 'paused') && (
+                <div className={`mt-auto sticky bottom-0 ${isDarkMode ? 'bg-gray-800 border-t-4 border-purple-500' : 'bg-white border-t-4 border-purple-500'} p-3 rounded-t shadow-lg z-10`}>
+                    <div className="flex justify-between items-center mb-2">
+                        <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider animate-pulse">Executing Plan...</h4>
+                        <button onClick={() => setPlanStatus('paused')} className="text-[10px] text-gray-400 hover:text-white">Pause</button>
+                    </div>
+                    <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+                        {activePlan.map((step, i) => (
+                            <div key={i} className="flex gap-2 items-center text-xs">
+                                <span className="font-mono text-gray-500 w-4">{i+1}.</span>
+                                <div className="flex-grow truncate text-gray-300">
+                                    {step.description}
+                                </div>
+                                <div className="w-4">
+                                    {step.status === 'pending' && <span className="text-gray-600">○</span>}
+                                    {step.status === 'in_progress' && <span className="text-blue-400 animate-spin">◐</span>}
+                                    {step.status === 'completed' && <span className="text-green-500">✓</span>}
+                                    {step.status === 'error' && <span className="text-red-500">✕</span>}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div ref={messagesEndRef} />
         </div>
 
@@ -673,8 +1113,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             handleSendMessage();
                         }
                     }}
-                    placeholder="Ask to create nodes, analyze connections..."
-                    className={`w-full ${inputBg} text-sm rounded p-2 border focus:border-blue-500 outline-none resize-none max-h-32 scrollbar-thin`}
+                    placeholder={planStatus === 'proposed' ? "Type to modify the proposed plan..." : "Ask to create nodes, analyze connections..."}
+                    className={`w-full ${inputBg} text-sm rounded p-2 border focus:border-blue-500 outline-none resize-none max-h-32 scrollbar-thin ${planStatus === 'proposed' ? 'border-purple-500 ring-1 ring-purple-500' : ''}`}
                     rows={1}
                 />
                 <button 

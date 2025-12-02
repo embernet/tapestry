@@ -70,6 +70,13 @@ export interface HistoryEntry {
   summary?: string;
 }
 
+export interface PlanStep {
+  id: string;
+  description: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'error';
+  result?: string;
+}
+
 export interface ChatMessage {
   role: 'user' | 'model';
   text?: string;
@@ -79,6 +86,7 @@ export interface ChatMessage {
   // Store raw JSON if available for history reconstruction
   rawJson?: any;
   requestPayload?: any; // Store the raw request sent to the AI
+  plan?: PlanStep[]; // If this message proposed a plan
 }
 
 export interface RelationshipDefinition {
@@ -201,7 +209,7 @@ export interface ModelActions {
   // Document Actions
   readDocument: (title: string) => string | null;
   createDocument: (title: string, content?: string, type?: string, data?: any) => string;
-  updateDocument: (title: string, content: string, mode: 'replace' | 'append') => boolean;
+  updateDocument: (title: string, content: string, mode: 'replace' | 'append' | 'prepend') => boolean;
   createFolder: (name: string, parentId?: string | null) => string;
   moveDocument: (docId: string, folderId: string | null) => boolean;
 }
@@ -254,7 +262,7 @@ export type LssToolType = 'charter' | 'sipoc' | 'voc' | 'ctq' | 'stakeholder' | 
 export type TocToolType = 'crt' | 'ec' | 'frt' | 'tt' | null;
 export type SsmToolType = 'rich_picture' | 'catwoe' | 'activity_models' | 'comparison' | null;
 export type SwotToolType = 'matrix' | 'pestel' | 'steer' | 'destep' | 'longpest' | 'five_forces' | 'cage' | 'custom_create' | string | null;
-export type ExplorerToolType = 'treemap' | 'tags' | 'relationships' | 'sunburst' | null;
+export type ExplorerToolType = 'treemap' | 'tags' | 'relationships' | 'sunburst' | 'matrix' | 'table' | null;
 export type TagCloudToolType = 'tags' | 'nodes' | 'words' | 'full_text' | null;
 export type MiningToolType = 'dashboard' | null;
 export type MermaidToolType = 'editor' | null;

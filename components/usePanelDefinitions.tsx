@@ -243,7 +243,8 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
             content: <MatrixPanel 
                         elements={props.filteredElements} 
                         relationships={props.filteredRelationships} 
-                        onClose={() => props.setIsMatrixPanelOpen(false)} 
+                        onClose={() => props.setIsMatrixPanelOpen(false)}
+                        onNodeClick={(id) => props.onNodeClick(id, new MouseEvent('click'))}
                         isDarkMode={props.isDarkMode}
                      />, 
             isOpen: props.isMatrixPanelOpen, 

@@ -155,12 +155,26 @@ const TablePanel: React.FC<TablePanelProps> = ({
                     {sortedElements.map(el => (
                         <tr key={el.id} className={`border-b ${borderClass} ${hoverBgClass} ${selectedElementId === el.id ? selectedRowBg : ''}`}>
                             <td className="p-3">
-                                <input 
-                                    type="text" 
-                                    defaultValue={el.name}
-                                    onBlur={(e) => handleNameChange(el.id, e.target.value)}
-                                    className={`bg-transparent border border-transparent ${isDarkMode ? 'hover:border-gray-600' : 'hover:border-gray-300'} focus:border-blue-500 rounded px-1 w-full outline-none transition-colors ${inputTextClass}`}
-                                />
+                                <div className="flex items-center gap-2">
+                                    {onNodeClick && (
+                                        <button 
+                                            onClick={() => onNodeClick(el.id)}
+                                            className="text-gray-400 hover:text-blue-500 shrink-0"
+                                            title="Focus Node"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <circle cx="12" cy="12" r="3" strokeWidth="2" />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 2v2m0 16v2M2 12h2m16 0h2" />
+                                            </svg>
+                                        </button>
+                                    )}
+                                    <input 
+                                        type="text" 
+                                        defaultValue={el.name}
+                                        onBlur={(e) => handleNameChange(el.id, e.target.value)}
+                                        className={`bg-transparent border border-transparent ${isDarkMode ? 'hover:border-gray-600' : 'hover:border-gray-300'} focus:border-blue-500 rounded px-1 w-full outline-none transition-colors ${inputTextClass}`}
+                                    />
+                                </div>
                             </td>
                             <td className="p-3">
                                 <input 

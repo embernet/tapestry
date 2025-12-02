@@ -321,6 +321,8 @@ export default function App() {
           panelState.setIsSunburstPanelOpen(prev => !prev);
           panelState.setSunburstState(prev => ({ ...prev, active: true }));
       }
+      if (tool === 'matrix') panelState.setIsMatrixPanelOpen(prev => !prev);
+      if (tool === 'table') panelState.setIsTablePanelOpen(prev => !prev);
       tools.setActiveTool(null); 
   };
   const handleTagCloudToolSelect = (tool: TagCloudToolType) => {
