@@ -271,6 +271,8 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
                         elements={props.filteredElements} 
                         modelActions={props.aiActions} 
                         onClose={() => props.setIsKanbanPanelOpen(false)} 
+                        selectedElementId={props.selectedElementId}
+                        onNodeClick={(id) => props.onNodeClick(id, new MouseEvent('click'))}
                         isDarkMode={props.isDarkMode}
                      />, 
             isOpen: props.isKanbanPanelOpen, 

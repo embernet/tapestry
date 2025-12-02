@@ -874,6 +874,34 @@ export default function App() {
       setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
   }, [panelStateUI]);
 
+  // Handler to open Kanban board in a floating window (80% of screen)
+  const handleOpenKanban = useCallback(() => {
+      if (!panelState.isKanbanPanelOpen) {
+          const width = window.innerWidth * 0.8;
+          const height = window.innerHeight * 0.8;
+          const x = (window.innerWidth - width) / 2;
+          const y = (window.innerHeight - height) / 2;
+          
+          const nextZ = panelZIndex + 1;
+          setPanelZIndex(nextZ);
+          
+          setPanelLayouts(prev => ({
+              ...prev,
+              'kanban': {
+                  x,
+                  y,
+                  w: width,
+                  h: height,
+                  zIndex: nextZ,
+                  isFloating: true
+              }
+          }));
+          panelState.setIsKanbanPanelOpen(true);
+      } else {
+          panelState.setIsKanbanPanelOpen(false);
+      }
+  }, [panelState, panelZIndex]);
+
   // Construct dynamic panel definitions using props from usePanelState and local state
   const panelDefinitions = usePanelDefinitions({
     ...panelState,
@@ -987,6 +1015,7 @@ export default function App() {
             isDarkMode={isDarkMode}
             onToggleTheme={handleThemeToggle}
             onToggleDebug={() => setIsDebugPanelOpen(prev => !prev)}
+            onOpenKanban={handleOpenKanban}
           />
       )}
       
