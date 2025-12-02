@@ -180,6 +180,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                     { id: 'swot', label: 'Strategic Analysis', color: 'text-lime-400' },
                     { id: 'explorer', label: 'Explorer', color: 'text-yellow-400' },
                     { id: 'tagcloud', label: 'Word Cloud', color: 'text-pink-400' },
+                    { id: 'visualise', label: 'Visualise', color: 'text-rose-400' },
                     { id: 'mermaid', label: 'Diagrams', color: 'text-cyan-400' },
                     { id: 'bulk', label: 'Bulk Edit', color: 'text-pink-400' },
                     { id: 'command', label: 'Command Bar', color: 'text-green-400' }
@@ -301,11 +302,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             </svg>
         </button>
 
-        <button onClick={() => panelState.setIsGridPanelOpen((prev: boolean) => !prev)} title="Attribute Grid View" className={`p-2 rounded-md transition ${textClass}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" />
-            </svg>
-        </button>
         <button onClick={() => panelState.setIsMarkdownPanelOpen((prev: boolean) => !prev)} title="Markdown View" className={`p-2 rounded-md transition ${textClass}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
         </button>

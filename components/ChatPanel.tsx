@@ -48,7 +48,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
       type: Type.OBJECT,
       properties: {
         name: { type: Type.STRING, description: "Name of the element" },
-        tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of tags" },
+        tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of tags (max 20 chars each)" },
         notes: { type: Type.STRING, description: "Additional details" },
         rationale: { type: Type.STRING, description: "Why this element is being added" }
       },
@@ -61,7 +61,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
       type: Type.OBJECT,
       properties: {
         name: { type: Type.STRING, description: "Name of the element to update" },
-        tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+        tags: { type: Type.ARRAY, items: { type: Type.STRING }, description: "List of tags (max 20 chars each)" },
         notes: { type: Type.STRING },
         rationale: { type: Type.STRING }
       },

@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, NodeFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage } from './types';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, NodeFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage, VisualiseToolType } from './types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
 import { TOOL_DOCUMENTATION } from './documentation';
 import { usePanelDefinitions } from './components/usePanelDefinitions';
@@ -32,6 +32,7 @@ import SwotModal from './components/SwotModal';
 import MermaidToolbar from './components/MermaidToolbar';
 import CommandBar from './components/CommandBar';
 import AiToolbar from './components/AiToolbar';
+import VisualiseToolbar from './components/VisualiseToolbar';
 import RightPanelContainer from './components/RightPanelContainer';
 import SettingsModal from './components/SettingsModal';
 import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe, generateSelectionReport, callAI, AIConfig, aiLogger } from './utils';
@@ -46,6 +47,7 @@ import { usePersistence } from './hooks/usePersistence';
 import { GuidancePanel } from './components/GuidancePanel';
 import SearchToolbar from './components/SearchToolbar';
 import { DebugPanel } from './components/DebugPanel';
+import { SketchPanel } from './components/SketchPanel';
 
 // Explicitly define coordinate type to fix type inference issues
 type Coords = { x: number; y: number };
@@ -53,6 +55,7 @@ type Coords = { x: number; y: number };
 const GLOBAL_SETTINGS_KEY = 'tapestry_global_settings';
 
 // Tools that expand horizontally and should hide others when active
+// Visualise removed so it acts as a dropdown overlay
 const HORIZONTAL_TOOLS = ['ai', 'search', 'schema', 'layout', 'analysis', 'bulk', 'command', 'mermaid', 'scamper', 'triz', 'lss', 'toc', 'ssm'];
 
 // --- Main App Component ---
@@ -112,6 +115,9 @@ export default function App() {
   // --- Panel State Hook ---
   const panelState = usePanelState();
   const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(false);
+  
+  // --- Sketch Panel State ---
+  const [isSketchPanelOpen, setIsSketchPanelOpen] = useState(false);
 
   // --- Tools State Hook ---
   const tools = useTools(panelState);
@@ -325,6 +331,14 @@ export default function App() {
       if (tool === 'matrix') panelState.setIsMatrixPanelOpen(prev => !prev);
       if (tool === 'table') panelState.setIsTablePanelOpen(prev => !prev);
       tools.setActiveTool(null); 
+  };
+  const handleVisualiseToolSelect = (tool: VisualiseToolType) => {
+      if (tool === 'grid') {
+          panelState.setIsGridPanelOpen(prev => !prev);
+      } else if (tool === 'sketch') {
+          setIsSketchPanelOpen(prev => !prev);
+      }
+      tools.setActiveTool(null);
   };
   const handleTagCloudToolSelect = (tool: TagCloudToolType) => {
       // Create a large default centered layout for Cloud tools if not present
@@ -887,7 +901,7 @@ export default function App() {
       if (HORIZONTAL_TOOLS.includes(tools.activeTool)) {
           return tools.activeTool === toolId;
       }
-      // If active tool is dropdown, show all
+      // If active tool is dropdown (or not in horizontal list), show all
       return true;
   };
 
@@ -1080,6 +1094,14 @@ export default function App() {
                         onReset={handleSearchReset}
                     />
                 )}
+                {isToolVisible('visualise') && (
+                    <VisualiseToolbar 
+                        onSelectTool={handleVisualiseToolSelect} 
+                        isCollapsed={tools.activeTool !== 'visualise'} 
+                        onToggle={() => tools.toggleTool('visualise')} 
+                        isDarkMode={isDarkMode} 
+                    />
+                )}
                 {isToolVisible('schema') && (
                     <SchemaToolbar schemes={colorSchemes} activeSchemeId={activeSchemeId} onSchemeChange={setActiveSchemeId} activeColorScheme={activeColorScheme} onDefaultRelationshipChange={handleUpdateDefaultRelationship} defaultTags={defaultTags} onDefaultTagsChange={setDefaultTags} elements={elements} isCollapsed={tools.activeTool !== 'schema'} onToggle={() => tools.toggleTool('schema')} onUpdateSchemes={(newSchemes) => setColorSchemes(newSchemes)} isDarkMode={isDarkMode} />
                 )}
@@ -1130,7 +1152,7 @@ export default function App() {
                         onToggle={() => tools.toggleTool('triz')} 
                         onOpenSettings={() => { setSettingsInitialTab('prompts'); setIsSettingsModalOpen(true); }} 
                         isDarkMode={isDarkMode} 
-                        onOpenGuidance={() => tools.handleOpenGuidance('triz')}
+                        onOpenGuidance={() => tools.handleOpenGuidance('triz-' + tools.activeTrizTool)}
                     />
                 )}
                 {tools.activeTool === 'lss' && (
@@ -1240,6 +1262,18 @@ export default function App() {
                 isDarkMode={isDarkMode}
             />
         </div>
+      )}
+      
+      {/* Sketch Panel - Floating Window - UPDATED: Removed wrapper div to allow free floating */}
+      {isSketchPanelOpen && persistence.currentModelId && !isPresenting && (
+          <SketchPanel 
+              elements={filteredElements}
+              relationships={filteredRelationships}
+              onClose={() => setIsSketchPanelOpen(false)}
+              isDarkMode={isDarkMode}
+              colorSchemes={colorSchemes}
+              activeSchemeId={activeSchemeId}
+          />
       )}
 
       {persistence.currentModelId && !isPresenting && (
