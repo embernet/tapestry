@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
 import * as d3 from 'd3';
 import { Element, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection, SimulationNodeState, NodeShape } from '../types';
@@ -135,7 +136,8 @@ const createDragHandler = (
   setElementsState: React.Dispatch<React.SetStateAction<Element[]>>,
   onNodeClickCallback: (elementId: string, event: MouseEvent) => void,
   onNodeConnectCallback: (sourceId: string, targetId: string) => void,
-  onNodeConnectToNew: (sourceId: string, coords: { x: number, y: number }) => void
+  onNodeConnectToNew: (sourceId: string, coords: { x: number, y: number }) => void,
+  multiSelection: Set<string>
 ) => {
   let isMoving = false; // Flag to track drag mode
   let hasMoved = false; // Flag to distinguish click from drag
@@ -145,25 +147,17 @@ const createDragHandler = (
   function dragstarted(this: SVGGElement, event: any, d: D3Node) {
     const target = event.sourceEvent.target as SVGElement;
     
-    // Check if dragging via a quick-add button - if so, stop drag immediately to let click handle it
-    if (target.closest('.quick-add-btn')) {
-        return; 
-    }
+    // Check if dragging via a quick-add button
+    if (target.closest('.quick-add-btn')) return;
 
     isMoving = target.classList.contains('move-zone');
-    
     hasMoved = false;
     const e = event as any;
     startX = e.x;
     startY = e.y;
 
-    // Pin the node during any drag operation to prevent interference from the simulation
-    d.fx = d.x;
-    d.fy = d.y;
-    
     if (!isMoving) {
-      // It's a connect drag. Draw a temporary line from edge to actual mouse pointer.
-      // We use d3.pointer to get coordinates relative to the parent group (model space)
+      // It's a connect drag. Draw a temporary line.
       const parent = this.parentNode as SVGGElement;
       const [mx, my] = d3.pointer(event.sourceEvent, parent);
       
@@ -185,17 +179,59 @@ const createDragHandler = (
     if (target.closest('.quick-add-btn')) return;
 
     const e = event as any;
-    // Check for significant movement to determine if this is a drag or a click
     if (!hasMoved && (Math.abs(e.x - startX) > 3 || Math.abs(e.y - startY) > 3)) {
         hasMoved = true;
     }
 
     if (isMoving) {
-      // For a move drag, update the node's fixed position.
-      d.fx = e.x;
-      d.fy = e.y;
+        // Adjust sensitivity based on current zoom level
+        const transform = d3.zoomTransform(this.ownerSVGElement as unknown as globalThis.Element);
+        const dx = event.dx / transform.k;
+        const dy = event.dy / transform.k;
+
+        const isGroupDrag = multiSelection.has(d.id);
+        const nodesToMove = d3.select(this.ownerSVGElement)
+            .selectAll<SVGGElement, D3Node>('.node')
+            .filter(n => isGroupDrag ? multiSelection.has(n.id) : n.id === d.id);
+
+        // Update D3 data and DOM for nodes
+        nodesToMove.each(function(n) {
+            n.x = (n.x || 0) + dx;
+            n.y = (n.y || 0) + dy;
+            n.fx = n.x;
+            n.fy = n.y;
+            d3.select(this).attr('transform', `translate(${n.x},${n.y})`);
+        });
+
+        // Helper to get node data by ID for link updates
+        const nodeDataMap = new Map<string, D3Node>();
+        d3.select(this.ownerSVGElement).selectAll<SVGGElement, D3Node>('.node').each(n => nodeDataMap.set(n.id, n));
+
+        // Update connected Links
+        d3.select(this.ownerSVGElement).selectAll<SVGPathElement, D3Link>('.link')
+            .attr('d', l => {
+                const sourceId = typeof l.source === 'object' ? l.source.id : l.source as string;
+                const targetId = typeof l.target === 'object' ? l.target.id : l.target as string;
+                
+                // If either end of the link is moving, update it
+                if ((isGroupDrag && (multiSelection.has(sourceId) || multiSelection.has(targetId))) || 
+                    (!isGroupDrag && (sourceId === d.id || targetId === d.id))) {
+                    
+                    const sNode = nodeDataMap.get(sourceId);
+                    const tNode = nodeDataMap.get(targetId);
+                    
+                    if (sNode && tNode) {
+                         const startPoint = getRectIntersection(sNode, tNode);
+                         const endPoint = getRectIntersection(tNode, sNode);
+                         return `M${startPoint.x},${startPoint.y} L${endPoint.x},${endPoint.y}`;
+                    }
+                }
+                // Return existing 'd' if not updated, but d3 attr callback expects a string return
+                return d3.select(`#${l.id}`).attr('d');
+            });
+
     } else {
-      // For a connect drag, use absolute mouse pointer position
+      // Connect drag
       const parent = this.parentNode as SVGGElement;
       const [mx, my] = d3.pointer(event.sourceEvent, parent);
       
@@ -209,21 +245,36 @@ const createDragHandler = (
     const target = event.sourceEvent.target as SVGElement;
     if (target.closest('.quick-add-btn')) return;
 
-    setElementsState(prev => prev.map(e => e.id === d.id ? { ...e, fx: d.fx, fy: d.fy } : e));
-    
+    // Cleanup temp line
     if (!isMoving) {
         const tempLine: any = d3.select(this.ownerSVGElement).select('.temp-drag-line');
         if (tempLine) tempLine.remove();
     }
 
-    // If we haven't moved significantly, treat it as a click
+    // Click handling
     if (!hasMoved) {
         onNodeClickCallback(d.id, event.sourceEvent);
         return; 
     }
 
-    // If we moved, and it wasn't a move-zone drag (meaning it was a connect drag)
-    if (!isMoving) {
+    if (isMoving) {
+        // Get final positions from D3 data
+        const d3Nodes = d3.select(this.ownerSVGElement).selectAll<SVGGElement, D3Node>('.node').data() as D3Node[];
+        const nodeMap = new Map(d3Nodes.map(n => [n.id, { x: n.x, y: n.y, fx: n.fx, fy: n.fy }]));
+        const isGroupDrag = multiSelection.has(d.id);
+
+        setElementsState(prev => prev.map(el => {
+            // If in group drag, update all selected. Else update dragged one.
+            if (isGroupDrag ? multiSelection.has(el.id) : el.id === d.id) {
+                const d3N = nodeMap.get(el.id);
+                if (d3N) {
+                    return { ...el, x: d3N.x, y: d3N.y, fx: d3N.fx, fy: d3N.fy, updatedAt: new Date().toISOString() };
+                }
+            }
+            return el;
+        }));
+    } else {
+        // Connect drag end
         const dropTargetElement = event.sourceEvent.target as HTMLElement;
         const dropNodeElement = dropTargetElement?.closest('.node');
         const dropNodeSelection = dropNodeElement ? d3.select(dropNodeElement) : d3.select(null as any);
@@ -246,12 +297,17 @@ const createDragHandler = (
     .on('end', dragended);
 };
 
-const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>, onNodeClickCallback: (elementId: string, event: MouseEvent) => void) => {
+const createPhysicsDragHandler = (
+    simulation: d3.Simulation<D3Node, D3Link>, 
+    onNodeClickCallback: (elementId: string, event: MouseEvent) => void,
+    setElementsState: React.Dispatch<React.SetStateAction<Element[]>>,
+    multiSelection: Set<string>
+) => {
   let startX = 0;
   let startY = 0;
   let hasMoved = false;
 
-  function dragstarted(event: any, d: D3Node) {
+  function dragstarted(this: SVGGElement, event: any, d: D3Node) {
     const target = event.sourceEvent.target as SVGElement;
     if (target.closest('.quick-add-btn')) return;
 
@@ -259,39 +315,81 @@ const createPhysicsDragHandler = (simulation: d3.Simulation<D3Node, D3Link>, onN
       simulation.alphaTarget(0.3);
       (simulation as any).restart();
     }
-    d.fx = d.x;
-    d.fy = d.y;
+    
+    // Pin all nodes being moved
+    const isGroupDrag = multiSelection.has(d.id);
+    d3.select(this.ownerSVGElement).selectAll<SVGGElement, D3Node>('.node')
+        .filter(n => isGroupDrag ? multiSelection.has(n.id) : n.id === d.id)
+        .each(n => {
+            n.fx = n.x;
+            n.fy = n.y;
+        });
+
     const e = event as any;
     startX = e.x;
     startY = e.y;
     hasMoved = false;
   }
 
-  function dragged(event: any, d: D3Node) {
+  function dragged(this: SVGGElement, event: any, d: D3Node) {
     const target = event.sourceEvent.target as SVGElement;
     if (target.closest('.quick-add-btn')) return;
 
     const e = event as any;
-    d.fx = e.x;
-    d.fy = e.y;
     if (!hasMoved && (Math.abs(e.x - startX) > 3 || Math.abs(e.y - startY) > 3)) {
         hasMoved = true;
     }
+
+    // Update fx/fy for all selected nodes
+    const transform = d3.zoomTransform(this.ownerSVGElement as unknown as globalThis.Element);
+    const dx = event.dx / transform.k;
+    const dy = event.dy / transform.k;
+
+    const isGroupDrag = multiSelection.has(d.id);
+    d3.select(this.ownerSVGElement).selectAll<SVGGElement, D3Node>('.node')
+        .filter(n => isGroupDrag ? multiSelection.has(n.id) : n.id === d.id)
+        .each(n => {
+            if (n.fx !== undefined && n.fx !== null) n.fx += dx;
+            if (n.fy !== undefined && n.fy !== null) n.fy += dy;
+            // Note: n.x/n.y will be updated by simulation tick
+        });
   }
 
-  function dragended(event: any, d: D3Node) {
+  function dragended(this: SVGGElement, event: any, d: D3Node) {
     const target = event.sourceEvent.target as SVGElement;
     if (target.closest('.quick-add-btn')) return;
 
     if (!event.active) simulation.alphaTarget(0);
     
-    // In physics mode, typical D3 drag swallows click events. 
-    // We manually trigger click if no movement occurred.
     if (!hasMoved) {
         onNodeClickCallback(d.id, event.sourceEvent);
     }
-    d.fx = null;
-    d.fy = null;
+
+    // Unpin nodes (or keep them fixed if that's the design, here we unpin)
+    // NOTE: Standard d3 force drag unpins on end.
+    const isGroupDrag = multiSelection.has(d.id);
+    
+    // Capture final positions before unpinning to save state
+    const d3Nodes = d3.select(this.ownerSVGElement).selectAll<SVGGElement, D3Node>('.node').data() as D3Node[];
+    const nodeMap = new Map(d3Nodes.map(n => [n.id, { x: n.x, y: n.y }]));
+
+    d3.select(this.ownerSVGElement).selectAll<SVGGElement, D3Node>('.node')
+        .filter(n => isGroupDrag ? multiSelection.has(n.id) : n.id === d.id)
+        .each(n => {
+            n.fx = null;
+            n.fy = null;
+        });
+    
+    // Sync back to React
+    setElementsState(prev => prev.map(el => {
+        if (isGroupDrag ? multiSelection.has(el.id) : el.id === d.id) {
+            const d3N = nodeMap.get(el.id);
+            if (d3N) {
+                return { ...el, x: d3N.x, y: d3N.y, fx: null, fy: null, updatedAt: new Date().toISOString() };
+            }
+        }
+        return el;
+    }));
   }
 
   return d3.drag<SVGGElement, D3Node>()
@@ -584,6 +682,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .data(d3Links, d => d.id)
       .join('path')
       .attr('class', 'link')
+      .attr('id', d => d.id) // Ensure ID is set on path for label textPath reference
       .attr('stroke', d => (d.id === selectedRelationshipId ? selectedLinkColor : linkColor))
       .attr('stroke-width', d => (d.id === selectedRelationshipId ? 3 : 2))
       .attr('fill', 'none')
@@ -975,7 +1074,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .force('charge', d3.forceManyBody().strength(layoutParams.repulsion))
         .force('center', d3.forceCenter(width / 2, height / 2));
 
-      const physicsDragHandler = createPhysicsDragHandler(simulation, onNodeClick);
+      const physicsDragHandler = createPhysicsDragHandler(simulation, onNodeClick, setElements, multiSelection);
       node.call(physicsDragHandler as any);
     } else {
       simulation
@@ -983,7 +1082,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .force('charge', null)
         .force('center', null);
         
-      const staticDragHandler = createDragHandler(setElements, onNodeClick, onNodeConnect, onNodeConnectToNew);
+      const staticDragHandler = createDragHandler(setElements, onNodeClick, onNodeConnect, onNodeConnectToNew, multiSelection);
       node.call(staticDragHandler as any);
     }
 
