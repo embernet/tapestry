@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship } from '../types';
 import { AIConfig, callAI } from '../utils';
 import { Type } from '@google/genai';
+import { promptStore } from '../services/PromptStore';
 
 interface TagCloudPanelProps {
   mode: 'tags' | 'nodes' | 'words' | 'full_text';
@@ -266,23 +267,10 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
                 return;
             }
 
-            const prompt = `
-            You are a linguistic expert. Transform the following list of words/phrases into ${newMode}.
-            
-            Words: ${JSON.stringify(wordsToTransform)}
-            
-            Return a JSON object containing an array of mappings.
-            Structure: { "mappings": [ { "original": "word", "transformed": "new_word" }, ... ] }
-            
-            - Keep the casing consistent.
-            - If a word cannot be transformed meaningfully, keep it as is.
-            - "Related": contextually associated concepts.
-            - "Metaphors": figurative representations.
-            - "Hypernyms": more general categories.
-            - "Hyponyms": more specific examples.
-            
-            Output valid JSON only.
-            `;
+            const prompt = promptStore.get('transform:linguistic', {
+                mode: newMode,
+                words: JSON.stringify(wordsToTransform)
+            });
 
             // Safer schema: Array of objects avoids issues with weird characters in keys
             const responseSchema = {

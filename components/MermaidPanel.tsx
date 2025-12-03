@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import mermaid from 'mermaid';
 import { MermaidDiagram, Element, Relationship } from '../types';
 import { generateUUID, generateMarkdownFromGraph } from '../utils';
+import { promptStore } from '../services/PromptStore';
 
 interface MermaidPanelProps {
   savedDiagrams: MermaidDiagram[];
@@ -18,17 +19,17 @@ interface MermaidPanelProps {
 }
 
 const AI_ACTIONS = [
-    { name: "Flowchart", prompt: "Provide mermaid markdown for a flowchart for this" },
-    { name: "Mind Map", prompt: "Provide mermaid markdown for a mind map for this" },
-    { name: "Use Case", prompt: "Provide mermaid markdown for a use case diagram based on a left to right flowchart diagram that uses stadium-shaped nodes by wrapping the node names in round and square brackets ([node name]) for this" },
-    { name: "Decomposition", prompt: "Provide mermaid markdown for a functional decomposition diagram showing functions as boxes. Sub-functions of each function should be shown as subgraphs in their own boxes inside the box for the function they belong to for this" },
-    { name: "Sequence", prompt: "Provide mermaid markdown for a sequence diagram for this" },
-    { name: "Class Diagram", prompt: "Provide mermaid markdown for a class diagram for this" },
-    { name: "Perimeter", prompt: "Provide mermaid markdown for a perimeter diagram showing the perimeter as a box with a dashed line and the components of the system inside connected via firewall to systems outside the perimeter for this" },
-    { name: "ER Diagram", prompt: "Provide mermaid markdown for an entity relationship diagram for this" },
-    { name: "State Diagram", prompt: "Provide mermaid markdown for a state diagram for this" },
-    { name: "Timeline", prompt: "Provide mermaid markdown for a timeline for this" },
-    { name: "Gantt Chart", prompt: "Provide mermaid markdown for a Gantt chart breaking it down into phases as appropriate for this" },
+    { name: "Flowchart", key: "mermaid:flowchart" },
+    { name: "Mind Map", key: "mermaid:mindmap" },
+    { name: "Use Case", key: "mermaid:usecase" },
+    { name: "Decomposition", key: "mermaid:decomposition" },
+    { name: "Sequence", key: "mermaid:sequence" },
+    { name: "Class Diagram", key: "mermaid:class" },
+    { name: "Perimeter", key: "mermaid:perimeter" },
+    { name: "ER Diagram", key: "mermaid:er" },
+    { name: "State Diagram", key: "mermaid:state" },
+    { name: "Timeline", key: "mermaid:timeline" },
+    { name: "Gantt Chart", key: "mermaid:gantt" },
 ];
 
 export const MermaidPanel: React.FC<MermaidPanelProps> = ({ 
@@ -187,9 +188,10 @@ export const MermaidPanel: React.FC<MermaidPanelProps> = ({
         return generateMarkdownFromGraph(contextElements, contextRels);
     };
 
-    const handleAIRequest = async (promptAction: string) => {
+    const handleAIRequest = async (key: string) => {
         setIsDropdownOpen(false);
         const context = getGraphContext();
+        const promptAction = promptStore.get(key);
         const result = await onGenerate(promptAction, context);
         if (result) {
             let cleanCode = result.replace(/```mermaid/g, '').replace(/```/g, '').trim();
@@ -204,12 +206,12 @@ export const MermaidPanel: React.FC<MermaidPanelProps> = ({
     const handleCommandExecute = async () => {
         if (!commandInput.trim()) return;
         const context = getGraphContext();
-        const prompt = `Modify or create a diagram based on the current request: "${commandInput}".
-        Current Code (if any):
-        ${code}
         
-        Graph Data Context:
-        ${context}`;
+        const prompt = promptStore.get('mermaid:modify', {
+            input: commandInput,
+            code,
+            context
+        });
         
         setCommandInput('');
         const result = await onGenerate(prompt, context);
@@ -351,7 +353,7 @@ export const MermaidPanel: React.FC<MermaidPanelProps> = ({
                                         {AI_ACTIONS.map(action => (
                                             <button
                                                 key={action.name}
-                                                onClick={() => handleAIRequest(action.prompt)}
+                                                onClick={() => handleAIRequest(action.key)}
                                                 disabled={isGenerating}
                                                 className={`block w-full text-left px-4 py-2 text-xs ${isDarkMode ? 'text-gray-300 hover:bg-gray-700 hover:text-white border-gray-700' : 'text-gray-700 hover:bg-gray-100 border-gray-200'} border-b last:border-0`}
                                             >
@@ -449,5 +451,3 @@ export const MermaidPanel: React.FC<MermaidPanelProps> = ({
         </div>
     );
 };
-
-export default MermaidPanel;

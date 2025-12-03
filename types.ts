@@ -1,7 +1,4 @@
 
-
-// Fix: Import d3 types to resolve "Cannot find namespace 'd3'" errors.
-import * as d3 from 'd3';
 import { FunctionCall, FunctionResponse } from '@google/genai';
 
 export enum RelationshipDirection {
@@ -107,12 +104,28 @@ export interface ColorScheme {
   defaultRelationshipLabel?: string;
 }
 
-export type D3Node = Element & d3.SimulationNodeDatum & {
+export interface SimulationNodeDatum {
+  index?: number;
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+  fx?: number | null;
+  fy?: number | null;
+}
+
+export type D3Node = Element & SimulationNodeDatum & {
   width?: number;
   height?: number;
 };
 
-export interface D3Link extends d3.SimulationLinkDatum<D3Node> {
+export interface SimulationLinkDatum<NodeDatum extends SimulationNodeDatum> {
+  source: NodeDatum | string | number;
+  target: NodeDatum | string | number;
+  index?: number;
+}
+
+export interface D3Link extends SimulationLinkDatum<D3Node> {
   id: string;
   source: string | D3Node;
   target: string | D3Node;

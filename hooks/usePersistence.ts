@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { ModelMetadata, ColorScheme, SystemPromptConfig, Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, DateFilterState, PanelLayout } from '../types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG } from '../constants';
 import { generateUUID, computeContentHash, isInIframe } from '../utils';
@@ -194,12 +194,6 @@ export const usePersistence = ({
             const indexStr = localStorage.getItem(MODELS_INDEX_KEY); 
             const index = indexStr ? JSON.parse(indexStr) : []; 
             setModelsIndex(index); 
-            
-            // Auto-load removed to enforce start screen
-            // const lastId = localStorage.getItem(LAST_OPENED_MODEL_ID_KEY);
-            // if (lastId && index.some((m: ModelMetadata) => m.id === lastId)) {
-            //     handleLoadModel(lastId);
-            // } 
         } catch (error) { 
             console.error("Failed to load models index:", error); 
             setModelsIndex([]); 
@@ -217,10 +211,6 @@ export const usePersistence = ({
     // Auto-save current model content
     useEffect(() => { 
         if (currentModelId && !isInitialLoad) { 
-            // Use refs for large data structures to avoid stale closures in effects if dependencies were missing,
-            // but here we depend on the props which are state values.
-            // Note: The parent App passes *state* variables as props (elements, etc), not refs. 
-            // But we requested refs in props as well. Using refs for reading ensures latest data.
             const modelData = { 
                 elements: elementsRef.current, 
                 relationships: relationshipsRef.current, 
@@ -497,6 +487,12 @@ export const usePersistence = ({
         setIsCreateModelModalOpen(true); 
     }, [currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, handleDiskSave]);
 
+    const hasUnsavedChanges = useMemo(() => {
+        const currentMeta = modelsIndex.find(m => m.id === currentModelId);
+        if (!currentMeta) return false;
+        return currentMeta.contentHash !== currentMeta.lastDiskHash;
+    }, [modelsIndex, currentModelId]);
+
     return {
         modelsIndex,
         currentModelId,
@@ -514,6 +510,7 @@ export const usePersistence = ({
         schemaUpdateChanges,
         isInitialLoad,
         currentModelName: modelsIndex.find(m => m.id === currentModelId)?.name || 'Loading...',
+        hasUnsavedChanges,
         
         // Actions
         handleLoadModel,

@@ -9,7 +9,7 @@ import MatrixPanel from './MatrixPanel';
 import GridPanel from './GridPanel';
 import KanbanPanel from './KanbanPanel';
 import PresentationPanel from './PresentationPanel';
-import MermaidPanel from './MermaidPanel';
+import { MermaidPanel } from './MermaidPanel';
 import MarkdownPanel from './MarkdownPanel';
 import JSONPanel from './JSONPanel';
 import HistoryPanel from './HistoryPanel';

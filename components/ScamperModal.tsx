@@ -4,6 +4,7 @@ import { ScamperSuggestion, Element, Relationship, ModelActions, TapestryDocumen
 import { generateUUID, callAI } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
+import { promptStore } from '../services/PromptStore';
 
 interface ScamperModalProps {
   isOpen: boolean;
@@ -135,12 +136,15 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
             exclusionText = `Do NOT suggest the following ideas again: ${suggestions.map(s => s.name).join(', ')}.`;
         }
 
-        const prompt = `${customPrompt}
-        
-        TASK: Apply the SCAMPER technique '${opLetter} - ${opName}' to the concept: "${sourceElement.name}" (Notes: ${sourceElement.notes}). 
-        Generate ${isAppend ? '3-5' : '4-8'} distinct, creative ideas that emerge from applying this operator. 
-        ${exclusionText}
-        For each idea, provide a name, a short description/rationale, and a short relationship label that connects the original concept to the new idea (e.g. "can be replaced by", "combined with", "adapted to").`;
+        const prompt = promptStore.get('scamper:generate', {
+            basePrompt: customPrompt,
+            letter: opLetter,
+            operator: opName,
+            sourceName: sourceElement.name,
+            sourceNotes: sourceElement.notes,
+            count: isAppend ? '3-5' : '4-8',
+            exclusion: exclusionText
+        });
         
         const responseSchema = { 
             type: Type.ARRAY, 

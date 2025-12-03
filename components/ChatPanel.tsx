@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Content, FunctionCall, FunctionResponse, Type, Schema } from '@google/genai';
 import { Element, Relationship, ModelActions, ColorScheme, SystemPromptConfig, TapestryDocument, TapestryFolder, ChatMessage, PlanStep } from '../types';
 import { generateMarkdownFromGraph, callAI, AIConfig, generateUUID } from '../utils';
+import { promptStore } from '../services/PromptStore';
 
 interface ChatPanelProps {
   elements: Element[];
@@ -336,14 +337,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                   
                   try {
                       // Construct prompt for this specific step
-                      const stepPrompt = `EXECUTE PLAN STEP ${nextStepIdx + 1}/${activePlan.length}: "${step.description}". 
-                      
-                      Instructions:
-                      1. Review the current documents and graph state.
-                      2. Generate the specific JSON actions required to complete this step.
-                      3. CRITICAL: You MUST generate an action in the 'actions' array. Do not just narrate.
-                      4. CRITICAL: Adhere strictly to the schema for 'createDocument' (requires 'content') if creating docs.
-                      5. Return actions in the 'actions' array of the JSON response.`;
+                      const stepPrompt = promptStore.get('plan:execute_step', {
+                        current: String(nextStepIdx + 1),
+                        total: String(activePlan.length),
+                        description: step.description
+                      });
 
                       // Build context: Chat history + Accumulated Plan Execution History
                       const contents = [...buildApiHistory(messages), ...planContextRef.current];
@@ -360,19 +358,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                           docContext = `CURRENT DOCUMENTS:\n${documentsRef.current.map(d => `- "${d.title}" (Length: ${d.content.length} chars)`).join('\n')}`;
                       }
 
-                      const systemInstruction = `
-                      ${systemPromptConfig.defaultPrompt}
-
-                      ${docContext}
-                      
-                      GRAPH DATA:
-                      ${modelMarkdown}
-                      
-                      AVAILABLE TOOLS:
-                      ${toolsContextString}
-                      
-                      CONTEXT: You are executing a multi-step plan. Focus ONLY on the current step.
-                      `;
+                      const systemInstruction = promptStore.get('chat:system', {
+                        defaultPrompt: systemPromptConfig.defaultPrompt,
+                        modeContext: "CONTEXT: You are executing a multi-step plan. Focus ONLY on the current step.",
+                        schemaContext: "", // Not passing active schema here to keep it simpler for now, usually handled in main flow
+                        docContext: docContext,
+                        toolsContext: toolsContextString,
+                        graphData: modelMarkdown
+                      });
 
                       // First Attempt
                       let result = await callAI(
@@ -395,7 +388,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                       // RETRY LOGIC: If no actions generated but step likely implies action
                       if (toolRequests.length === 0) {
                           console.warn("Plan execution: No actions generated. Retrying with stronger prompt.");
-                          const retryPrompt = "SYSTEM ALERT: You did not generate any actions. You MUST generate a JSON object with an 'actions' array containing the tool calls. Do not just narrate completion. Generate the code now.";
+                          const retryPrompt = promptStore.get('plan:retry');
                           contents.push({ role: 'model', parts: [{ text: result.text }] }); // Push previous response
                           contents.push({ role: 'user', parts: [{ text: retryPrompt }] }); // Push retry demand
                           
@@ -739,13 +732,10 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     // Handle modification of proposed plan
     if (planStatus === 'proposed' && activePlan) {
         const userModification = input.trim();
-        const modificationPrompt = `The user wants to modify the proposed plan.
-        Current Plan:
-        ${JSON.stringify(activePlan.map(p => p.description))}
-        
-        User Request: "${userModification}"
-        
-        Generate a new updated plan based on this request. Return the new plan array in the JSON response.`;
+        const modificationPrompt = promptStore.get('chat:plan:modify', {
+             currentPlan: JSON.stringify(activePlan.map(p => p.description)),
+             userRequest: userModification
+        });
         
         setInput('');
         setIsLoading(true);
@@ -800,39 +790,14 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             docContext = `AVAILABLE DOCUMENTS:\n${documents.map(d => `- "${d.title}"`).join('\n')}`;
         }
 
-        const systemInstruction = `
-        You are Tapestry AI, an expert knowledge graph assistant.
-        
-        ${systemPromptConfig.defaultPrompt}
-        
-        ${isCreativeMode ? 'MODE: CREATIVE PARTNER (Proactive, suggest ideas)' : 'MODE: STRICT ANALYST (Only facts)'}
-
-        ${schemaContext}
-        ${docContext}
-
-        AVAILABLE TOOLS:
-        You must output a JSON object to use tools.
-        ${toolsContextString}
-
-        OUTPUT FORMAT:
-        You must respond with a JSON object strictly adhering to this schema:
-        {
-          "analysis": "Your internal thought process...",
-          "message": "The text response to show the user...",
-          "plan": ["Step 1", "Step 2", ...], // OPTIONAL: For multi-step tasks
-          "actions": [ { "tool": "toolName", "parameters": { ... } }, ... ] // OPTIONAL: For immediate actions
-        }
-
-        CRITICAL RULES:
-        1. Always return valid JSON.
-        2. Use 'actions' array for immediate changes.
-        3. Use 'plan' array for complex multi-step workflows.
-        4. STRICT SCHEMA COMPLIANCE: When creating documents, you MUST provide the 'content' field.
-        5. Use 'rationale' parameter to explain actions.
-
-        GRAPH DATA:
-        ${modelMarkdown}
-        `;
+        const systemInstruction = promptStore.get('chat:system', {
+            defaultPrompt: systemPromptConfig.defaultPrompt,
+            modeContext: isCreativeMode ? 'MODE: CREATIVE PARTNER (Proactive, suggest ideas)' : 'MODE: STRICT ANALYST (Only facts)',
+            schemaContext,
+            docContext,
+            toolsContext: toolsContextString,
+            graphData: modelMarkdown
+        });
 
         const contents: Content[] = buildApiHistory(newMessages);
         

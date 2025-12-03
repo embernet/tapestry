@@ -1,8 +1,10 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import * as d3 from 'd3';
+import * as d3Import from 'd3';
 import { Element, ColorScheme } from '../types';
 import { DEFAULT_NODE_COLOR } from '../constants';
+
+const d3: any = d3Import;
 
 interface GridPanelProps {
   elements: Element[];
@@ -22,7 +24,7 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
   
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const simulationRef = useRef<d3.Simulation<any, any> | null>(null);
+  const simulationRef = useRef<any | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
 
   // Store positions to persist them between renders (e.g., when changing font size or stopping physics)
@@ -390,7 +392,7 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
 
     // Draw Labels
     const labelGroup = g.append('g').attr('class', 'labels');
-    const labelSelection = labelGroup.selectAll<SVGTextElement, any>('.label-text')
+    const labelSelection = labelGroup.selectAll('.label-text')
         .data(labels, d => d.id)
         .join('text') // Use join to update existing elements when fontSize changes
         .attr('class', 'label-text')
@@ -410,8 +412,8 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
     let startY = 0;
     let hasMoved = false;
 
-    const drag = d3.drag<SVGTextElement, any>()
-        .on("start", function(event, d) {
+    const drag = d3.drag()
+        .on("start", function(event: any, d: any) {
             if (!event.active && isSimulating) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
             d.fy = d.y;
@@ -420,7 +422,7 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
             hasMoved = false;
             d3.select(this).style("cursor", "grabbing");
         })
-        .on("drag", function(event, d) {
+        .on("drag", function(event: any, d: any) {
             d.fx = event.x;
             d.fy = event.y;
             // Update data
@@ -447,7 +449,7 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
                     .attr('y2', event.y);
             }
         })
-        .on("end", function(event, d) {
+        .on("end", function(event: any, d: any) {
             if (!event.active && isSimulating) simulation.alphaTarget(0);
             d.fx = null;
             d.fy = null;

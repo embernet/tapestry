@@ -5,6 +5,7 @@ import { generateMarkdownFromGraph, generateUUID, callAI } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
+import { promptStore } from '../services/PromptStore';
 
 interface SwotModalProps {
   isOpen: boolean;
@@ -58,7 +59,7 @@ const MATRIX_CONFIGS: Record<string, MatrixConfig> = {
     matrix: {
         title: "SWOT Matrix",
         description: "Analyze internal Strengths & Weaknesses and external Opportunities & Threats.",
-        basePrompt: "Perform a SWOT Analysis. Identify internal Strengths and Weaknesses, and external Opportunities and Threats.",
+        basePrompt: promptStore.get("swot_base:matrix"),
         gridCols: "grid-cols-2",
         gridRows: "grid-rows-2",
         categories: [
@@ -71,7 +72,7 @@ const MATRIX_CONFIGS: Record<string, MatrixConfig> = {
     five_forces: {
         title: "Porter's Five Forces",
         description: "Analyze competitive intensity and market attractiveness.",
-        basePrompt: "Analyze Porter's Five Forces. Identify specific factors for each force based on the graph context.",
+        basePrompt: promptStore.get("swot_base:five_forces"),
         gridCols: "grid-cols-3",
         gridRows: "grid-rows-2",
         categories: [
@@ -85,7 +86,7 @@ const MATRIX_CONFIGS: Record<string, MatrixConfig> = {
     pestel: {
         title: "PESTEL Analysis",
         description: "Analyze Political, Economic, Social, Technological, Environmental, and Legal factors.",
-        basePrompt: "Perform a PESTEL Analysis. Identify Political, Economic, Social, Technological, Environmental, and Legal factors affecting the subject.",
+        basePrompt: promptStore.get("swot_base:pestel"),
         gridCols: "grid-cols-3",
         gridRows: "grid-rows-2",
         categories: [
@@ -100,7 +101,7 @@ const MATRIX_CONFIGS: Record<string, MatrixConfig> = {
     steer: {
         title: "STEER Analysis",
         description: "Analyze Socio-cultural, Technological, Economic, Ecological, and Regulatory factors.",
-        basePrompt: "Perform a STEER Analysis. Identify specific factors for each category based on the graph context.",
+        basePrompt: promptStore.get("swot_base:steer"),
         gridCols: "grid-cols-3",
         gridRows: "grid-rows-2",
         categories: [
@@ -114,7 +115,7 @@ const MATRIX_CONFIGS: Record<string, MatrixConfig> = {
     destep: {
         title: "DESTEP Analysis",
         description: "Analyze Demographic, Economic, Social, Technological, Ecological, and Political factors.",
-        basePrompt: "Perform a DESTEP Analysis. Identify specific factors for each category based on the graph context.",
+        basePrompt: promptStore.get("swot_base:destep"),
         gridCols: "grid-cols-3",
         gridRows: "grid-rows-2",
         categories: [
@@ -129,7 +130,7 @@ const MATRIX_CONFIGS: Record<string, MatrixConfig> = {
     longpest: {
         title: "LoNGPEST Analysis",
         description: "Analyze Political, Economic, Social, and Technological factors at Local, National, and Global scales.",
-        basePrompt: "Perform a LoNGPEST Analysis. Identify PEST factors at Local, National, and Global levels based on the graph context.",
+        basePrompt: promptStore.get("swot_base:longpest"),
         gridCols: "grid-cols-3",
         gridRows: "grid-rows-1",
         categories: [
@@ -141,7 +142,7 @@ const MATRIX_CONFIGS: Record<string, MatrixConfig> = {
     cage: {
         title: "CAGE Distance Framework",
         description: "Analyze Cultural, Administrative, Geographic, and Economic distances.",
-        basePrompt: "Perform a CAGE Distance Analysis. Identify specific distance factors between the entities/markets in the graph.",
+        basePrompt: promptStore.get("swot_base:cage"),
         gridCols: "grid-cols-2",
         gridRows: "grid-rows-2",
         categories: [
@@ -1053,7 +1054,7 @@ const SwotModal: React.FC<SwotModalProps> = ({
                                                         title="Select for Action"
                                                     />
                                                     <button onClick={() => deleteEntry(cat.id, entry.id)} className="text-red-400 hover:text-red-300">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                                                     </button>
                                                 </div>
                                             </div>

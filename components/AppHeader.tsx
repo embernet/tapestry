@@ -74,6 +74,7 @@ interface AppHeaderProps {
   onToggleTheme: () => void;
   onToggleDebug: () => void;
   onOpenKanban: () => void;
+  hasUnsavedChanges: boolean;
 }
 
 const AppHeader: React.FC<AppHeaderProps> = ({
@@ -97,7 +98,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   isDarkMode,
   onToggleTheme,
   onToggleDebug,
-  onOpenKanban
+  onOpenKanban,
+  hasUnsavedChanges
 }) => {
   const [isMainMenuOpen, setIsMainMenuOpen] = useState(false);
   const [isHelpMenuOpen, setIsHelpMenuOpen] = useState(false);
@@ -121,6 +123,10 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   const menuItemHover = isDarkMode ? 'hover:bg-gray-800 hover:text-white' : 'hover:bg-gray-100 hover:text-black';
   const dividerClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
   const labelClass = isDarkMode ? 'text-gray-500' : 'text-gray-400';
+  
+  const saveColorClass = hasUnsavedChanges 
+      ? 'text-green-400' 
+      : (isDarkMode ? 'text-gray-500' : 'text-gray-400');
 
   return (
     <div className={`absolute top-4 left-4 z-[600] p-2 rounded-lg flex items-center space-x-2 ${headerBg}`}>
@@ -243,8 +249,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         <button onClick={onOpenModel} title="Open Model..." className={`p-2 rounded-md transition ${textClass}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
         </button>
-        <button onClick={onSaveDisk} title="Save to Disk" className={`p-2 rounded-md transition ${textClass}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+        <button onClick={onSaveDisk} title={hasUnsavedChanges ? "Save changes to disk" : "No unsaved changes"} className={`p-2 rounded-md transition ${textClass}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${saveColorClass}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
         </button>
         <div className={`border-l h-6 mx-1 ${dividerClass}`}></div>
         

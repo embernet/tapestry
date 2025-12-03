@@ -1,5 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom/client';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, NodeFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage, VisualiseToolType, NodeShape } from './types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
 import { TOOL_DOCUMENTATION } from './documentation';
@@ -23,6 +24,7 @@ import { GuidancePanel } from './components/GuidancePanel';
 import { DebugPanel } from './components/DebugPanel';
 import { SketchPanel } from './components/SketchPanel';
 import { RandomWalkPanel } from './components/RandomWalkPanel';
+import { promptStore } from './services/PromptStore';
 
 // New Extracted Components
 import { StartScreen } from './components/StartScreen';
@@ -409,16 +411,22 @@ export default function App() {
     } else if (toolId === 'expand') {
         if (selectedElementId) {
              const el = elements.find(e => e.id === selectedElementId);
-             if (el) setChatDraftMessage(`Suggest 5 related concepts to "${el.name}" and add them to the graph.`);
+             if (el) {
+                const prompt = promptStore.get('ai:expand:node', { name: el.name });
+                setChatDraftMessage(prompt);
+             }
         } else {
-             setChatDraftMessage(`Suggest 5 new concepts related to the current graph and add them.`);
+             const prompt = promptStore.get('ai:expand:general');
+             setChatDraftMessage(prompt);
         }
         panelState.setIsChatPanelOpen(true);
     } else if (toolId === 'connect') {
-        setChatDraftMessage(`Analyze the current graph nodes and suggest meaningful relationships between them that are currently missing.`);
+        const prompt = promptStore.get('ai:connect');
+        setChatDraftMessage(prompt);
         panelState.setIsChatPanelOpen(true);
     } else if (toolId === 'critique') {
-        setChatDraftMessage(`Critique the current graph model. Identify logical gaps, circular reasoning, ambiguities, or missing key perspectives.`);
+        const prompt = promptStore.get('ai:critique');
+        setChatDraftMessage(prompt);
         panelState.setIsChatPanelOpen(true);
     }
 }, [elements, selectedElementId, panelState, tools]);
@@ -589,7 +597,21 @@ export default function App() {
 
   const handleSaveMermaidDiagram = useCallback((diagram: MermaidDiagram) => { setMermaidDiagrams(prev => { const existingIndex = prev.findIndex(d => d.id === diagram.id); if (existingIndex >= 0) { const newDiagrams = [...prev]; newDiagrams[existingIndex] = diagram; return newDiagrams; } else { return [...prev, diagram]; } }); }, []);
   const handleDeleteMermaidDiagram = useCallback((id: string) => { if (confirm("Delete this diagram?")) { setMermaidDiagrams(prev => prev.filter(d => d.id !== id)); } }, []);
-  const handleGenerateMermaid = useCallback(async (prompt: string, contextMarkdown?: string) => { setIsMermaidGenerating(true); try { const graphMarkdown = contextMarkdown || generateMarkdownFromGraph(elements, relationships); const fullPrompt = `You are an expert in Mermaid.js diagram syntax. The user wants you to generate or update a Mermaid diagram based on the following knowledge graph data. TASK: ${prompt} GRAPH CONTEXT (Markdown Format): ${graphMarkdown} Instructions: 1. Analyze the graph context. 2. Generate valid Mermaid markdown code that visualizes this structure according to the user's specific request. 3. ONLY return the mermaid code block (enclosed in \`\`\`mermaid ... \`\`\`).`; const response = await callAI(aiConfig, fullPrompt); return response.text || ""; } catch (e) { console.error("Mermaid Gen Error", e); alert("Failed to generate diagram."); return ""; } finally { setIsMermaidGenerating(false); } }, [elements, relationships, aiConfig]);
+  const handleGenerateMermaid = useCallback(async (prompt: string, contextMarkdown?: string) => { 
+      setIsMermaidGenerating(true); 
+      try { 
+          const graphMarkdown = contextMarkdown || generateMarkdownFromGraph(elements, relationships); 
+          const fullPrompt = promptStore.get('mermaid:generate', { prompt, context: graphMarkdown });
+          const response = await callAI(aiConfig, fullPrompt); 
+          return response.text || ""; 
+      } catch (e) { 
+          console.error("Mermaid Gen Error", e); 
+          alert("Failed to generate diagram."); 
+          return ""; 
+      } finally { 
+          setIsMermaidGenerating(false); 
+      } 
+    }, [elements, relationships, aiConfig]);
 
   const aiActions: ModelActions = useModelActions({ elementsRef, setElements, relationshipsRef, setRelationships, documentsRef, setDocuments, foldersRef, setFolders, openDocIds, setOpenDocIds, onDeleteElement: handleDeleteElement });
 
@@ -1225,6 +1247,7 @@ export default function App() {
             onToggleTheme={handleThemeToggle}
             onToggleDebug={() => setIsDebugPanelOpen(prev => !prev)}
             onOpenKanban={handleOpenKanban}
+            hasUnsavedChanges={persistence.hasUnsavedChanges}
           />
       )}
       
@@ -1523,7 +1546,7 @@ export default function App() {
                 isDarkMode={isDarkMode}
             />
         </>
-      ) : (
+    ) : (
         <StartScreen 
             isDarkMode={isDarkMode} 
             persistence={persistence} 
