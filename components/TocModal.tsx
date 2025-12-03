@@ -1,3 +1,5 @@
+
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship, TocToolType, ModelActions, TapestryDocument, TapestryFolder } from '../types';
 import { generateMarkdownFromGraph, AIConfig, callAI } from '../utils';
@@ -22,6 +24,7 @@ interface TocModalProps {
   customPrompt?: string;
   activeModel?: string;
   aiConfig: AIConfig;
+  isDarkMode: boolean;
 }
 
 const CrtPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> = ({ onGenerate, isLoading }) => {
@@ -136,7 +139,7 @@ const TtPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> = ({ onG
     );
 };
 
-const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel, aiConfig }) => {
+const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel, aiConfig, isDarkMode }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -407,6 +410,7 @@ const TocModal: React.FC<TocModalProps> = ({ isOpen, activeTool, elements, relat
                             onUpdate={onUpdateDocument} 
                             onClose={() => setGeneratedDocId(null)} 
                             initialViewMode="preview"
+                            isDarkMode={isDarkMode}
                         />
                     </div>
                 ) : (

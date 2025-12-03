@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship, LssToolType, ModelActions, TapestryDocument, TapestryFolder } from '../types';
 import { generateMarkdownFromGraph, AIConfig, callAI } from '../utils';
@@ -23,6 +24,7 @@ interface LssModalProps {
   customPrompt?: string;
   activeModel?: string;
   aiConfig: AIConfig;
+  isDarkMode: boolean;
 }
 
 // ... (Keep Sub Components CharterPanel, SipocPanel, VocPanel, CtqPanel, StakeholderPanel, DmaicPanel, FiveWhysPanel, FishbonePanel, FmeaPanel, VsmPanel identical) ...
@@ -295,7 +297,7 @@ const VsmPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> = ({ on
     );
 };
 
-const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, documents, folders, onUpdateDocument, initialParams, customPrompt, activeModel, aiConfig }) => {
+const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, documents, folders, onUpdateDocument, initialParams, customPrompt, activeModel, aiConfig, isDarkMode }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -625,6 +627,7 @@ const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relat
                             onUpdate={onUpdateDocument} 
                             onClose={() => setGeneratedDocId(null)} 
                             initialViewMode="preview"
+                            isDarkMode={isDarkMode}
                         />
                     </div>
                 ) : (

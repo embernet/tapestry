@@ -51,7 +51,7 @@ export const TRIZ_PRINCIPLES_FULL = [
     { 
         id: 3, name: "3. Local Quality", 
         general: "Optimise each part of the system for its specific function or environment.",
-        engineering: "Change an object's structure from uniform to non-uniform. Example: A hammer with a rubberised grip for comfort and a steel head for impact.",
+        engineering: "Change the shape of an object from symmetrical to asymmetrical. Example: Mixing vessels with asymmetrical baffles to improve mixing efficiency.",
         business: "Regional pricing strategies or personalised marketing. Example: A supermarket placing high-margin items at eye level.",
         software: "Edge computing or local caching. Example: Storing frequently accessed data on a user's device rather than the server.",
         social: "Empower local councils to make decisions relevant to their specific area. Example: Local bylaws addressing specific town needs rather than national laws.",
@@ -1083,6 +1083,32 @@ export const TOOL_DOCUMENTATION: ToolDocumentationItem[] = [
                         "`A:tag1,tag2` adds tags.",
                         "`A -> B; C -> D` handles multiple operations."
                     ]
+                }
+            ]
+        }
+    },
+    {
+        id: 'random_walk',
+        name: "Random Walk",
+        color: "text-rose-400",
+        desc: "Explore connectivity.",
+        summary: "Automated traversal of the graph to discover serendipitous connections.",
+        icon: (
+            <>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
+            </>
+        ),
+        guidance: {
+            title: "Random Walk: The Value of Wandering",
+            sections: [
+                {
+                    title: "Emergent Patterns",
+                    text: "Patterns in complex situations often emerge only after reflection and exploring how concepts connect. Many people focus on the areas they already know, which can create blind spots and missed opportunities."
+                },
+                {
+                    title: "Breaking Thought Loops",
+                    text: "Random walks help break familiar thought loops, revealing fresh insights, hidden relationships, and a broader understanding of the context. This wider perspective is often what’s needed to tackle wicked problems effectively."
                 }
             ]
         }

@@ -1,0 +1,92 @@
+
+import React from 'react';
+import { ContextMenu, CanvasContextMenu, RelationshipContextMenu } from './ModalComponents';
+import { Element, Relationship } from '../types';
+
+interface ContextMenusProps {
+  contextMenu: { x: number, y: number, elementId: string } | null;
+  relationshipContextMenu: { x: number, y: number, relationshipId: string } | null;
+  canvasContextMenu: { x: number, y: number } | null;
+  relationships: Relationship[];
+  panelState: any;
+  persistence: any;
+  
+  onCloseContextMenu: () => void;
+  onCloseRelationshipContextMenu: () => void;
+  onCloseCanvasContextMenu: () => void;
+  
+  onDeleteElement: (id: string) => void;
+  onAddRelationshipFromContext: (id: string) => void;
+  onDeleteRelationship: (id: string) => void;
+  onChangeRelationshipDirection: (id: string, dir: any) => void;
+  onZoomToFit: () => void;
+  onAutoLayout: () => void;
+  onSaveAsImage: () => void;
+  importFileRef: any;
+  isDarkMode: boolean;
+}
+
+export const ContextMenus: React.FC<ContextMenusProps> = (props) => {
+    const { 
+        contextMenu, relationshipContextMenu, canvasContextMenu, 
+        persistence, panelState, isDarkMode 
+    } = props;
+
+    if (!persistence.currentModelId) return null;
+
+    return (
+        <>
+            {contextMenu && (
+                <ContextMenu 
+                    x={contextMenu.x} 
+                    y={contextMenu.y} 
+                    onClose={props.onCloseContextMenu} 
+                    onDeleteElement={() => { props.onDeleteElement(contextMenu.elementId); props.onCloseContextMenu(); }} 
+                    onAddRelationship={() => { props.onAddRelationshipFromContext(contextMenu.elementId); props.onCloseContextMenu(); }} 
+                />
+            )}
+
+            {relationshipContextMenu && (
+                <RelationshipContextMenu
+                    x={relationshipContextMenu.x}
+                    y={relationshipContextMenu.y}
+                    relationship={props.relationships.find(r => r.id === relationshipContextMenu.relationshipId)!}
+                    onClose={props.onCloseRelationshipContextMenu}
+                    onDelete={() => { props.onDeleteRelationship(relationshipContextMenu.relationshipId); props.onCloseRelationshipContextMenu(); }}
+                    onChangeDirection={(dir) => props.onChangeRelationshipDirection(relationshipContextMenu.relationshipId, dir)}
+                    isDarkMode={isDarkMode}
+                />
+            )}
+
+            {canvasContextMenu && (
+                <CanvasContextMenu 
+                    x={canvasContextMenu.x} 
+                    y={canvasContextMenu.y} 
+                    onClose={props.onCloseCanvasContextMenu} 
+                    onZoomToFit={props.onZoomToFit} 
+                    onAutoLayout={props.onAutoLayout} 
+                    onToggleReport={() => panelState.setIsReportPanelOpen((p:any) => !p)} 
+                    onToggleMarkdown={() => panelState.setIsMarkdownPanelOpen((p:any) => !p)} 
+                    onToggleJSON={() => panelState.setIsJSONPanelOpen((p:any) => !p)} 
+                    onToggleFilter={() => panelState.setIsFilterPanelOpen((p:any) => !p)} 
+                    onToggleMatrix={() => panelState.setIsMatrixPanelOpen((p:any) => !p)} 
+                    onToggleTable={() => panelState.setIsTablePanelOpen((p:any) => !p)} 
+                    onToggleGrid={() => panelState.setIsGridPanelOpen((p:any) => !p)} 
+                    onOpenModel={() => persistence.handleImportClick(props.importFileRef)} 
+                    onSaveModel={persistence.handleDiskSave} 
+                    onCreateModel={persistence.handleNewModelClick} 
+                    onSaveAs={() => persistence.setIsSaveAsModalOpen(true)} 
+                    onSaveAsImage={props.onSaveAsImage} 
+                    isReportOpen={panelState.isReportPanelOpen} 
+                    isMarkdownOpen={panelState.isMarkdownPanelOpen} 
+                    isJSONOpen={panelState.isJSONPanelOpen} 
+                    isFilterOpen={panelState.isFilterPanelOpen} 
+                    isMatrixOpen={panelState.isMatrixPanelOpen} 
+                    isTableOpen={panelState.isTablePanelOpen} 
+                    isGridOpen={panelState.isGridPanelOpen} 
+                    isDarkMode={isDarkMode} 
+                />
+            )}
+        </>
+    );
+}

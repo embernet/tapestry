@@ -1,4 +1,5 @@
 
+
 // Fix: Import d3 types to resolve "Cannot find namespace 'd3'" errors.
 import * as d3 from 'd3';
 import { FunctionCall, FunctionResponse } from '@google/genai';
@@ -206,7 +207,7 @@ export interface ModelActions {
   setElementAttribute: (elementName: string, key: string, value: string) => boolean;
   deleteElementAttribute: (elementName: string, key: string) => boolean;
   setRelationshipAttribute: (sourceName: string, targetName: string, key: string, value: string) => boolean;
-  deleteRelationshipAttribute: (sourceName: string, targetName: string, key: string, value: string) => boolean;
+  deleteRelationshipAttribute: (sourceName: string, targetName: string, key: string) => boolean;
   
   // Document Actions
   readDocument: (title: string) => string | null;

@@ -1,3 +1,5 @@
+
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship, SsmToolType, ModelActions, TapestryDocument, TapestryFolder } from '../types';
 import { generateMarkdownFromGraph, AIConfig } from '../utils';
@@ -22,6 +24,7 @@ interface SsmModalProps {
   customPrompt?: string;
   activeModel?: string;
   aiConfig: AIConfig;
+  isDarkMode: boolean;
 }
 
 const RichPicturePanel: React.FC<{ onGenerate: (topic: string) => void, isLoading: boolean, initialParams?: any }> = ({ onGenerate, isLoading, initialParams }) => {
@@ -118,7 +121,7 @@ const ComparisonPanel: React.FC<{ onGenerate: () => void, isLoading: boolean }> 
     );
 };
 
-const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel, aiConfig }) => {
+const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel, aiConfig, isDarkMode }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -385,6 +388,7 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
                             onUpdate={onUpdateDocument} 
                             onClose={() => setGeneratedDocId(null)} 
                             initialViewMode="preview"
+                            isDarkMode={isDarkMode}
                         />
                     </div>
                 ) : (

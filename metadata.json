@@ -1,5 +1,5 @@
 {
   "name": "Tapestry Studio",
-  "description": "A visual tool to capture and connect facts as nodes in a dynamic graph. Create facts, define their relationships, and customize their appearance to build a web of knowledge.",
+  "description": "Tapestry Studio is an AI-powered knowledge graph editor, creativity, and problem solving tool that brings together many Science, Engineering, Business, and Innovation tools and uses AI to bring them to life.",
   "requestFramePermissions": []
 }

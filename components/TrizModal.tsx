@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship, TrizToolType, ModelActions, TapestryDocument, TapestryFolder } from '../types';
 import { generateMarkdownFromGraph, AIConfig, callAI } from '../utils';
@@ -25,6 +26,7 @@ interface TrizModalProps {
   activeModel?: string;
   aiConfig: AIConfig;
   onOpenGuidance?: () => void;
+  isDarkMode: boolean;
 }
 
 const PERSPECTIVES = [
@@ -327,7 +329,7 @@ const TrendsPanel: React.FC<{ elements: Element[], onGenerate: (node: string) =>
     );
 };
 
-const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel, aiConfig, onOpenGuidance }) => {
+const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, relationships, modelActions, onClose, onLogHistory, onOpenHistory, onAnalyze, initialParams, documents, folders, onUpdateDocument, customPrompt, activeModel, aiConfig, onOpenGuidance, isDarkMode }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [analysisText, setAnalysisText] = useState('');
@@ -634,6 +636,7 @@ const TrizModal: React.FC<TrizModalProps> = ({ isOpen, activeTool, elements, rel
                             onUpdate={onUpdateDocument} 
                             onClose={() => setGeneratedDocId(null)} 
                             initialViewMode="preview"
+                            isDarkMode={isDarkMode}
                         />
                     </div>
                 ) : (
