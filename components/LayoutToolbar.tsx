@@ -15,6 +15,7 @@ interface LayoutToolbarProps {
   onStartAutoLayout: () => void;
   onAcceptAutoLayout: () => void;
   onRejectAutoLayout: () => void;
+  onStaticLayout: () => void;
   onExpand: () => void;
   onContract: () => void;
   isCollapsed: boolean;
@@ -37,6 +38,7 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
   onStartAutoLayout,
   onAcceptAutoLayout,
   onRejectAutoLayout,
+  onStaticLayout,
   onExpand,
   onContract,
   isCollapsed,
@@ -258,6 +260,21 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
                                     </svg>
                                 </button>
                             </div>
+                        </div>
+
+                         {/* Auto Layout (Static) */}
+                        <div className="flex flex-col justify-center items-center ml-1">
+                            <span className={`text-[9px] font-bold uppercase tracking-wider mb-1 ${labelClass}`}>AUTO</span>
+                             <button 
+                                onClick={onStaticLayout}
+                                disabled={isPhysicsActive}
+                                className={`flex flex-col items-center justify-center p-1 rounded border transition-colors h-8 w-8 disabled:opacity-30 ${iconButtonBg}`}
+                                title="Auto-Arrange Nodes (Static)"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7" />
+                                </svg>
+                            </button>
                         </div>
 
                          {/* Node Shape Control */}

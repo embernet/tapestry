@@ -63,6 +63,7 @@ interface AppHeaderProps {
   focusMode: 'narrow' | 'wide' | 'zoom';
   onToggleFocusMode: () => void;
   onZoomToFit: () => void;
+  onAutoLayout: () => void;
   onOpenSettings: (tab: any) => void;
   
   // Help Handlers
@@ -90,6 +91,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   focusMode,
   onToggleFocusMode,
   onZoomToFit,
+  onAutoLayout,
   onOpenSettings,
   onAbout,
   onPatternGallery,
@@ -284,6 +286,18 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             {focusMode === 'zoom' && (<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="3" /><path strokeLinecap="round" strokeLinejoin="round" d="M2 6V2h4 M22 6V2h-4 M2 18v4h4 M22 18v4h-4" /></svg>)}
         </button>
         
+        <button onClick={onZoomToFit} title="Zoom to Fit" className={`p-2 rounded-md transition ${textClass}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+            </svg>
+        </button>
+
+        <button onClick={onAutoLayout} title="Auto Layout (Static)" className={`p-2 rounded-md transition ${textClass} hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-400`}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7" />
+            </svg>
+        </button>
+        
         <button onClick={() => panelState.setIsMermaidPanelOpen((prev: boolean) => !prev)} title="Diagrams" className={`p-2 rounded-md transition ${textClass}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
@@ -330,11 +344,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         <button onClick={() => onOpenSettings('general')} title="Settings" className={`p-2 rounded-md transition ${textClass}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-            </svg>
-        </button>
-        <button onClick={onZoomToFit} title="Zoom to Fit" className={`p-2 rounded-md transition ${textClass}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
             </svg>
         </button>
         

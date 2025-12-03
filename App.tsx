@@ -1,8 +1,9 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
+import * as d3 from 'd3';
 import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, NodeFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage, VisualiseToolType, NodeShape } from './types';
-import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS } from './constants';
+import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS, NODE_MAX_WIDTH } from './constants';
 import { TOOL_DOCUMENTATION } from './documentation';
 import { usePanelDefinitions } from './components/usePanelDefinitions';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
@@ -807,6 +808,48 @@ export default function App() {
   };
 
   const handleStartPhysicsLayout = () => { setOriginalElements(elements); setElements(prev => prev.map(f => ({ ...f, fx: null, fy: null }))); setIsPhysicsModeActive(true); };
+  
+  const handleStaticLayout = useCallback(() => {
+      if (elements.length === 0) return;
+      
+      // Create deep clones for simulation to avoid modifying state directly during calculation
+      const nodes = elements.map(e => ({ ...e }));
+      const links = relationships.map(r => ({ ...r }));
+
+      // Estimate dimensions based on text? 
+      const simulation = d3.forceSimulation(nodes)
+          .force("charge", d3.forceManyBody().strength(layoutParams.repulsion))
+          .force("link", d3.forceLink(links).id((d: any) => d.id).distance(layoutParams.linkDistance))
+          .force("center", d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2))
+          .force("collide", d3.forceCollide().radius((d: any) => {
+              // Estimate width based on name length roughly
+              const w = d.width || Math.max(160, d.name.length * 8);
+              return (w / 2) + 30; // Radius + padding
+          }).iterations(3))
+          .stop();
+
+      simulation.tick(300);
+
+      setElements(prev => {
+          const newEls = prev.map(el => {
+              const node = nodes.find(n => n.id === el.id);
+              if (node) {
+                  return { 
+                      ...el, 
+                      x: node.x, 
+                      y: node.y,
+                      fx: node.x,
+                      fy: node.y,
+                      updatedAt: new Date().toISOString()
+                  };
+              }
+              return el;
+          });
+          return newEls;
+      });
+      
+  }, [elements, relationships, layoutParams]);
+
   const handleAcceptLayout = () => { const finalPositions = graphCanvasRef.current?.getFinalNodePositions(); if (finalPositions) { const positionsMap = new Map(finalPositions.map((p: { id: string; x: number; y: number; }) => [p.id, p])); setElements(prev => prev.map(element => { const pos = positionsMap.get(element.id); const posEntry = pos as { x: number; y: number } | undefined; return posEntry ? { ...element, x: posEntry.x, y: posEntry.y, fx: posEntry.x, fy: posEntry.y } : element; })); } setIsPhysicsModeActive(false); setOriginalElements(null); };
   const handleRejectLayout = () => { if (originalElements) { setElements(originalElements); } setIsPhysicsModeActive(false); setOriginalElements(null); };
   const handleScaleLayout = useCallback((factor: number) => { if (isPhysicsModeActive) return; setElements(prev => { if (prev.length === 0) return prev; const xs = prev.map(e => e.x || 0); const ys = prev.map(e => e.y || 0); const avgX = xs.reduce((a,b) => a+b, 0) / prev.length; const avgY = ys.reduce((a,b) => a+b, 0) / prev.length; return prev.map(e => { const x = e.x || 0; const y = e.y || 0; const dx = x - avgX; const dy = y - avgY; const newX = avgX + dx * factor; const newY = avgY + dy * factor; return { ...e, x: newX, y: newY, fx: newX, fy: newY, updatedAt: new Date().toISOString() }; }); }); }, [isPhysicsModeActive]);
@@ -1238,6 +1281,7 @@ export default function App() {
             focusMode={focusMode}
             onToggleFocusMode={handleToggleFocusMode}
             onZoomToFit={handleZoomToFit}
+            onAutoLayout={handleStaticLayout}
             onOpenSettings={(tab) => { setSettingsInitialTab(tab || 'general'); setIsSettingsModalOpen(true); }}
             onAbout={() => setIsAboutModalOpen(true)}
             onPatternGallery={() => setIsPatternGalleryModalOpen(true)}
@@ -1284,6 +1328,7 @@ export default function App() {
             handleAcceptLayout={handleAcceptLayout}
             handleRejectLayout={handleRejectLayout}
             handleScaleLayout={handleScaleLayout}
+            handleStaticLayout={handleStaticLayout}
             setNodeShape={setNodeShape}
             handleBulkTagAction={handleBulkTagAction}
             handleAnalysisHighlight={handleAnalysisHighlight}
@@ -1540,7 +1585,7 @@ export default function App() {
                 onDeleteRelationship={handleDeleteRelationship}
                 onChangeRelationshipDirection={handleChangeRelationshipDirection}
                 onZoomToFit={handleZoomToFit}
-                onAutoLayout={handleStartPhysicsLayout}
+                onAutoLayout={handleStaticLayout}
                 onSaveAsImage={handleSaveAsImage}
                 importFileRef={importFileRef}
                 isDarkMode={isDarkMode}

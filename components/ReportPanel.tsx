@@ -74,6 +74,18 @@ const ElementReportSection: React.FC<{
       <h2 className={`text-xl font-bold mb-2 border-b pb-1 ${headingClass}`}>{element.name}</h2>
       <div className={`pl-2 space-y-2 ${textClass}`}>
         {element.tags.length > 0 && <p><strong className={`font-semibold w-20 inline-block ${labelClass}`}>Tags:</strong> {element.tags.join(', ')}</p>}
+        
+        {element.attributes && Object.keys(element.attributes).length > 0 && (
+             <div className="mb-2">
+                <strong className={`font-semibold block ${labelClass} mb-1`}>Attributes:</strong>
+                <ul className="list-disc list-inside pl-4 text-sm">
+                     {Object.entries(element.attributes).map(([k, v]) => (
+                         <li key={k}><span className="font-medium opacity-90">{k}:</span> {v}</li>
+                     ))}
+                </ul>
+             </div>
+        )}
+
         {element.notes && (
           <div>
             <strong className={`font-semibold w-20 inline-block align-top ${labelClass}`}>Notes:</strong>

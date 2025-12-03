@@ -58,6 +58,7 @@ interface ToolsOverlayProps {
   handleAcceptLayout: () => void;
   handleRejectLayout: () => void;
   handleScaleLayout: (factor: number) => void;
+  handleStaticLayout: () => void;
   setNodeShape: (shape: NodeShape) => void;
   handleBulkTagAction: (ids: string[], tag: string, mode: 'add' | 'remove') => void;
   handleAnalysisHighlight: (map: Map<string, string>) => void;
@@ -164,7 +165,8 @@ export const ToolsOverlay: React.FC<ToolsOverlayProps> = (props) => {
                         isPhysicsActive={props.isPhysicsModeActive} 
                         onStartAutoLayout={props.handleStartPhysicsLayout} 
                         onAcceptAutoLayout={props.handleAcceptLayout} 
-                        onRejectAutoLayout={props.handleRejectLayout} 
+                        onRejectAutoLayout={props.handleRejectLayout}
+                        onStaticLayout={props.handleStaticLayout}
                         onExpand={() => props.handleScaleLayout(1.1)} 
                         onContract={() => props.handleScaleLayout(0.9)} 
                         isCollapsed={tools.activeTool !== 'layout'} 
