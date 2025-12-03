@@ -4,9 +4,9 @@
 
 # Run and deploy your AI Studio app
 
-This contains everything you need to run your app locally.
+This contains everything needed to run Tapestry Studio locally.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1Lbb73O0DeS-v4U7HPA1WenYMFZi9HZ7R
+View the app in AI Studio: https://ai.studio/apps/drive/1Lbb73O0DeS-v4U7HPA1WenYMFZi9HZ7R
 
 ## Run Locally
 
