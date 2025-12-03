@@ -1,5 +1,9 @@
 
-# Run and deploy your AI Studio app
+# Tapestry Studio
+
+Tapestry Studio is an AI-powered knowledge graph environment designed for systems thinking. It combines a flexible node-link canvas with structured analytical frameworks.
+
+Motivation: Linear documents and static diagrams often fail to capture the complexity of real-world systems. Tapestry was created to bridge this gap, allowing users to model causal relationships and leverage AI to analyze structure, detect contradictions, and generate solutions.
 
 This contains everything needed to run Tapestry Studio locally.
 
