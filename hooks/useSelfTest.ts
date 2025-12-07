@@ -9,17 +9,52 @@ interface UseSelfTestProps {
     setPanelLayouts: React.Dispatch<React.SetStateAction<Record<string, PanelLayout>>>;
 }
 
+interface TestStep {
+    id: string;
+    description: string;
+    selector?: string; // CSS selector or 'text:Some Text'
+    action?: () => Promise<void> | void;
+    wait?: number;
+    timeout?: number; // Max time to wait for selector (ms)
+}
+
 export const useSelfTest = ({ panelState, tools, setPanelLayouts }: UseSelfTestProps) => {
     const [isSelfTestModalOpen, setIsSelfTestModalOpen] = useState(false);
     const [testLogs, setTestLogs] = useState<TestLog[]>([]);
     const [testStatus, setTestStatus] = useState<'idle' | 'running' | 'complete'>('idle');
+
+    const checkElement = async (selector: string, timeout: number = 3000): Promise<boolean> => {
+        const startTime = Date.now();
+        while (true) {
+            try {
+                let found = false;
+                if (selector.startsWith('text:')) {
+                    const textToFind = selector.substring(5);
+                    // Use XPath to find text node containing string
+                    const xpath = `//*[contains(text(),'${textToFind}')]`;
+                    const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+                    found = !!result.singleNodeValue;
+                } else {
+                    found = !!document.querySelector(selector);
+                }
+                
+                if (found) return true;
+            } catch (e) {
+                console.error(`Error checking selector ${selector}:`, e);
+                return false; // Syntax error or other issue, fail immediately
+            }
+
+            if (Date.now() - startTime > timeout) return false;
+            await new Promise(r => setTimeout(r, 200));
+        }
+    };
 
     const runSelfTest = async () => {
         setIsSelfTestModalOpen(true);
         setTestStatus('running');
         setTestLogs([]);
         
-        // Reset state: Close everything first
+        // 0. Reset state
         panelState.closeAllPanels();
         tools.setActiveTool(null);
         tools.setIsScamperModalOpen(false);
@@ -28,97 +63,211 @@ export const useSelfTest = ({ panelState, tools, setPanelLayouts }: UseSelfTestP
         tools.setIsTocModalOpen(false);
         tools.setIsSsmModalOpen(false);
         tools.setIsSwotModalOpen(false);
+        tools.setIsBulkEditActive(false);
         setPanelLayouts({}); 
         
-        await new Promise(r => setTimeout(r, 500)); // Wait for clear
+        await new Promise(r => setTimeout(r, 800));
 
-        const log = (name: string, status: 'running' | 'ok' | 'error' | 'pending', message?: string) => {
-            setTestLogs(prev => {
-                const existingIndex = prev.findIndex(l => l.name === name);
-                if (existingIndex >= 0) {
-                    const newLogs = [...prev];
-                    newLogs[existingIndex] = { ...newLogs[existingIndex], status, message };
-                    return newLogs;
-                }
-                return [...prev, { id: prev.length + 1, name, status, message }];
-            });
-        };
+        // Define Tests
+        const testSteps: TestStep[] = [
+            // --- 1. Core Interface Panels ---
+            // 1.1 Report Panel
+            { id: '1.1.1', description: 'Button(Report).Click -> Open Panel', action: () => panelState.setIsReportPanelOpen(true), wait: 500 },
+            { id: '1.1.2', description: 'Panel(Report).Check(Header)', selector: 'text:Report' },
+            { id: '1.1.3', description: 'Panel(Report).Check(Index)', selector: 'text:Element Index' },
+            { id: '1.1.4', description: 'Panel(Report).Check(Appendix)', selector: 'text:Appendix' },
+            { id: '1.1.5', description: 'Panel(Report).Close', action: () => panelState.setIsReportPanelOpen(false), wait: 300 },
 
-        const checkElement = (selector: string) => {
-            const el = document.querySelector(selector);
-            if (el) return true;
-            if (selector.startsWith('text:')) {
-                return document.body.textContent?.includes(selector.substring(5));
-            }
-            return false;
-        };
+            // 1.2 Table Panel
+            { id: '1.2.1', description: 'Button(Table).Click -> Open Panel', action: () => panelState.setIsTablePanelOpen(true), wait: 500 },
+            { id: '1.2.2', description: 'Panel(Table).Check(Header)', selector: 'text:Table View' },
+            { id: '1.2.3', description: 'Panel(Table).Check(Column:Name)', selector: 'text:Name' },
+            { id: '1.2.4', description: 'Panel(Table).Check(Column:Tags)', selector: 'text:Tags' },
+            { id: '1.2.5', description: 'Panel(Table).Close', action: () => panelState.setIsTablePanelOpen(false), wait: 300 },
 
-        const testPanel = async (name: string, openFn: () => void, closeFn: () => void, checkId: string) => {
-            log(name, 'running');
-            openFn();
-            await new Promise(r => setTimeout(r, 200)); 
-            const success = checkElement(`[data-testid="${checkId}"]`);
-            log(name, success ? 'ok' : 'error');
-            closeFn();
-            await new Promise(r => setTimeout(r, 50));
-        };
+            // 1.3 Matrix Panel
+            { id: '1.3.1', description: 'Button(Matrix).Click -> Open Panel', action: () => panelState.setIsMatrixPanelOpen(true), wait: 500 },
+            { id: '1.3.2', description: 'Panel(Matrix).Check(Header)', selector: 'text:Adjacency Matrix' },
+            { id: '1.3.3', description: 'Panel(Matrix).Close', action: () => panelState.setIsMatrixPanelOpen(false), wait: 300 },
 
-        // Phase 1: Panels (Dockable)
-        const panels = [
-            { name: 'Report Panel', open: () => panelState.setIsReportPanelOpen(true), close: () => panelState.setIsReportPanelOpen(false), id: 'panel-report' },
-            { name: 'Table View', open: () => panelState.setIsTablePanelOpen(true), close: () => panelState.setIsTablePanelOpen(false), id: 'panel-table' },
-            { name: 'Matrix View', open: () => panelState.setIsMatrixPanelOpen(true), close: () => panelState.setIsMatrixPanelOpen(false), id: 'panel-matrix' },
-            { name: 'Grid View', open: () => panelState.setIsGridPanelOpen(true), close: () => panelState.setIsGridPanelOpen(false), id: 'panel-grid' },
-            { name: 'Documents', open: () => panelState.setIsDocumentPanelOpen(true), close: () => panelState.setIsDocumentPanelOpen(false), id: 'panel-documents' },
-            { name: 'Kanban', open: () => panelState.setIsKanbanPanelOpen(true), close: () => panelState.setIsKanbanPanelOpen(false), id: 'panel-kanban' },
-            { name: 'Story Mode', open: () => panelState.setIsPresentationPanelOpen(true), close: () => panelState.setIsPresentationPanelOpen(false), id: 'panel-presentation' },
-            { name: 'History', open: () => panelState.setIsHistoryPanelOpen(true), close: () => panelState.setIsHistoryPanelOpen(false), id: 'panel-history' },
-            { name: 'Markdown', open: () => panelState.setIsMarkdownPanelOpen(true), close: () => panelState.setIsMarkdownPanelOpen(false), id: 'panel-markdown' },
-            { name: 'JSON', open: () => panelState.setIsJSONPanelOpen(true), close: () => panelState.setIsJSONPanelOpen(false), id: 'panel-json' },
-            { name: 'Mermaid Diagrams', open: () => panelState.setIsMermaidPanelOpen(true), close: () => panelState.setIsMermaidPanelOpen(false), id: 'panel-mermaid' },
-            { name: 'Treemap', open: () => panelState.setIsTreemapPanelOpen(true), close: () => panelState.setIsTreemapPanelOpen(false), id: 'panel-treemap' },
-            { name: 'Sunburst', open: () => panelState.setIsSunburstPanelOpen(true), close: () => panelState.setIsSunburstPanelOpen(false), id: 'panel-sunburst' },
-            { name: 'Tag Cloud', open: () => panelState.setIsConceptCloudOpen(true), close: () => panelState.setIsConceptCloudOpen(false), id: 'panel-concept-cloud' },
+            // 1.4 Grid Panel
+            { id: '1.4.1', description: 'Button(Grid).Click -> Open Panel', action: () => panelState.setIsGridPanelOpen(true), wait: 500 },
+            { id: '1.4.2', description: 'Panel(Grid).Check(Header)', selector: 'text:Attribute Grid' },
+            { id: '1.4.3', description: 'Panel(Grid).Check(Control:Physics)', selector: 'button[title*="Physics"]' },
+            { id: '1.4.4', description: 'Panel(Grid).Close', action: () => panelState.setIsGridPanelOpen(false), wait: 300 },
+
+            // 1.5 Kanban Panel
+            { id: '1.5.1', description: 'Button(Kanban).Click -> Open Panel', action: () => panelState.setIsKanbanPanelOpen(true), wait: 500 },
+            { id: '1.5.2', description: 'Panel(Kanban).Check(Header)', selector: 'text:Kanban Board' },
+            { id: '1.5.3', description: 'Panel(Kanban).Check(Column:To Do)', selector: 'text:To Do' },
+            { id: '1.5.4', description: 'Panel(Kanban).Close', action: () => panelState.setIsKanbanPanelOpen(false), wait: 300 },
+
+            // --- 2. Toolbars & Tools ---
+            
+            // 2.1 AI Tools
+            { id: '2.1.1', description: 'Toolbar(AI).Open', action: () => { tools.setIsToolsPanelOpen(true); tools.setActiveTool('ai'); }, wait: 500 },
+            { id: '2.1.2', description: 'Toolbar(AI).Check(Assistant)', selector: 'text:Assistant' },
+            { id: '2.1.3', description: 'Toolbar(AI).Check(Expand)', selector: 'text:Expand' },
+            { id: '2.1.4', description: 'Toolbar(AI).Check(Connect)', selector: 'text:Connect' },
+            { id: '2.1.5', description: 'Toolbar(AI).Close', action: () => tools.setActiveTool(null), wait: 300 },
+
+            // 2.2 Schema Tools
+            { id: '2.2.1', description: 'Toolbar(Schema).Open', action: () => tools.setActiveTool('schema'), wait: 500 },
+            { id: '2.2.2', description: 'Toolbar(Schema).Check(Active Schema)', selector: 'text:Active Schema' },
+            { id: '2.2.3', description: 'Toolbar(Schema).Check(Default Relation)', selector: 'text:Default Relation' },
+            { id: '2.2.4', description: 'Toolbar(Schema).Check(Tags Input)', selector: 'input[placeholder="Add default tag..."]' },
+            { id: '2.2.5', description: 'Toolbar(Schema).Close', action: () => tools.setActiveTool(null), wait: 300 },
+
+            // 2.3 Layout Tools
+            { id: '2.3.1', description: 'Toolbar(Layout).Open', action: () => tools.setActiveTool('layout'), wait: 500 },
+            { id: '2.3.2', description: 'Toolbar(Layout).Check(Spread)', selector: 'text:Spread' },
+            { id: '2.3.3', description: 'Toolbar(Layout).Check(Repel)', selector: 'text:Repel' },
+            { id: '2.3.4', description: 'Toolbar(Layout).Check(Simulate)', selector: 'text:SIMULATE' },
+            { id: '2.3.5', description: 'Toolbar(Layout).Close', action: () => tools.setActiveTool(null), wait: 300 },
+
+            // 2.4 Analysis Tools
+            { id: '2.4.1', description: 'Toolbar(Analysis).Open', action: () => tools.setActiveTool('analysis'), wait: 500 },
+            { id: '2.4.2', description: 'Toolbar(Analysis).Check(Network)', selector: 'text:Network Analysis' },
+            { id: '2.4.3', description: 'Toolbar(Analysis).Check(Tags)', selector: 'text:Tag Analysis' },
+            { id: '2.4.4', description: 'Toolbar(Analysis).Close', action: () => tools.setActiveTool(null), wait: 300 },
+
+            // 2.5 Visualise Tools
+            { id: '2.5.1', description: 'Toolbar(Visualise).Open', action: () => tools.setActiveTool('visualise'), wait: 500 },
+            { id: '2.5.2', description: 'Toolbar(Visualise).Check(Grid)', selector: 'text:Attribute Grid' },
+            { id: '2.5.3', description: 'Toolbar(Visualise).Check(Circle)', selector: 'text:Circle Packing' },
+            { id: '2.5.4', description: 'Toolbar(Visualise).Close', action: () => tools.setActiveTool(null), wait: 300 },
+
+            // --- 3. Methodology Modals ---
+
+            // 3.1 SCAMPER
+            { id: '3.1.1', description: 'Modal(SCAMPER).Open', action: () => tools.setIsScamperModalOpen(true), wait: 600 },
+            { id: '3.1.2', description: 'Modal(SCAMPER).Check(Header)', selector: 'text:SCAMPER' },
+            { id: '3.1.3', description: 'Modal(SCAMPER).Check(Save)', selector: 'text:Save Report' }, 
+            { id: '3.1.4', description: 'Modal(SCAMPER).Close', action: () => tools.setIsScamperModalOpen(false), wait: 300 },
+
+            // 3.2 TRIZ
+            { id: '3.2.1', description: 'Modal(TRIZ).Open(Contradiction)', action: () => { tools.setActiveTrizTool('contradiction'); tools.setIsTrizModalOpen(true); }, wait: 600 },
+            { id: '3.2.2', description: 'Modal(TRIZ).Check(Header)', selector: 'text:TRIZ' },
+            { id: '3.2.3', description: 'Modal(TRIZ).Check(SubHeader)', selector: 'text:Contradiction Matrix' },
+            { id: '3.2.4', description: 'Modal(TRIZ).Check(Inputs)', selector: 'text:Improving Feature' },
+            { id: '3.2.5', description: 'Modal(TRIZ).Close', action: () => tools.setIsTrizModalOpen(false), wait: 300 },
+
+            // 3.3 Lean Six Sigma
+            { id: '3.3.1', description: 'Modal(LSS).Open(Charter)', action: () => { tools.setActiveLssTool('charter'); tools.setIsLssModalOpen(true); }, wait: 600 },
+            { id: '3.3.2', description: 'Modal(LSS).Check(Header)', selector: 'text:Lean Six Sigma' },
+            { id: '3.3.3', description: 'Modal(LSS).Check(SubHeader)', selector: 'text:Project Charter' },
+            { id: '3.3.4', description: 'Modal(LSS).Close', action: () => tools.setIsLssModalOpen(false), wait: 300 },
+
+            // 3.4 TOC
+            { id: '3.4.1', description: 'Modal(TOC).Open(CRT)', action: () => { tools.setActiveTocTool('crt'); tools.setIsTocModalOpen(true); }, wait: 600 },
+            { id: '3.4.2', description: 'Modal(TOC).Check(Header)', selector: 'text:TOC' },
+            { id: '3.4.3', description: 'Modal(TOC).Check(SubHeader)', selector: 'text:Current Reality Tree' },
+            { id: '3.4.4', description: 'Modal(TOC).Close', action: () => tools.setIsTocModalOpen(false), wait: 300 },
+
+            // 3.5 SSM
+            { id: '3.5.1', description: 'Modal(SSM).Open(Rich Picture)', action: () => { tools.setActiveSsmTool('rich_picture'); tools.setIsSsmModalOpen(true); }, wait: 600 },
+            { id: '3.5.2', description: 'Modal(SSM).Check(Header)', selector: 'text:SSM' },
+            { id: '3.5.3', description: 'Modal(SSM).Check(SubHeader)', selector: 'text:Rich Picture' },
+            { id: '3.5.4', description: 'Modal(SSM).Close', action: () => tools.setIsSsmModalOpen(false), wait: 300 },
+
+            // 3.6 Strategy
+            { id: '3.6.1', description: 'Modal(Strategy).Open(SWOT)', action: () => { tools.setActiveSwotTool('matrix'); tools.setIsSwotModalOpen(true); }, wait: 600 },
+            { id: '3.6.2', description: 'Modal(Strategy).Check(Title)', selector: 'text:SWOT Matrix' },
+            { id: '3.6.3', description: 'Modal(Strategy).Check(Grid)', selector: 'text:Strengths' },
+            { id: '3.6.4', description: 'Modal(Strategy).Close', action: () => tools.setIsSwotModalOpen(false), wait: 300 },
+
+            // --- 4. Explorer Views ---
+             { id: '4.1.1', description: 'Panel(Treemap).Open', action: () => panelState.setIsTreemapPanelOpen(true), wait: 600 },
+             { id: '4.1.2', description: 'Panel(Treemap).Check(Header)', selector: 'text:Treemap' },
+             { id: '4.1.3', description: 'Panel(Treemap).Close', action: () => panelState.setIsTreemapPanelOpen(false), wait: 300 },
+             
+             { id: '4.2.1', description: 'Panel(Sunburst).Open', action: () => panelState.setIsSunburstPanelOpen(true), wait: 600 },
+             { id: '4.2.2', description: 'Panel(Sunburst).Check(Header)', selector: 'text:Sunburst' },
+             { id: '4.2.3', description: 'Panel(Sunburst).Close', action: () => panelState.setIsSunburstPanelOpen(false), wait: 300 },
+
+             { id: '4.3.1', description: 'Panel(TagCloud).Open', action: () => panelState.setIsConceptCloudOpen(true), wait: 600 },
+             { id: '4.3.2', description: 'Panel(TagCloud).Check(Header)', selector: 'text:Tag Cloud' },
+             { id: '4.3.3', description: 'Panel(TagCloud).Close', action: () => panelState.setIsConceptCloudOpen(false), wait: 300 },
+
+             // 4.4 Network Analysis Panel
+             { id: '4.4.1', description: 'Panel(Network).Open', action: () => panelState.setIsNetworkAnalysisOpen(true), wait: 600 },
+             { id: '4.4.2', description: 'Panel(Network).Check(Header)', selector: 'text:Network Analysis' },
+             { id: '4.4.3', description: 'Panel(Network).Check(Sim)', selector: 'text:Impact Simulation' },
+             { id: '4.4.4', description: 'Panel(Network).Close', action: () => panelState.setIsNetworkAnalysisOpen(false), wait: 300 },
+
+             // --- 5. Data & View Panels ---
+             { id: '5.1.1', description: 'Panel(Diagrams).Open', action: () => panelState.setIsMermaidPanelOpen(true), wait: 600 },
+             { id: '5.1.2', description: 'Panel(Diagrams).Check(Editor)', selector: 'text:Mermaid Code' },
+             { id: '5.1.3', description: 'Panel(Diagrams).Close', action: () => panelState.setIsMermaidPanelOpen(false), wait: 300 },
+
+             { id: '5.2.1', description: 'Panel(Docs).Open', action: () => panelState.setIsDocumentPanelOpen(true), wait: 600 },
+             { id: '5.2.2', description: 'Panel(Docs).Check(Header)', selector: 'text:Documents' },
+             { id: '5.2.3', description: 'Panel(Docs).Close', action: () => panelState.setIsDocumentPanelOpen(false), wait: 300 },
+
+             { id: '5.3.1', description: 'Panel(History).Open', action: () => panelState.setIsHistoryPanelOpen(true), wait: 600 },
+             { id: '5.3.2', description: 'Panel(History).Check(Header)', selector: 'text:AI History Log' },
+             { id: '5.3.3', description: 'Panel(History).Close', action: () => panelState.setIsHistoryPanelOpen(false), wait: 300 },
+
+             { id: '5.4.1', description: 'Panel(Markdown).Open', action: () => panelState.setIsMarkdownPanelOpen(true), wait: 600 },
+             { id: '5.4.2', description: 'Panel(Markdown).Check(Header)', selector: 'text:Markdown View' },
+             { id: '5.4.3', description: 'Panel(Markdown).Close', action: () => panelState.setIsMarkdownPanelOpen(false), wait: 300 },
+
+             { id: '5.5.1', description: 'Panel(JSON).Open', action: () => panelState.setIsJSONPanelOpen(true), wait: 600 },
+             { id: '5.5.2', description: 'Panel(JSON).Check(Header)', selector: 'text:JSON View' },
+             { id: '5.5.3', description: 'Panel(JSON).Close', action: () => panelState.setIsJSONPanelOpen(false), wait: 300 },
+
+             // --- 6. Utility Bars ---
+             { id: '6.1.1', description: 'Toolbar(Bulk).Open', action: () => tools.setActiveTool('bulk'), wait: 500 },
+             { id: '6.1.2', description: 'Toolbar(Bulk).Check(Inputs)', selector: 'input[placeholder="Tags to add..."]' },
+             { id: '6.1.3', description: 'Toolbar(Bulk).Close', action: () => tools.setActiveTool(null), wait: 300 },
+
+             { id: '6.2.1', description: 'Toolbar(Command).Open', action: () => tools.setActiveTool('command'), wait: 500 },
+             { id: '6.2.2', description: 'Toolbar(Command).Check(Input)', selector: 'textarea[placeholder*="Element A"]' },
+             { id: '6.2.3', description: 'Toolbar(Command).Close', action: () => tools.setActiveTool(null), wait: 300 },
+
         ];
 
-        for (const p of panels) {
-            await testPanel(p.name, p.open, p.close, p.id);
-        }
+        // Initialize log state
+        setTestLogs(testSteps.map(step => ({
+            id: step.id,
+            name: step.description,
+            status: 'pending'
+        })));
 
-        // Phase 2: Tools & Modals
-        const testTool = async (toolId: string, toolName: string, checkText: string, openModal?: () => void, closeModal?: () => void) => {
-            log(`${toolName} Toolbar`, 'running');
-            tools.setIsToolsPanelOpen(true);
-            tools.setActiveTool(toolId);
-            await new Promise(r => setTimeout(r, 400));
-            const toolbarOk = document.body.innerText.includes(toolName.toUpperCase()); 
-            log(`${toolName} Toolbar`, toolbarOk ? 'ok' : 'error');
-
-            if (openModal && closeModal) {
-                log(`${toolName} Modal`, 'running');
-                openModal();
-                await new Promise(r => setTimeout(r, 400));
-                const modalOk = document.body.innerText.includes(checkText);
-                log(`${toolName} Modal`, modalOk ? 'ok' : 'error', modalOk ? undefined : `Expected text '${checkText}' not found`);
-                closeModal();
-                await new Promise(r => setTimeout(r, 50));
+        // Execute Tests
+        for (const step of testSteps) {
+            // Mark running
+            setTestLogs(prev => prev.map(l => l.id === step.id ? { ...l, status: 'running' } : l));
+            
+            if (step.action) {
+                try {
+                    await step.action();
+                } catch (e) {
+                    const msg = e instanceof Error ? e.message : 'Action failed';
+                    setTestLogs(prev => prev.map(l => l.id === step.id ? { ...l, status: 'error', message: msg } : l));
+                    continue; // Continue to next test even if action failed, to catch cascading failures
+                }
             }
-            tools.setActiveTool(null);
-            await new Promise(r => setTimeout(r, 50));
-        };
 
-        await testTool('scamper', 'SCAMPER', 'Generating ideas for', () => tools.setIsScamperModalOpen(true), () => tools.setIsScamperModalOpen(false));
-        await testTool('triz', 'TRIZ', 'Contradiction Matrix', () => { tools.setActiveTrizTool('contradiction'); tools.setIsTrizModalOpen(true); }, () => tools.setIsTrizModalOpen(false));
-        await testTool('lss', 'LSS', 'Project Charter', () => { tools.setActiveLssTool('charter'); tools.setIsLssModalOpen(true); }, () => tools.setIsLssModalOpen(false));
-        await testTool('toc', 'TOC', 'Current Reality Tree', () => { tools.setActiveTocTool('crt'); tools.setIsTocModalOpen(true); }, () => tools.setIsTocModalOpen(false));
-        await testTool('ssm', 'SSM', 'Rich Picture', () => { tools.setActiveSsmTool('rich_picture'); tools.setIsSsmModalOpen(true); }, () => tools.setIsSsmModalOpen(false));
-        await testTool('swot', 'Strategy', 'SWOT Matrix', () => { tools.setActiveSwotTool('matrix'); tools.setIsSwotModalOpen(true); }, () => tools.setIsSwotModalOpen(false));
-        
-        await testTool('schema', 'Schema', 'Active Schema');
-        await testTool('layout', 'Layout', 'Spread');
-        await testTool('analysis', 'Analysis', 'Simulation');
-        await testTool('bulk', 'Bulk', 'Add Tags');
-        await testTool('command', 'CMD', 'Quick Add');
+            if (step.wait) {
+                await new Promise(r => setTimeout(r, step.wait));
+            }
+
+            if (step.selector) {
+                const exists = await checkElement(step.selector, step.timeout || 2000);
+                if (exists) {
+                    setTestLogs(prev => prev.map(l => l.id === step.id ? { ...l, status: 'ok' } : l));
+                } else {
+                    setTestLogs(prev => prev.map(l => l.id === step.id ? { ...l, status: 'error', message: `Element '${step.selector}' not found` } : l));
+                }
+            } else {
+                // Action-only steps pass if no error thrown
+                setTestLogs(prev => prev.map(l => l.id === step.id ? { ...l, status: 'ok' } : l));
+            }
+            
+            // Short pause for visual feedback
+            await new Promise(r => setTimeout(r, 50));
+        }
 
         setTestStatus('complete');
     };

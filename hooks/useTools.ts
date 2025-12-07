@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { 
     TrizToolType, LssToolType, TocToolType, SsmToolType, 
     ExplorerToolType, TagCloudToolType, SwotToolType, 
-    MermaidToolType, HistoryEntry, TapestryDocument 
+    MermaidToolType, HistoryEntry, TapestryDocument, VisualiseToolType
 } from '../types';
 import { TOOL_DOCUMENTATION } from '../documentation';
 
@@ -79,15 +79,21 @@ export const useTools = (panelState?: any) => {
           setIsSwotModalOpen(true);
       } else if (tool === 'mermaid' && panelState) {
           panelState.setIsMermaidPanelOpen(true);
-      } else if (tool === 'explorer' && panelState) {
-          if (subTool === 'treemap') panelState.setIsTreemapPanelOpen(true);
+      } else if (tool === 'visualise' && panelState) {
+          if (subTool === 'circle_packing') panelState.setIsCirclePackingPanelOpen(true);
+          else if (subTool === 'treemap') panelState.setIsTreemapPanelOpen(true);
+          else panelState.setIsGridPanelOpen(true); // Default or grid
+      } else if (tool === 'analysis' && panelState) {
+          if (subTool === 'network') panelState.setIsNetworkAnalysisOpen(true);
           else if (subTool === 'tags') panelState.setIsTagDistPanelOpen(true);
           else if (subTool === 'relationships') panelState.setIsRelDistPanelOpen(true);
-          else if (subTool === 'sunburst') {
+          else panelState.setIsNetworkAnalysisOpen(true);
+      } else if (tool === 'explorer' && panelState) {
+          // Handle legacy explorer calls or remaining explorer items
+          if (subTool === 'sunburst') {
               panelState.setIsSunburstPanelOpen(true);
               panelState.setSunburstState((prev: any) => ({ ...prev, active: true }));
           }
-          else panelState.setIsTreemapPanelOpen(true); 
       } else if (tool === 'tagcloud' && panelState) {
           if (subTool === 'tags') panelState.setIsConceptCloudOpen(true);
           else if (subTool === 'nodes') panelState.setIsInfluenceCloudOpen(true);
@@ -143,10 +149,13 @@ export const useTools = (panelState?: any) => {
           setSwotInitialDoc(null);
           setIsSwotModalOpen(true);
       } else if (toolId.includes('explorer') && panelState) {
-          setActiveTool('explorer');
-          // Basic mapping, assuming standard types
-          if (subTool === 'treemap') panelState.setIsTreemapPanelOpen(true);
-          // ... other mapping logic can be duplicated from handleOpenTool if needed
+          // Handle legacy explorer tools
+          if (subTool === 'treemap') {
+              setActiveTool('visualise');
+              panelState.setIsTreemapPanelOpen(true);
+          } else {
+              setActiveTool('explorer');
+          }
       } 
       // Add other history reopen logic here
       

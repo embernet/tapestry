@@ -11,17 +11,6 @@ interface ExplorerToolbarProps {
 
 const EXPLORER_TOOLS = [
   { 
-    id: 'treemap' as ExplorerToolType, 
-    name: 'Treemap Explorer', 
-    desc: 'Hierarchical visualization of graph structure and density.',
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-      </svg>
-    ),
-    color: '#facc15' // Yellow
-  },
-  { 
     id: 'sunburst' as ExplorerToolType, 
     name: 'Sunburst Explorer', 
     desc: 'Focus on a node and expand relationships outward by hops.',
@@ -33,26 +22,16 @@ const EXPLORER_TOOLS = [
     color: '#fb923c' // Orange
   },
   { 
-    id: 'tags' as ExplorerToolType, 
-    name: 'Tag Distribution', 
-    desc: 'Analyze the frequency and spread of tags across nodes.',
+    id: 'random_walk' as ExplorerToolType, 
+    name: 'Random Walk', 
+    desc: 'Auto-navigate graph connections to discover paths.',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
       </svg>
     ),
-    color: '#60a5fa' // Blue
-  },
-  { 
-    id: 'relationships' as ExplorerToolType, 
-    name: 'Relationship Types', 
-    desc: 'Analyze the types and frequency of connections.',
-    icon: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-      </svg>
-    ),
-    color: '#4ade80' // Green
+    color: '#f87171' // Red-400
   },
   {
     id: 'matrix' as ExplorerToolType,

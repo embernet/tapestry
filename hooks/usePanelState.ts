@@ -20,11 +20,15 @@ export const usePanelState = () => {
   const [isGuidancePanelOpen, setIsGuidancePanelOpen] = useState(false);
   const [guidanceContent, setGuidanceContent] = useState<GuidanceContent | null>(null);
 
+  // --- Analysis Panels ---
+  const [isNetworkAnalysisOpen, setIsNetworkAnalysisOpen] = useState(false);
+
   // --- Explorer Panels ---
   const [isTreemapPanelOpen, setIsTreemapPanelOpen] = useState(false);
   const [isTagDistPanelOpen, setIsTagDistPanelOpen] = useState(false);
   const [isRelDistPanelOpen, setIsRelDistPanelOpen] = useState(false);
   const [isSunburstPanelOpen, setIsSunburstPanelOpen] = useState(false);
+  const [isCirclePackingPanelOpen, setIsCirclePackingPanelOpen] = useState(false);
   const [sunburstState, setSunburstState] = useState<{ active: boolean, centerId: string | null, hops: number }>({ active: false, centerId: null, hops: 0 });
 
   // --- Tag Cloud Panels ---
@@ -48,10 +52,12 @@ export const usePanelState = () => {
     setIsFilterPanelOpen(false);
     setIsChatPanelOpen(false);
     setIsGuidancePanelOpen(false);
+    setIsNetworkAnalysisOpen(false);
     setIsTreemapPanelOpen(false);
     setIsTagDistPanelOpen(false);
     setIsRelDistPanelOpen(false);
     setIsSunburstPanelOpen(false);
+    setIsCirclePackingPanelOpen(false);
     setIsConceptCloudOpen(false);
     setIsInfluenceCloudOpen(false);
     setIsTextAnalysisOpen(false);
@@ -75,11 +81,14 @@ export const usePanelState = () => {
     
     isGuidancePanelOpen, setIsGuidancePanelOpen,
     guidanceContent, setGuidanceContent,
+    
+    isNetworkAnalysisOpen, setIsNetworkAnalysisOpen,
 
     isTreemapPanelOpen, setIsTreemapPanelOpen,
     isTagDistPanelOpen, setIsTagDistPanelOpen,
     isRelDistPanelOpen, setIsRelDistPanelOpen,
     isSunburstPanelOpen, setIsSunburstPanelOpen,
+    isCirclePackingPanelOpen, setIsCirclePackingPanelOpen,
     sunburstState, setSunburstState,
     
     isConceptCloudOpen, setIsConceptCloudOpen,

@@ -21,6 +21,7 @@ interface AddRelationshipPanelProps {
   isDarkMode: boolean;
   relationships?: Relationship[];
   onUpdateRelationship?: (relationship: Relationship) => void;
+  onDragStart?: (e: React.MouseEvent) => void;
 }
 
 const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
@@ -37,7 +38,8 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   activeSchemeId,
   isDarkMode,
   relationships = [],
-  onUpdateRelationship
+  onUpdateRelationship,
+  onDragStart
 }) => {
   const [selectedTargetId, setSelectedTargetId] = useState<string>(targetElementId || 'NEW_ELEMENT');
   const [elementEditorData, setElementEditorData] = useState<Partial<Element>>({
@@ -177,7 +179,10 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
   return (
     <div className={`${bgClass} border ${borderClass} w-96 flex flex-col h-full min-h-0 transition-colors`} onKeyDown={handleKeyDown}>
         {/* Header */}
-        <div className={`p-6 pb-4 flex-shrink-0 ${bgClass} z-10 border-b ${borderClass}`}>
+        <div 
+            className={`p-6 pb-4 flex-shrink-0 ${bgClass} z-10 border-b ${borderClass} cursor-move select-none`}
+            onMouseDown={onDragStart}
+        >
             <h2 className={`text-2xl font-bold ${textClass}`}>
                 {existingRel ? 'Edit Relationship' : 'Add Relationship'}
             </h2>

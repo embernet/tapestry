@@ -1,5 +1,5 @@
 
-import { Element, Relationship, RelationshipDirection, ChatMessage } from './types';
+import { Element, Relationship, RelationshipDirection, ChatMessage, ColorScheme } from './types';
 import { GoogleGenAI } from '@google/genai';
 
 /**
@@ -148,7 +148,8 @@ export const generateMarkdownFromGraph = (elements: Element[], relationships: Re
 export const generateElementMarkdown = (
   element: Element,
   relationships: Relationship[],
-  allElements: Element[]
+  allElements: Element[],
+  activeColorScheme?: ColorScheme
 ): string => {
   const elementMap = new Map(allElements.map(e => [e.id, e]));
   const lines: string[] = [`## ${element.name}`];
@@ -160,6 +161,26 @@ export const generateElementMarkdown = (
           lines.push(`- ${k}: ${v}`);
       });
   }
+  
+  // Merge Schema Lists
+  const mergedCustomLists: Record<string, string[]> = { ...element.customLists };
+  if (activeColorScheme?.customLists) {
+      Object.entries(activeColorScheme.customLists).forEach(([key, defaultItems]) => {
+          if (!mergedCustomLists[key]) {
+               mergedCustomLists[key] = [...(defaultItems as string[])];
+          }
+      });
+  }
+  
+  if (Object.keys(mergedCustomLists).length > 0) {
+      Object.entries(mergedCustomLists).forEach(([listName, items]) => {
+          if (items && items.length > 0) {
+              lines.push(`**${listName}:**`);
+              items.forEach(item => lines.push(`- ${item}`));
+          }
+      });
+  }
+
   if (element.notes) lines.push(`**Notes:**\n${element.notes}`);
 
   const elementRels = relationships.filter(r => r.source === element.id || r.target === element.id);

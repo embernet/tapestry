@@ -50,7 +50,20 @@ export const useModelActions = ({
                 const centerY = window.innerHeight / 2;
                 const x = centerX + radius * Math.cos(angle);
                 const y = centerY + radius * Math.sin(angle);
-                const newElement: Element = { id, name: data.name, notes: data.notes || '', tags: data.tags || [], attributes: data.attributes || {}, createdAt: now, updatedAt: now, x, y, fx: x, fy: y };
+                const newElement: Element = { 
+                    id, 
+                    name: data.name, 
+                    notes: data.notes || '', 
+                    tags: data.tags || [], 
+                    attributes: data.attributes || {}, 
+                    customLists: data.customLists || {},
+                    createdAt: now, 
+                    updatedAt: now, 
+                    x, 
+                    y, 
+                    fx: x, 
+                    fy: y 
+                };
                 elementsRef.current = [...elementsRef.current, newElement];
                 setElements(prev => [...prev, newElement]);
                 return id;

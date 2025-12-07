@@ -25,7 +25,7 @@ export const TapestryBanner = () => {
     };
 
     return (
-        <div className="relative w-[600px] h-[150px] overflow-hidden rounded-lg shadow-2xl border border-gray-700 bg-gray-900 group">
+        <div className="relative w-full max-w-[600px] aspect-[4/1] overflow-hidden rounded-lg shadow-2xl border border-gray-700 bg-gray-900 group">
             
             {/* 0. The Weave (Original) */}
             <div className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${activeBanner === 0 ? 'opacity-100' : 'opacity-0'}`}>

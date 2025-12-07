@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import AiToolbar from './AiToolbar';
 import SearchToolbar from './SearchToolbar';
@@ -16,13 +15,12 @@ import SsmToolbar from './SsmToolbar';
 import SwotToolbar from './SwotToolbar';
 import ExplorerToolbar from './ExplorerToolbar';
 import TagCloudToolbar from './TagCloudToolbar';
-import MermaidToolbar from './MermaidToolbar';
 import BulkEditToolbar from './BulkEditToolbar';
 import CommandBar from './CommandBar';
 import { Element, Relationship, ColorScheme, CustomStrategyTool, NodeShape } from '../types';
 
 // Tools that expand horizontally and should hide others when active
-const HORIZONTAL_TOOLS = ['ai', 'search', 'schema', 'layout', 'analysis', 'bulk', 'command', 'mermaid', 'scamper', 'triz', 'lss', 'toc', 'ssm'];
+const HORIZONTAL_TOOLS = ['search', 'schema', 'layout', 'bulk', 'command'];
 
 interface ToolsOverlayProps {
   tools: any;
@@ -93,6 +91,9 @@ interface ToolsOverlayProps {
   globalSettings: { customStrategies: CustomStrategyTool[] };
   isDarkMode: boolean;
   selectedElementId: string | null;
+
+  // Analysis
+  handleAnalysisToolSelect: (toolId: string) => void;
 }
 
 export const ToolsOverlay: React.FC<ToolsOverlayProps> = (props) => {
@@ -104,6 +105,40 @@ export const ToolsOverlay: React.FC<ToolsOverlayProps> = (props) => {
             return tools.activeTool === toolId;
         }
         return true;
+    };
+
+    // Methods that are now handled by the MethodsToolbar
+    const isMethodActive = ['scamper', 'triz', 'lss', 'toc', 'ssm'].includes(tools.activeTool || '');
+
+    const handleMethodToolSelect = (method: string, tool: string) => {
+        // Close tool panel by clearing active tool
+        tools.setActiveTool(null);
+
+        if (method === 'triz') {
+            props.handleTrizToolSelect(tool);
+        } else if (method === 'lss') {
+            props.handleLssToolSelect(tool);
+        } else if (method === 'toc') {
+            props.handleTocToolSelect(tool);
+        } else if (method === 'ssm') {
+            props.handleSsmToolSelect(tool);
+        } else if (method === 'scamper') {
+            // SCAMPER expects operator name and letter
+            // The tool ID from toolbar comes as the LETTER (e.g. 'S', 'C')
+            // We need to map letter to full operator for the handler
+            const SCAMPER_MAP: Record<string, string> = {
+                'S': 'Substitute', 'C': 'Combine', 'A': 'Adapt', 'M': 'Modify',
+                'P': 'Put to another use', 'E': 'Eliminate', 'R': 'Reverse'
+            };
+            const letter = tool;
+            const operator = SCAMPER_MAP[letter];
+            
+            if (operator) {
+                tools.setScamperInitialDoc(null);
+                tools.setScamperTrigger({ operator, letter });
+                tools.setIsScamperModalOpen(true);
+            }
+        }
     };
 
     return (
@@ -177,60 +212,21 @@ export const ToolsOverlay: React.FC<ToolsOverlayProps> = (props) => {
                     />
                 )}
                 {isToolVisible('analysis') && (
-                    <AnalysisToolbar elements={props.elements} relationships={props.relationships} onBulkTag={props.handleBulkTagAction} onHighlight={props.handleAnalysisHighlight} onFilter={props.handleAnalysisFilter} isCollapsed={tools.activeTool !== 'analysis'} onToggle={() => tools.toggleTool('analysis')} isSimulationMode={props.isSimulationMode} onToggleSimulation={() => props.setIsSimulationMode(p => !p)} onResetSimulation={() => props.setSimulationState({})} isDarkMode={isDarkMode} />
+                    <AnalysisToolbar 
+                        onSelectTool={props.handleAnalysisToolSelect}
+                        isCollapsed={tools.activeTool !== 'analysis'} 
+                        onToggle={() => tools.toggleTool('analysis')} 
+                        isDarkMode={isDarkMode} 
+                    />
                 )}
                 
+                {/* Methods Toolbar replaces individual method toolbars */}
                 {isToolVisible('methods') && (
                     <MethodsToolbar 
-                        onSelectMethod={(method) => tools.setActiveTool(method)} 
+                        onSelectTool={handleMethodToolSelect} 
                         isCollapsed={tools.activeTool !== 'methods'} 
                         onToggle={() => tools.toggleTool('methods')}
                         isDarkMode={isDarkMode}
-                    />
-                )}
-
-                {tools.activeTool === 'scamper' && (
-                    <ScamperToolbar selectedElementId={props.selectedElementId} onScamper={(operator, letter) => { tools.setScamperInitialDoc(null); tools.setScamperTrigger({ operator, letter }); tools.setIsScamperModalOpen(true); tools.setActiveTool(null); }} isCollapsed={tools.activeTool !== 'scamper'} onToggle={() => tools.toggleTool('scamper')} onOpenSettings={() => { props.setSettingsInitialTab('prompts'); props.setIsSettingsModalOpen(true); }} isDarkMode={isDarkMode} />
-                )}
-                {tools.activeTool === 'triz' && (
-                    <TrizToolbar 
-                        activeTool={tools.activeTrizTool} 
-                        onSelectTool={(tool) => { props.handleTrizToolSelect(tool); tools.setActiveTool(null); }}
-                        isCollapsed={tools.activeTool !== 'triz'} 
-                        onToggle={() => tools.toggleTool('triz')} 
-                        onOpenSettings={() => { props.setSettingsInitialTab('prompts'); props.setIsSettingsModalOpen(true); }} 
-                        isDarkMode={isDarkMode} 
-                        onOpenGuidance={() => tools.handleOpenGuidance('triz-' + tools.activeTrizTool)}
-                    />
-                )}
-                {tools.activeTool === 'lss' && (
-                    <LssToolbar 
-                        activeTool={tools.activeLssTool} 
-                        onSelectTool={(tool) => { props.handleLssToolSelect(tool); tools.setActiveTool(null); }}
-                        isCollapsed={tools.activeTool !== 'lss'} 
-                        onToggle={() => tools.toggleTool('lss')} 
-                        onOpenSettings={() => { props.setSettingsInitialTab('prompts'); props.setIsSettingsModalOpen(true); }} 
-                        isDarkMode={isDarkMode} 
-                    />
-                )}
-                {tools.activeTool === 'toc' && (
-                    <TocToolbar 
-                        activeTool={tools.activeTocTool} 
-                        onSelectTool={(tool) => { props.handleTocToolSelect(tool); tools.setActiveTool(null); }}
-                        isCollapsed={tools.activeTool !== 'toc'} 
-                        onToggle={() => tools.toggleTool('toc')} 
-                        onOpenSettings={() => { props.setSettingsInitialTab('prompts'); props.setIsSettingsModalOpen(true); }} 
-                        isDarkMode={isDarkMode} 
-                    />
-                )}
-                {tools.activeTool === 'ssm' && (
-                    <SsmToolbar 
-                        activeTool={tools.activeSsmTool} 
-                        onSelectTool={(tool) => { props.handleSsmToolSelect(tool); tools.setActiveTool(null); }}
-                        isCollapsed={tools.activeTool !== 'ssm'} 
-                        onToggle={() => tools.toggleTool('ssm')} 
-                        onOpenSettings={() => { props.setSettingsInitialTab('prompts'); props.setIsSettingsModalOpen(true); }} 
-                        isDarkMode={isDarkMode} 
                     />
                 )}
 
@@ -261,14 +257,6 @@ export const ToolsOverlay: React.FC<ToolsOverlayProps> = (props) => {
                         onToggle={() => tools.toggleTool('tagcloud')} 
                         isDarkMode={isDarkMode} 
                         onOpenGuidance={() => tools.handleOpenGuidance('wordcloud')}
-                    />
-                )}
-                {isToolVisible('mermaid') && (
-                    <MermaidToolbar 
-                        onSelectTool={(tool) => { props.handleMermaidToolSelect(tool); tools.setActiveTool(null); }}
-                        isCollapsed={tools.activeTool !== 'mermaid'} 
-                        onToggle={() => tools.toggleTool('mermaid')} 
-                        isDarkMode={isDarkMode} 
                     />
                 )}
                 {isToolVisible('bulk') && (

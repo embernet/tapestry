@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Content, FunctionCall, FunctionResponse, Type, Schema } from '@google/genai';
 import { Element, Relationship, ModelActions, ColorScheme, SystemPromptConfig, TapestryDocument, TapestryFolder, ChatMessage, PlanStep } from '../types';
@@ -268,8 +267,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Floating Window State
-  const [position, setPosition] = useState({ x: 20, y: 550 });
-  const [size, setSize] = useState({ width: 400, height: 600 });
+  // Initial positioning: Left side, below toolbar area, stretching down
+  const [position, setPosition] = useState(() => ({ x: 20, y: 160 }));
+  const [size, setSize] = useState(() => {
+      const h = window.innerHeight - 160 - 20; // 160 top, 20 bottom padding
+      return { width: 400, height: Math.max(400, h) };
+  });
+  
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
@@ -782,7 +786,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         let schemaContext = "No specific schema defined.";
         const activeScheme = colorSchemes.find(s => s.id === activeSchemeId);
         if (activeScheme) {
-             schemaContext = `ACTIVE SCHEMA: "${activeScheme.name}"\nTags: ${Object.keys(activeScheme.tagColors).join(', ')}`;
+             const tagList = Object.keys(activeScheme.tagColors).join(', ');
+             // Add lists
+             let listContext = "";
+             if (activeScheme.customLists && Object.keys(activeScheme.customLists).length > 0) {
+                 listContext = "\nCustom Lists defined:\n";
+                 Object.entries(activeScheme.customLists).forEach(([key, items]) => {
+                     const listItems = items as string[];
+                     const desc = activeScheme.customListDescriptions?.[key] ? ` (${activeScheme.customListDescriptions[key]})` : "";
+                     const defaults = listItems.length > 0 ? ` Defaults: ${listItems.join(', ')}` : "";
+                     listContext += `- ${key}${desc}${defaults}\n`;
+                 });
+             }
+             schemaContext = `ACTIVE SCHEMA: "${activeScheme.name}"\nTags: ${tagList}${listContext}`;
         }
 
         let docContext = "";

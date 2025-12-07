@@ -3,6 +3,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ColorScheme, Element, RelationshipDefinition } from '../types';
 import { generateUUID } from '../utils';
 import { DEFAULT_COLOR_SCHEMES } from '../constants';
+import ListEditor from './ListEditor';
 
 interface SchemaToolbarProps {
   schemes: ColorScheme[];
@@ -110,7 +111,9 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
           tagColors: { 'Idea': '#efef10' },
           tagDescriptions: { 'Idea': 'A generic concept or thought.' },
           relationshipDefinitions: [{ label: 'related to', description: 'A generic connection.' }],
-          defaultRelationshipLabel: 'related to'
+          defaultRelationshipLabel: 'related to',
+          customLists: {},
+          customListDescriptions: {}
       };
       onUpdateSchemes([...schemes, newScheme]);
       setEditingSchemeId(newId);
@@ -241,6 +244,19 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
       }
   };
 
+  // Custom Lists Operations
+  const handleCustomListsChange = (newLists: Record<string, string[]>) => {
+    if (editingSchemeId && editingScheme) {
+        updateScheme(editingSchemeId, { customLists: newLists });
+    }
+  };
+
+  const handleCustomListDescriptionsChange = (newDescriptions: Record<string, string>) => {
+    if (editingSchemeId && editingScheme) {
+        updateScheme(editingSchemeId, { customListDescriptions: newDescriptions });
+    }
+  };
+
   // Classes
   const bgClass = isDarkMode ? 'bg-gray-800 bg-opacity-95 border-gray-600' : 'bg-white bg-opacity-95 border-gray-200';
   const buttonBgClass = isDarkMode ? 'bg-gray-700 hover:bg-gray-600 border-gray-600 text-teal-400' : 'bg-white hover:bg-gray-50 border-gray-200 text-teal-600';
@@ -345,7 +361,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
 
             {/* Expanded Edit Panel */}
             {!isCollapsed && isEditMode && editingScheme && (
-                <div className={`border-t p-4 max-h-[600px] overflow-y-auto animate-fade-in flex flex-col gap-4 w-[800px] ${editPanelBg}`}>
+                <div className={`border-t p-4 max-h-[600px] overflow-y-auto animate-fade-in flex flex-col gap-4 w-[1100px] ${editPanelBg}`}>
                     
                     {/* AI Info Bar */}
                     <div className="bg-blue-900/30 border border-blue-500/30 p-3 rounded flex gap-3 items-start">
@@ -408,7 +424,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-3 gap-4">
                         {/* Tags Editor */}
                         <div className="flex flex-col gap-2">
                             <h3 className={`text-sm font-bold uppercase tracking-wide border-b pb-2 mb-2 ${isDarkMode ? 'text-gray-300 border-gray-700' : 'text-gray-700 border-gray-300'}`}>
@@ -484,7 +500,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                                             className={`border rounded px-2 py-1 text-xs focus:outline-none ${editInputBg}`}
                                         />
                                         <button onClick={() => handleDeleteRel(idx)} className="text-gray-500 hover:text-red-400 flex justify-center">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L10 11.414l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L10 11.414l4.293 4.293a1 1 0 01-1.414 1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
                                         </button>
                                     </div>
                                 ))}
@@ -510,6 +526,23 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                                 <button onClick={handleAddRel} disabled={!newRelLabel} className="text-green-500 hover:text-green-400 disabled:opacity-50 font-bold text-lg leading-none">
                                     +
                                 </button>
+                            </div>
+                        </div>
+
+                        {/* Custom Lists Editor */}
+                        <div className="flex flex-col gap-2">
+                            <h3 className={`text-sm font-bold uppercase tracking-wide border-b pb-2 mb-2 ${isDarkMode ? 'text-gray-300 border-gray-700' : 'text-gray-700 border-gray-300'}`}>
+                                Custom Lists
+                            </h3>
+                            <div className="max-h-80 overflow-y-auto pr-2">
+                                <ListEditor 
+                                    lists={editingScheme.customLists || {}}
+                                    descriptions={editingScheme.customListDescriptions || {}}
+                                    onChange={handleCustomListsChange}
+                                    onDescriptionChange={handleCustomListDescriptionsChange}
+                                    isDarkMode={isDarkMode}
+                                    hideHeader={true}
+                                />
                             </div>
                         </div>
                     </div>

@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { Element, Relationship, RelationshipDirection, TapestryDocument, TapestryFolder } from '../types';
+import { Element, Relationship, RelationshipDirection, TapestryDocument, TapestryFolder, ColorScheme } from '../types';
 import { generateElementMarkdown } from '../utils';
 
 interface ReportPanelProps {
@@ -12,6 +12,7 @@ interface ReportPanelProps {
   onNodeClick: (elementId: string) => void;
   onOpenDocument?: (docId: string) => void;
   isDarkMode: boolean;
+  activeColorScheme?: ColorScheme;
 }
 
 // Sub-component for a clickable element link
@@ -64,10 +65,22 @@ const ElementReportSection: React.FC<{
   elementMap: Map<string, Element>;
   onNodeClick: (elementId: string) => void;
   isDarkMode: boolean;
-}> = ({ element, elementRels, elementMap, onNodeClick, isDarkMode }) => {
+  activeColorScheme?: ColorScheme;
+}> = ({ element, elementRels, elementMap, onNodeClick, isDarkMode, activeColorScheme }) => {
   const headingClass = isDarkMode ? 'text-white border-gray-700' : 'text-gray-900 border-gray-200';
   const textClass = isDarkMode ? 'text-gray-300' : 'text-gray-700';
   const labelClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+
+  // Merge custom lists from schema
+  const mergedCustomLists: Record<string, string[]> = { ...element.customLists };
+  if (activeColorScheme?.customLists) {
+      Object.entries(activeColorScheme.customLists).forEach(([key, defaultItems]) => {
+          if (!mergedCustomLists[key]) {
+               // Cast to avoid TS errors if defaultItems is inferred loosely
+               mergedCustomLists[key] = [...(defaultItems as string[])]; 
+          }
+      });
+  }
 
   return (
     <div id={`element-report-${element.id}`} className="py-4 scroll-mt-4">
@@ -83,6 +96,26 @@ const ElementReportSection: React.FC<{
                          <li key={k}><span className="font-medium opacity-90">{k}:</span> {v}</li>
                      ))}
                 </ul>
+             </div>
+        )}
+
+        {Object.keys(mergedCustomLists).length > 0 && (
+             <div className="mb-2">
+                {Object.entries(mergedCustomLists).map(([name, items]) => {
+                    const listItems = items as string[];
+                    return (
+                        listItems && listItems.length > 0 && (
+                            <div key={name} className="mb-2">
+                                <strong className={`font-semibold block ${labelClass} mb-1`}>{name}:</strong>
+                                <ul className="list-disc list-inside pl-4 text-sm">
+                                    {listItems.map((item, idx) => (
+                                        <li key={idx}>{item}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )
+                    );
+                })}
              </div>
         )}
 
@@ -159,7 +192,8 @@ const WysiwigReport: React.FC<{
   folders?: TapestryFolder[];
   onOpenDocument?: (id: string) => void;
   isDarkMode: boolean;
-}> = ({ elements, relationships, elementMap, relStats, tagStats, onNodeClick, elementRelCounts, documents, folders, onOpenDocument, isDarkMode }) => {
+  activeColorScheme?: ColorScheme;
+}> = ({ elements, relationships, elementMap, relStats, tagStats, onNodeClick, elementRelCounts, documents, folders, onOpenDocument, isDarkMode, activeColorScheme }) => {
   if (elements.length === 0) {
     return <p className="text-gray-500 p-4">No elements to display based on the current filter.</p>;
   }
@@ -197,7 +231,7 @@ const WysiwigReport: React.FC<{
       <div className={`divide-y ${isDarkMode ? 'divide-gray-700 border-gray-600' : 'divide-gray-200 border-gray-200'} border-t mt-4`}>
         {elements.map(element => {
           const elementRels = relationships.filter(r => r.source === element.id || r.target === element.id);
-          return <ElementReportSection key={element.id} element={element} elementRels={elementRels} elementMap={elementMap} onNodeClick={onNodeClick} isDarkMode={isDarkMode} />;
+          return <ElementReportSection key={element.id} element={element} elementRels={elementRels} elementMap={elementMap} onNodeClick={onNodeClick} isDarkMode={isDarkMode} activeColorScheme={activeColorScheme} />;
         })}
       </div>
       
@@ -233,7 +267,8 @@ const generateMarkdownReport = (
   elementMap: Map<string, Element>,
   relStats: Map<string, number>,
   tagStats: Map<string, number>,
-  elementRelCounts: Map<string, number>
+  elementRelCounts: Map<string, number>,
+  activeColorScheme?: ColorScheme
 ): string => {
   if (elements.length === 0) {
     return "No elements to display based on the current filter.";
@@ -249,7 +284,7 @@ const generateMarkdownReport = (
   const detailLines: string[] = ["# Element Details"];
   elements.forEach(element => {
     // Use shared helper for consistency
-    const elementMarkdown = generateElementMarkdown(element, relationships, elements);
+    const elementMarkdown = generateElementMarkdown(element, relationships, elements, activeColorScheme);
     detailLines.push(elementMarkdown);
   });
   sections.push(detailLines.join('\n\n---\n\n'));
@@ -275,7 +310,7 @@ const generateMarkdownReport = (
 };
 
 
-export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationships, onClose, onNodeClick, documents, folders, onOpenDocument, isDarkMode }) => {
+export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationships, onClose, onNodeClick, documents, folders, onOpenDocument, isDarkMode, activeColorScheme }) => {
   const [isCopied, setIsCopied] = useState(false);
   const [viewMode, setViewMode] = useState<'wysiwig' | 'markdown'>('wysiwig');
 
@@ -313,8 +348,8 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationship
   }, [elements, relationships]);
 
   const reportText = useMemo(() => {
-    return generateMarkdownReport(sortedElements, relationships, elementMap, relStats, tagStats, elementRelCounts);
-  }, [sortedElements, relationships, elementMap, relStats, tagStats, elementRelCounts]);
+    return generateMarkdownReport(sortedElements, relationships, elementMap, relStats, tagStats, elementRelCounts, activeColorScheme);
+  }, [sortedElements, relationships, elementMap, relStats, tagStats, elementRelCounts, activeColorScheme]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(reportText).then(() => {
@@ -506,6 +541,7 @@ export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationship
             folders={folders}
             onOpenDocument={onOpenDocument}
             isDarkMode={isDarkMode}
+            activeColorScheme={activeColorScheme}
           />
         ) : (
           <textarea

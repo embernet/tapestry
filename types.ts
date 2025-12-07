@@ -26,6 +26,7 @@ export interface Element {
   notes: string;
   tags: string[];
   attributes?: Record<string, string>;
+  customLists?: Record<string, string[]>;
   createdAt: string;
   updatedAt: string;
   x?: number;
@@ -102,6 +103,8 @@ export interface ColorScheme {
   relationshipDefinitions?: RelationshipDefinition[];
   relationshipLabels?: string[]; // Legacy support
   defaultRelationshipLabel?: string;
+  customLists?: Record<string, string[]>;
+  customListDescriptions?: Record<string, string>;
 }
 
 export interface SimulationNodeDatum {
@@ -125,15 +128,7 @@ export interface SimulationLinkDatum<NodeDatum extends SimulationNodeDatum> {
   index?: number;
 }
 
-export interface D3Link extends SimulationLinkDatum<D3Node> {
-  id: string;
-  source: string | D3Node;
-  target: string | D3Node;
-  label: string;
-  direction: RelationshipDirection;
-  tags: string[];
-  attributes?: Record<string, string>;
-}
+export type D3Link = SimulationLinkDatum<D3Node> & Relationship;
 
 export interface SystemPromptConfig {
   defaultPrompt: string;
@@ -212,7 +207,7 @@ export interface NodeFilterState {
 }
 
 export interface ModelActions {
-  addElement: (data: { name: string; notes?: string; tags?: string[]; attributes?: Record<string, string> }) => string;
+  addElement: (data: { name: string; notes?: string; tags?: string[]; attributes?: Record<string, string>; customLists?: Record<string, string[]> }) => string;
   updateElement: (name: string, data: Partial<Element>) => boolean;
   deleteElement: (name: string) => boolean;
   addRelationship: (sourceName: string, targetName: string, label: string, direction?: string) => boolean;
@@ -271,6 +266,25 @@ export interface GuidanceContent {
   sections: GuidanceSection[];
 }
 
+// --- CSV Import Types ---
+export type CsvColumnMappingType = 'ignore' | 'id' | 'name' | 'notes' | 'tags' | 'attribute' | 'list' | 'relationship' | 'source' | 'target' | 'label' | 'x' | 'y' | 'created' | 'updated';
+
+export interface CsvColumnConfig {
+    index: number;
+    header: string;
+    mappingType: CsvColumnMappingType;
+    separator?: string; // For lists and relationship targets
+    attributeKey?: string; // For attributes and relationships (the rel label)
+}
+
+export interface CsvImportStats {
+    nodesCreated: number;
+    nodesUpdated: number;
+    relationshipsCreated: number;
+    relationshipsUpdated: number;
+    errors: string[];
+}
+
 // ---
 
 export type TrizToolType = 'contradiction' | 'principles' | 'ariz' | 'sufield' | 'trends' | null;
@@ -278,8 +292,8 @@ export type LssToolType = 'charter' | 'sipoc' | 'voc' | 'ctq' | 'stakeholder' | 
 export type TocToolType = 'crt' | 'ec' | 'frt' | 'tt' | null;
 export type SsmToolType = 'rich_picture' | 'catwoe' | 'activity_models' | 'comparison' | null;
 export type SwotToolType = 'matrix' | 'pestel' | 'steer' | 'destep' | 'longpest' | 'five_forces' | 'cage' | 'custom_create' | string | null;
-export type ExplorerToolType = 'treemap' | 'tags' | 'relationships' | 'sunburst' | 'matrix' | 'table' | null;
+export type ExplorerToolType = 'tags' | 'relationships' | 'sunburst' | 'matrix' | 'table' | 'random_walk' | null;
 export type TagCloudToolType = 'tags' | 'nodes' | 'words' | 'full_text' | null;
 export type MiningToolType = 'dashboard' | null;
 export type MermaidToolType = 'editor' | null;
-export type VisualiseToolType = 'grid' | 'sketch' | 'random_walk' | null;
+export type VisualiseToolType = 'grid' | 'mermaid' | 'circle_packing' | 'treemap' | null;

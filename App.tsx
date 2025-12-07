@@ -23,15 +23,16 @@ import { useSelfTest } from './hooks/useSelfTest';
 import { usePersistence } from './hooks/usePersistence';
 import { GuidancePanel } from './components/GuidancePanel';
 import { DebugPanel } from './components/DebugPanel';
-import { SketchPanel } from './components/SketchPanel';
 import { RandomWalkPanel } from './components/RandomWalkPanel';
 import { promptStore } from './services/PromptStore';
+import { NetworkAnalysisPanel } from './components/NetworkAnalysisPanel';
 
 // New Extracted Components
 import { StartScreen } from './components/StartScreen';
 import { ToolsOverlay } from './components/ToolsOverlay';
 import { AppModals } from './components/AppModals';
 import { ContextMenus } from './components/ContextMenus';
+import { StatusBar } from './components/StatusBar'; // Import StatusBar
 
 // Explicitly define coordinate type to fix type inference issues
 type Coords = { x: number; y: number };
@@ -96,9 +97,6 @@ export default function App() {
   // --- Panel State Hook ---
   const panelState = usePanelState();
   const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(false);
-  
-  // --- Sketch Panel State ---
-  const [isSketchPanelOpen, setIsSketchPanelOpen] = useState(false);
   
   // --- Random Walk State ---
   const [isRandomWalkOpen, setIsRandomWalkOpen] = useState(false);
@@ -176,6 +174,7 @@ export default function App() {
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isPatternGalleryModalOpen, setIsPatternGalleryModalOpen] = useState(false);
   const [isUserGuideModalOpen, setIsUserGuideModalOpen] = useState(false);
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   
   const [tagFilter, setTagFilter] = useState<{ included: Set<string>, excluded: Set<string> }>({ included: new Set(), excluded: new Set() });
   const [dateFilter, setDateFilter] = useState<DateFilterState>({ createdAfter: '', createdBefore: '', updatedAfter: '', updatedBefore: '' });
@@ -327,24 +326,55 @@ export default function App() {
   const handleLssToolSelect = (tool: LssToolType) => { tools.setActiveLssTool(tool); tools.setIsLssModalOpen(true); tools.setLssInitialParams(null); tools.setActiveTool(null); };
   const handleTocToolSelect = (tool: TocToolType) => { tools.setActiveTocTool(tool); tools.setIsTocModalOpen(true); tools.setTocInitialParams(null); tools.setActiveTool(null); };
   const handleSsmToolSelect = (tool: SsmToolType) => { tools.setActiveSsmTool(tool); tools.setIsSsmModalOpen(true); tools.setSsmInitialParams(null); tools.setActiveTool(null); };
+  
+  const handleAnalysisToolSelect = useCallback((toolId: string) => {
+      // Close main tool menu
+      tools.setActiveTool(null);
+
+      const width = 400;
+      const height = 500;
+      const x = 100; // Floating on the left
+      const y = 160;
+
+      const nextZ = panelZIndex + 1;
+      
+      const defaultLayout: PanelLayout = { 
+          x, 
+          y, 
+          w: width, 
+          h: height, 
+          zIndex: nextZ, 
+          isFloating: true 
+      };
+
+      if (toolId === 'network') {
+          panelState.setIsNetworkAnalysisOpen(true);
+      } else if (toolId === 'tags') {
+          setPanelZIndex(nextZ);
+          if (!panelLayouts['tag-dist']) {
+               setPanelLayouts(prev => ({ ...prev, 'tag-dist': defaultLayout }));
+          }
+          panelState.setIsTagDistPanelOpen(true);
+      } else if (toolId === 'relationships') {
+          setPanelZIndex(nextZ);
+          if (!panelLayouts['rel-dist']) {
+               setPanelLayouts(prev => ({ ...prev, 'rel-dist': defaultLayout }));
+          }
+          panelState.setIsRelDistPanelOpen(true);
+      }
+  }, [panelState, panelLayouts, panelZIndex, tools, setPanelLayouts, setPanelZIndex]);
+
   const handleExplorerToolSelect = (tool: ExplorerToolType) => {
-      if (tool === 'treemap') panelState.setIsTreemapPanelOpen(prev => !prev);
-      if (tool === 'tags') panelState.setIsTagDistPanelOpen(prev => !prev);
-      if (tool === 'relationships') panelState.setIsRelDistPanelOpen(prev => !prev);
+      // Legacy Explorer tool handling (mostly moved to Visualise / Analysis)
       if (tool === 'sunburst') {
           panelState.setIsSunburstPanelOpen(prev => !prev);
           panelState.setSunburstState(prev => ({ ...prev, active: true }));
       }
       if (tool === 'matrix') panelState.setIsMatrixPanelOpen(prev => !prev);
       if (tool === 'table') panelState.setIsTablePanelOpen(prev => !prev);
-      tools.setActiveTool(null); 
-  };
-  const handleVisualiseToolSelect = (tool: VisualiseToolType) => {
-      if (tool === 'grid') {
-          panelState.setIsGridPanelOpen(prev => !prev);
-      } else if (tool === 'sketch') {
-          setIsSketchPanelOpen(prev => !prev);
-      } else if (tool === 'random_walk') {
+      
+      // Random Walk logic moved here
+      if (tool === 'random_walk') {
           if (!isRandomWalkOpen) {
                // Opening: Capture focus, reset state
                setPreWalkFocusMode(focusMode);
@@ -365,6 +395,36 @@ export default function App() {
                setIsRandomWalkOpen(false);
                setFocusMode(preWalkFocusMode);
           }
+      }
+
+      tools.setActiveTool(null); 
+  };
+  const handleVisualiseToolSelect = (tool: VisualiseToolType) => {
+      if (tool === 'grid') {
+          panelState.setIsGridPanelOpen(prev => !prev);
+      } else if (tool === 'treemap') {
+          panelState.setIsTreemapPanelOpen(prev => !prev);
+      } else if (tool === 'circle_packing') {
+          if (!panelState.isCirclePackingPanelOpen) {
+               // Opening
+               const size = Math.min(window.innerWidth, window.innerHeight) * 0.8;
+               const x = (window.innerWidth - size) / 2;
+               const y = (window.innerHeight - size) / 2;
+               const nextZ = panelZIndex + 1;
+               setPanelZIndex(nextZ);
+               
+               setPanelLayouts(prev => ({
+                   ...prev,
+                   'circle_packing': {
+                       x, y, w: size, h: size, zIndex: nextZ, isFloating: true
+                   }
+               }));
+               panelState.setIsCirclePackingPanelOpen(true);
+          } else {
+               panelState.setIsCirclePackingPanelOpen(false);
+          }
+      } else if (tool === 'mermaid') {
+          panelState.setIsMermaidPanelOpen(true);
       }
       tools.setActiveTool(null);
   };
@@ -451,8 +511,57 @@ export default function App() {
   useEffect(() => {
       if (persistence.currentModelId) {
           setChatConversation([{ role: 'model', text: "Hello! I'm your AI assistant. Ask me anything about your current model, or ask me to make changes to it." }]);
+          
+          // Auto-zoom to fit content when a model opens
+          setTimeout(() => {
+              if (graphCanvasRef.current) {
+                  graphCanvasRef.current.zoomToFit();
+              }
+          }, 150);
       }
   }, [persistence.currentModelId]);
+
+  // --- CSV Import Handler ---
+  const handleImportCsv = useCallback((newElements: Element[], newRelationships: Relationship[], mode: 'merge' | 'replace', selectAfterImport?: boolean) => {
+      // Create random positions for new nodes if they don't have them (circular)
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight / 2;
+      let count = 0;
+      
+      newElements.forEach(e => {
+          if (e.x === undefined) {
+             const angle = (count * 0.5) + Math.random();
+             const radius = 100 + (5 * count);
+             e.x = centerX + radius * Math.cos(angle);
+             e.y = centerY + radius * Math.sin(angle);
+             e.fx = e.x;
+             e.fy = e.y;
+             count++;
+          }
+      });
+
+      if (mode === 'replace') {
+          setElements(newElements);
+          setRelationships(newRelationships);
+          alert(`Imported ${newElements.length} nodes and ${newRelationships.length} relationships (Replaced existing model).`);
+      } else {
+          // Merge
+          setElements(prev => {
+              const prevMap = new Map(prev.map(e => [e.id, e]));
+              newElements.forEach(e => prevMap.set(e.id, e)); // Overwrite if ID matches
+              return Array.from(prevMap.values());
+          });
+          setRelationships(prev => [...prev, ...newRelationships]);
+          alert(`Imported/Merged ${newElements.length} nodes and ${newRelationships.length} relationships.`);
+      }
+
+      if (selectAfterImport && newElements.length > 0) {
+          const newIds = new Set(newElements.map(e => e.id));
+          setMultiSelection(newIds);
+          // Clear singular selection to ensure bulk selection is active
+          setSelectedElementId(null);
+      }
+  }, []);
 
   const allTags = useMemo(() => { const tags = new Set<string>(); elements.forEach(element => { element.tags.forEach(tag => tags.add(tag)); }); return Array.from(tags).sort(); }, [elements]);
   const tagCounts = useMemo(() => { const counts = new Map<string, number>(); elements.forEach(element => { element.tags.forEach(tag => { counts.set(tag, (counts.get(tag) || 0) + 1); }); }); return counts; }, [elements]);
@@ -537,7 +646,29 @@ export default function App() {
   const handleDeleteElement = useCallback((elementId: string) => { setElements(prev => prev.filter(f => f.id !== elementId)); setRelationships(prev => prev.filter(r => r.source !== elementId && r.target !== elementId)); if (selectedElementId === elementId) { setSelectedElementId(null); } if (multiSelection.has(elementId)) { const next = new Set(multiSelection); next.delete(elementId); setMultiSelection(next); } }, [selectedElementId, multiSelection]);
   
   // --- Actions ---
-  const handleAddElement = useCallback((coords: { x: number; y: number }) => { const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.x, }; setElements(prev => [...prev, newElement]); setSelectedElementId(newElement.id); setMultiSelection(new Set([newElement.id])); setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); }, [defaultTags]);
+  const handleAddElement = useCallback((coords: { x: number; y: number }) => { 
+      const now = new Date().toISOString(); 
+      const newElement: Element = { 
+          id: generateUUID(), 
+          name: 'New Element', 
+          notes: '', 
+          tags: [...defaultTags], 
+          createdAt: now, 
+          updatedAt: now, 
+          x: coords.x, 
+          y: coords.y, 
+          fx: coords.x, 
+          // CRITICAL FIX: Ensure fy uses coords.y, not coords.x. 
+          // This caused nodes to jump diagonally on creation.
+          fy: coords.y, 
+      }; 
+      setElements(prev => [...prev, newElement]); 
+      setSelectedElementId(newElement.id); 
+      setMultiSelection(new Set([newElement.id])); 
+      setSelectedRelationshipId(null); 
+      setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); 
+  }, [defaultTags]);
+  
   const handleAddElementFromName = useCallback((name: string) => { const centerX = window.innerWidth / 2; const centerY = window.innerHeight / 2; const randomOffset = () => (Math.random() - 0.5) * 100; const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: name, notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: centerX + randomOffset(), y: centerY + randomOffset(), fx: null, fy: null, }; setElements(prev => [...prev, newElement]); }, [defaultTags]);
   const handleUpdateElement = useCallback((updatedElement: Element) => { setElements(prev => prev.map(f => f.id === updatedElement.id ? { ...updatedElement, updatedAt: new Date().toISOString() } : f)); }, []);
   const handleBulkTagAction = useCallback((elementIds: string[], tag: string, mode: 'add' | 'remove') => { setElements(prev => prev.map(e => { if (elementIds.includes(e.id)) { let newTags = [...e.tags]; if (mode === 'add') { if (!newTags.includes(tag)) { newTags.push(tag); } else { return e; } } else { if (newTags.includes(tag)) { newTags = newTags.filter(t => t !== tag); } else { return e; } } return { ...e, tags: newTags, updatedAt: new Date().toISOString() }; } return e; })); }, []);
@@ -1065,7 +1196,7 @@ export default function App() {
   const addRelationshipSourceElement = useMemo(() => elements.find(f => f.id === panelStateUI.sourceElementId), [elements, panelStateUI.sourceElementId]);
   const activeColorScheme = useMemo(() => { const current = colorSchemes.find(s => s.id === activeSchemeId); if (!current) return undefined; const defaultScheme = DEFAULT_COLOR_SCHEMES.find(d => d.id === current.id); if (defaultScheme) { const mergedTags = { ...defaultScheme.tagColors, ...current.tagColors }; const currentDefs = current.relationshipDefinitions || []; const defaultDefs = defaultScheme.relationshipDefinitions || []; const combinedDefsMap = new Map<string, RelationshipDefinition>(); defaultDefs.forEach(d => combinedDefsMap.set(d.label, d)); currentDefs.forEach(d => combinedDefsMap.set(d.label, d)); const mergedDefinitions = Array.from(combinedDefsMap.values()); const mergedDefaultLabel = current.defaultRelationshipLabel || defaultScheme.defaultRelationshipLabel; return { ...current, tagColors: mergedTags, relationshipDefinitions: mergedDefinitions, defaultRelationshipLabel: mergedDefaultLabel }; } return current; }, [colorSchemes, activeSchemeId]);
   const activeRelationshipLabels = useMemo(() => { return activeColorScheme?.relationshipDefinitions?.map(d => d.label) || []; }, [activeColorScheme]);
-  const isRightPanelOpen = panelState.isReportPanelOpen || panelState.isMarkdownPanelOpen || panelState.isJSONPanelOpen || panelState.isMatrixPanelOpen || panelState.isTablePanelOpen || panelState.isGridPanelOpen || panelState.isDocumentPanelOpen || panelState.isHistoryPanelOpen || panelState.isKanbanPanelOpen || panelState.isPresentationPanelOpen || panelState.isMermaidPanelOpen || panelState.isTreemapPanelOpen || panelState.isTagDistPanelOpen || panelState.isRelDistPanelOpen || panelState.isSunburstPanelOpen || panelState.isConceptCloudOpen || panelState.isInfluenceCloudOpen || panelState.isTextAnalysisOpen || panelState.isFullTextAnalysisOpen || openDocIds.length > 0 || detachedHistoryIds.length > 0 || isDebugPanelOpen;
+  const isRightPanelOpen = panelState.isReportPanelOpen || panelState.isMarkdownPanelOpen || panelState.isJSONPanelOpen || panelState.isMatrixPanelOpen || panelState.isTablePanelOpen || panelState.isGridPanelOpen || panelState.isDocumentPanelOpen || panelState.isHistoryPanelOpen || panelState.isKanbanPanelOpen || panelState.isPresentationPanelOpen || panelState.isMermaidPanelOpen || panelState.isTreemapPanelOpen || panelState.isTagDistPanelOpen || panelState.isRelDistPanelOpen || panelState.isSunburstPanelOpen || panelState.isCirclePackingPanelOpen || panelState.isConceptCloudOpen || panelState.isInfluenceCloudOpen || panelState.isTextAnalysisOpen || panelState.isFullTextAnalysisOpen || openDocIds.length > 0 || detachedHistoryIds.length > 0 || isDebugPanelOpen;
 
   // --- New Command Handlers ---
   const handleOpenCommandHistory = useCallback(() => {
@@ -1233,7 +1364,7 @@ export default function App() {
 });
 
   return (
-    <div className="w-screen h-screen overflow-hidden flex relative">
+    <div className="w-screen h-screen overflow-hidden flex flex-col relative">
       <input type="file" ref={importFileRef} onChange={handleImportInputChangeWrapper} accept=".json" className="hidden" />
       
       {isPresenting && (
@@ -1267,337 +1398,386 @@ export default function App() {
           </div>
       )}
 
-      {persistence.currentModelId && !isPresenting && (
-          <AppHeader 
-            currentModelName={persistence.currentModelName}
-            onNewModel={persistence.handleNewModelClick}
-            onSaveAs={() => persistence.setIsSaveAsModalOpen(true)}
-            onOpenModel={() => persistence.handleImportClick(importFileRef)}
-            onSaveDisk={persistence.handleDiskSave}
-            onCopy={handleCopy}
-            onPaste={handlePaste}
-            tools={tools}
-            panelState={panelState}
-            focusMode={focusMode}
-            onToggleFocusMode={handleToggleFocusMode}
-            onZoomToFit={handleZoomToFit}
-            onAutoLayout={handleStaticLayout}
-            onOpenSettings={(tab) => { setSettingsInitialTab(tab || 'general'); setIsSettingsModalOpen(true); }}
-            onAbout={() => setIsAboutModalOpen(true)}
-            onPatternGallery={() => setIsPatternGalleryModalOpen(true)}
-            onSelfTest={runSelfTest}
-            onUserGuide={() => setIsUserGuideModalOpen(true)}
-            isDarkMode={isDarkMode}
-            onToggleTheme={handleThemeToggle}
-            onToggleDebug={() => setIsDebugPanelOpen(prev => !prev)}
-            onOpenKanban={handleOpenKanban}
-            hasUnsavedChanges={persistence.hasUnsavedChanges}
-          />
-      )}
-      
-      {persistence.currentModelId && !isPresenting && (
-        <ToolsOverlay 
-            tools={tools}
-            panelState={panelState}
-            elements={elements}
-            relationships={relationships}
-            colorSchemes={colorSchemes}
-            activeSchemeId={activeSchemeId}
-            activeColorScheme={activeColorScheme}
-            defaultTags={defaultTags}
-            layoutParams={layoutParams}
-            isPhysicsModeActive={isPhysicsModeActive}
-            isBulkEditActive={isBulkEditActive}
-            isSimulationMode={isSimulationMode}
-            nodeShape={nodeShape}
-            handleAiToolSelect={handleAiToolSelect}
-            handleSearch={handleSearch}
-            handleFocusSingle={handleFocusSingle}
-            handleSearchReset={handleSearchReset}
-            handleVisualiseToolSelect={handleVisualiseToolSelect}
-            setActiveSchemeId={setActiveSchemeId}
-            handleUpdateDefaultRelationship={handleUpdateDefaultRelationship}
-            setDefaultTags={setDefaultTags}
-            setColorSchemes={setColorSchemes}
-            setLayoutParams={setLayoutParams}
-            setJiggleTrigger={setJiggleTrigger}
-            handleZoomToFit={handleZoomToFit}
-            handleZoomIn={handleZoomIn}
-            handleZoomOut={handleZoomOut}
-            handleStartPhysicsLayout={handleStartPhysicsLayout}
-            handleAcceptLayout={handleAcceptLayout}
-            handleRejectLayout={handleRejectLayout}
-            handleScaleLayout={handleScaleLayout}
-            handleStaticLayout={handleStaticLayout}
-            setNodeShape={setNodeShape}
-            handleBulkTagAction={handleBulkTagAction}
-            handleAnalysisHighlight={handleAnalysisHighlight}
-            handleAnalysisFilter={handleAnalysisFilter}
-            setIsSimulationMode={setIsSimulationMode}
-            setSimulationState={setSimulationState}
-            handleTrizToolSelect={handleTrizToolSelect}
-            handleLssToolSelect={handleLssToolSelect}
-            handleTocToolSelect={handleTocToolSelect}
-            handleSsmToolSelect={handleSsmToolSelect}
-            handleSwotToolSelect={handleSwotToolSelect}
-            handleExplorerToolSelect={handleExplorerToolSelect}
-            handleTagCloudToolSelect={handleTagCloudToolSelect}
-            handleMermaidToolSelect={handleMermaidToolSelect}
-            setSettingsInitialTab={setSettingsInitialTab}
-            setIsSettingsModalOpen={setIsSettingsModalOpen}
-            bulkTagsToAdd={bulkTagsToAdd}
-            setBulkTagsToAdd={setBulkTagsToAdd}
-            bulkTagsToRemove={bulkTagsToRemove}
-            setBulkTagsToRemove={setBulkTagsToRemove}
-            setIsBulkEditActive={setIsBulkEditActive}
-            handleCommandExecution={handleCommandExecution}
-            handleOpenCommandHistory={handleOpenCommandHistory}
-            globalSettings={globalSettings}
-            isDarkMode={isDarkMode}
-            selectedElementId={selectedElementId}
-        />
-      )}
+      {/* Main Viewport Area */}
+      <div className="flex-grow relative w-full overflow-hidden">
 
-      {panelState.isFilterPanelOpen && persistence.currentModelId && !isPresenting && (
-        <FilterPanel 
-            allTags={allTags} 
-            tagCounts={tagCounts} 
-            tagFilter={tagFilter} 
-            dateFilter={dateFilter} 
-            nodeFilter={nodeFilter}
-            elements={elements}
-            onTagFilterChange={setTagFilter} 
-            onDateFilterChange={setDateFilter} 
-            onNodeFilterChange={setNodeFilter}
-            onClose={() => panelState.setIsFilterPanelOpen(false)} 
-            isDarkMode={isDarkMode} 
-        />
-      )}
-      
-      {/* Guidance Panel */}
-      {panelState.isGuidancePanelOpen && persistence.currentModelId && !isPresenting && (
-        <div className="fixed left-4 top-40 z-[600] w-[400px] h-[calc(100vh-200px)] shadow-2xl rounded-lg overflow-hidden border border-gray-600 bg-gray-900">
-            <GuidancePanel 
-                content={panelState.guidanceContent} 
-                onClose={() => panelState.setIsGuidancePanelOpen(false)} 
-                isDarkMode={isDarkMode}
-            />
-        </div>
-      )}
-      
-      {/* Sketch Panel */}
-      {isSketchPanelOpen && persistence.currentModelId && !isPresenting && (
-          <SketchPanel 
-              elements={filteredElements}
-              relationships={filteredRelationships}
-              onClose={() => setIsSketchPanelOpen(false)}
-              isDarkMode={isDarkMode}
-              colorSchemes={colorSchemes}
-              activeSchemeId={activeSchemeId}
-          />
-      )}
-
-      {/* Random Walk Panel */}
-      {isRandomWalkOpen && persistence.currentModelId && !isPresenting && (
-          <RandomWalkPanel 
-             currentNodeName={walkState.currentNodeId ? (elements.find(e => e.id === walkState.currentNodeId)?.name || null) : null}
-             visitedCount={walkState.visitedIds.size}
-             totalCount={elements.length}
-             waitTime={walkState.waitTime}
-             setWaitTime={(t) => setWalkState(prev => ({...prev, waitTime: t}))}
-             isPaused={walkState.isPaused}
-             togglePause={() => setWalkState(prev => ({...prev, isPaused: !prev.isPaused, direction: 'forward', speedMultiplier: 1}))}
-             onStepBack={() => setWalkState(prev => {
-                 const prevIdx = prev.historyIndex - 1;
-                 if (prevIdx >= 0) {
-                      return { ...prev, isPaused: true, historyIndex: prevIdx, currentNodeId: prev.pathHistory[prevIdx] };
-                 }
-                 return { ...prev, isPaused: true };
-             })}
-             onPlayReverse={() => setWalkState(prev => ({ ...prev, isPaused: false, direction: 'backward', speedMultiplier: 4 }))}
-             onStepForward={() => setWalkState(prev => {
-                 const nextIdx = prev.historyIndex + 1;
-                 if (nextIdx < prev.pathHistory.length) {
-                      return { ...prev, isPaused: true, historyIndex: nextIdx, currentNodeId: prev.pathHistory[nextIdx] };
-                 }
-                 return { ...prev, isPaused: false, direction: 'forward', speedMultiplier: 1 };
-             })}
-             onFastForward={() => setWalkState(prev => ({ ...prev, isPaused: false, direction: 'forward', speedMultiplier: 4 }))}
-             onRandomStart={() => {
-                 if (elements.length > 0) {
-                     const randomEl = elements[Math.floor(Math.random() * elements.length)];
-                     setWalkState(prev => ({
-                         ...prev,
-                         currentNodeId: randomEl.id,
-                         pathHistory: [randomEl.id],
-                         historyIndex: 0,
-                         visitedIds: new Set([randomEl.id]),
-                         isPaused: false,
-                         direction: 'forward',
-                         speedMultiplier: 1,
-                         hideDetails: false
-                     }));
-                 }
-             }}
-             onSprint={() => {
-                 // Sprint logic removed for brevity in refactor (same as original)
-                 // Triggering play to keep it simple for now or implement full sprint logic again
-                 setWalkState(prev => ({ ...prev, isPaused: false, speedMultiplier: 5 }));
-             }}
-             hideDetails={walkState.hideDetails}
-             setHideDetails={(s) => setWalkState(prev => ({...prev, hideDetails: s}))}
-             onClose={() => {
-                 setIsRandomWalkOpen(false);
-                 setFocusMode(preWalkFocusMode);
-             }}
-             isDarkMode={isDarkMode}
-             direction={walkState.direction}
-             speedMultiplier={walkState.speedMultiplier}
-             onOpenGuidance={() => tools.handleOpenGuidance('random_walk')}
-          />
-      )}
-
-      {persistence.currentModelId && !isPresenting && (
-        <RightPanelContainer panels={panelDefinitions} layouts={panelLayouts} onLayoutChange={setPanelLayouts} activeDockedId={activeDockedPanelId} onActiveDockedIdChange={setActiveDockedPanelId} globalZIndex={panelZIndex} onGlobalZIndexChange={setPanelZIndex} isDarkMode={isDarkMode} />
-      )}
-
-      {persistence.currentModelId && !isPresenting && ((panelStateUI.view === 'addRelationship' && addRelationshipSourceElement) || selectedRelationship || (selectedElement && (!isRandomWalkOpen || !walkState.hideDetails))) && (
-        <div ref={panelRef} className={`z-[70] flex flex-col pointer-events-none ${detailsPanelPosition ? 'fixed shadow-2xl rounded-lg' : 'absolute top-24'}`} style={detailsPanelPosition ? { left: detailsPanelPosition.x, top: detailsPanelPosition.y, maxHeight: 'calc(100vh - 2rem)' } : { right: isRightPanelOpen ? '620px' : '16px', maxHeight: 'calc(100vh - 8rem)' }}>
-            <div className={`pointer-events-auto flex flex-col h-auto max-h-full shadow-2xl rounded-lg border min-h-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-                <div className={`h-6 rounded-t-lg flex items-center justify-center cursor-move border-b group relative flex-shrink-0 ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-200'}`} onMouseDown={handlePanelDragStart}>
-                    <div className={`w-10 h-1 rounded-full transition-colors ${isDarkMode ? 'bg-gray-500 group-hover:bg-gray-400' : 'bg-gray-300 group-hover:bg-gray-400'}`}></div>
-                    <button onClick={handleResetPanelPosition} className={`absolute right-2 hover:text-blue-500 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`} title={detailsPanelPosition ? "Dock Panel" : "Unpin/Float Panel"}>
-                        {detailsPanelPosition ? (<svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M16 12V4H8v8L6 14v2h5v6l1 2 1-2v-6h5v-2l-2-2z" /></svg>) : (<svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 transform rotate-45" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M16 12V4H8v8L6 14v2h5v6l1 2 1-2v-6h5v-2l-2-2z" /></svg>)}
-                    </button>
-                </div>
-                <div className="rounded-b-lg overflow-hidden flex flex-col min-h-0 flex-grow">
-                    {panelStateUI.view === 'addRelationship' && addRelationshipSourceElement ? (
-                        <AddRelationshipPanel 
-                            sourceElement={addRelationshipSourceElement} 
-                            targetElementId={panelStateUI.targetElementId} 
-                            isNewTarget={panelStateUI.isNewTarget} 
-                            allElements={elements} 
-                            onCreate={handleCompleteAddRelationship} 
-                            onUpdateElement={handleUpdateElement} 
-                            onCancel={handleCancelAddRelationship} 
-                            suggestedLabels={activeRelationshipLabels} 
-                            defaultLabel={activeColorScheme?.defaultRelationshipLabel} 
-                            colorSchemes={colorSchemes} 
-                            activeSchemeId={activeSchemeId} 
-                            isDarkMode={isDarkMode} 
-                            relationships={relationships} 
-                            onUpdateRelationship={handleUpdateRelationship} 
-                        />
-                    ) : selectedRelationship ? (
-                        <RelationshipDetailsPanel relationship={selectedRelationship} elements={elements} onUpdate={handleUpdateRelationship} onDelete={handleDeleteRelationship} suggestedLabels={activeRelationshipLabels} isDarkMode={isDarkMode} />
-                    ) : selectedElement ? (
-                        <ElementDetailsPanel element={selectedElement} allElements={elements} relationships={relationships} onUpdate={handleUpdateElement} onDelete={handleDeleteElement} onClose={() => setSelectedElementId(null)} colorSchemes={colorSchemes} activeSchemeId={activeSchemeId} isDarkMode={isDarkMode} />
-                    ) : null}
-                </div>
-            </div>
-        </div>
-    )}
-
-      <ChatPanel className={(!panelState.isChatPanelOpen || !persistence.currentModelId || isPresenting) ? 'hidden' : ''} isOpen={panelState.isChatPanelOpen} elements={elements} relationships={relationships} colorSchemes={colorSchemes} activeSchemeId={activeSchemeId} onClose={() => panelState.setIsChatPanelOpen(false)} currentModelId={persistence.currentModelId} modelActions={aiActions} onOpenPromptSettings={() => { setSettingsInitialTab('ai_prompts'); setIsSettingsModalOpen(true); }} systemPromptConfig={systemPromptConfig} documents={documents} folders={folders} openDocIds={openDocIds} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onOpenTool={tools.handleOpenTool} initialInput={chatDraftMessage} aiConfig={aiConfig} isDarkMode={isDarkMode} messages={chatConversation} setMessages={setChatConversation} />
-      {isDebugPanelOpen && <DebugPanel messages={debugLog} onClose={() => setIsDebugPanelOpen(false)} isDarkMode={isDarkMode} />}
-      
-      <AppModals 
-        tools={tools}
-        panelState={panelState}
-        persistence={persistence}
-        elements={elements}
-        relationships={relationships}
-        selectedElementId={selectedElementId}
-        modelActions={aiActions}
-        documents={documents}
-        folders={folders}
-        onUpdateDocument={handleUpdateDocument}
-        handleAnalyzeWithChat={handleAnalyzeWithChat}
-        handleLogHistory={handleLogHistory}
-        defaultTags={defaultTags}
-        aiConfig={aiConfig}
-        isDarkMode={isDarkMode}
-        globalSettings={globalSettings}
-        handleGlobalSettingsChange={handleGlobalSettingsChange}
-        systemPromptConfig={systemPromptConfig}
-        setSystemPromptConfig={setSystemPromptConfig}
-        isSettingsModalOpen={isSettingsModalOpen}
-        setIsSettingsModalOpen={setIsSettingsModalOpen}
-        settingsInitialTab={settingsInitialTab}
-        isAboutModalOpen={isAboutModalOpen}
-        setIsAboutModalOpen={setIsAboutModalOpen}
-        isPatternGalleryModalOpen={isPatternGalleryModalOpen}
-        setIsPatternGalleryModalOpen={setIsPatternGalleryModalOpen}
-        isUserGuideModalOpen={isUserGuideModalOpen}
-        setIsUserGuideModalOpen={setIsUserGuideModalOpen}
-        isSelfTestModalOpen={isSelfTestModalOpen}
-        setIsSelfTestModalOpen={setIsSelfTestModalOpen}
-        testLogs={testLogs}
-        testStatus={testStatus}
-        importFileRef={importFileRef}
-        handleCustomStrategiesChange={handleCustomStrategiesChange}
-        getToolPrompt={getToolPrompt}
-      />
-
-      {persistence.currentModelId ? (
-        <>
-            <GraphCanvas 
-                ref={graphCanvasRef} 
-                elements={filteredElements} 
-                relationships={filteredRelationships} 
-                onNodeClick={handleNodeClick} 
-                onLinkClick={handleLinkClick} 
-                onCanvasClick={handleCanvasClick} 
-                onCanvasDoubleClick={handleAddElement} 
-                onNodeContextMenu={handleNodeContextMenu} 
-                onLinkContextMenu={handleLinkContextMenu}
-                onCanvasContextMenu={handleCanvasContextMenu} 
-                onNodeConnect={handleNodeConnect} 
-                onNodeConnectToNew={handleNodeConnectToNew} 
-                activeColorScheme={activeColorScheme} 
-                selectedElementId={selectedElementId} 
-                multiSelection={multiSelection} 
-                selectedRelationshipId={selectedRelationshipId} 
-                focusMode={focusMode} 
-                setElements={setElements} 
-                isPhysicsModeActive={isPhysicsModeActive} 
-                layoutParams={layoutParams} 
-                onJiggleTrigger={jiggleTrigger} 
-                isBulkEditActive={isBulkEditActive} 
-                isSimulationMode={isSimulationMode}
-                simulationState={simulationState} 
-                analysisHighlights={analysisHighlights} 
-                isDarkMode={isDarkMode}
-                nodeShape={nodeShape}
-            />
-            <ContextMenus 
-                contextMenu={contextMenu}
-                relationshipContextMenu={relationshipContextMenu}
-                canvasContextMenu={canvasContextMenu}
-                relationships={relationships}
+        {persistence.currentModelId && !isPresenting && (
+            <AppHeader 
+                currentModelName={persistence.currentModelName}
+                onNewModel={persistence.handleNewModelClick}
+                onSaveAs={() => persistence.setIsSaveAsModalOpen(true)}
+                onOpenModel={() => persistence.handleImportClick(importFileRef)}
+                onSaveDisk={persistence.handleDiskSave}
+                onCopy={handleCopy}
+                onPaste={handlePaste}
+                onOpenCsvTool={() => setIsCsvModalOpen(true)}
+                tools={tools}
                 panelState={panelState}
-                persistence={persistence}
-                onCloseContextMenu={handleCloseContextMenu}
-                onCloseRelationshipContextMenu={handleCloseRelationshipContextMenu}
-                onCloseCanvasContextMenu={handleCloseCanvasContextMenu}
-                onDeleteElement={handleDeleteElement}
-                onAddRelationshipFromContext={(id) => { setPanelStateUI({ view: 'addRelationship', sourceElementId: id, targetElementId: null, isNewTarget: false }); setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); }}
-                onDeleteRelationship={handleDeleteRelationship}
-                onChangeRelationshipDirection={handleChangeRelationshipDirection}
+                focusMode={focusMode}
+                onToggleFocusMode={handleToggleFocusMode}
                 onZoomToFit={handleZoomToFit}
                 onAutoLayout={handleStaticLayout}
-                onSaveAsImage={handleSaveAsImage}
-                importFileRef={importFileRef}
+                onOpenSettings={(tab) => { setSettingsInitialTab(tab || 'general'); setIsSettingsModalOpen(true); }}
+                onAbout={() => setIsAboutModalOpen(true)}
+                onPatternGallery={() => setIsPatternGalleryModalOpen(true)}
+                onSelfTest={runSelfTest}
+                onUserGuide={() => setIsUserGuideModalOpen(true)}
                 isDarkMode={isDarkMode}
+                onToggleTheme={handleThemeToggle}
+                onToggleDebug={() => setIsDebugPanelOpen(prev => !prev)}
+                onOpenKanban={handleOpenKanban}
+                hasUnsavedChanges={persistence.hasUnsavedChanges}
             />
-        </>
-    ) : (
-        <StartScreen 
-            isDarkMode={isDarkMode} 
-            persistence={persistence} 
-            importFileRef={importFileRef} 
-            onAbout={() => setIsAboutModalOpen(true)} 
+        )}
+        
+        {persistence.currentModelId && !isPresenting && (
+            <ToolsOverlay 
+                tools={tools}
+                panelState={panelState}
+                elements={elements}
+                relationships={relationships}
+                colorSchemes={colorSchemes}
+                activeSchemeId={activeSchemeId}
+                activeColorScheme={activeColorScheme}
+                defaultTags={defaultTags}
+                layoutParams={layoutParams}
+                isPhysicsModeActive={isPhysicsModeActive}
+                isBulkEditActive={isBulkEditActive}
+                isSimulationMode={isSimulationMode}
+                nodeShape={nodeShape}
+                handleAiToolSelect={handleAiToolSelect}
+                handleSearch={handleSearch}
+                handleFocusSingle={handleFocusSingle}
+                handleSearchReset={handleSearchReset}
+                handleVisualiseToolSelect={handleVisualiseToolSelect}
+                setActiveSchemeId={setActiveSchemeId}
+                handleUpdateDefaultRelationship={handleUpdateDefaultRelationship}
+                setDefaultTags={setDefaultTags}
+                setColorSchemes={setColorSchemes}
+                setLayoutParams={setLayoutParams}
+                setJiggleTrigger={setJiggleTrigger}
+                handleZoomToFit={handleZoomToFit}
+                handleZoomIn={handleZoomIn}
+                handleZoomOut={handleZoomOut}
+                handleStartPhysicsLayout={handleStartPhysicsLayout}
+                handleAcceptLayout={handleAcceptLayout}
+                handleRejectLayout={handleRejectLayout}
+                handleScaleLayout={handleScaleLayout}
+                handleStaticLayout={handleStaticLayout}
+                setNodeShape={setNodeShape}
+                handleBulkTagAction={handleBulkTagAction}
+                handleAnalysisHighlight={handleAnalysisHighlight}
+                handleAnalysisFilter={handleAnalysisFilter}
+                setIsSimulationMode={setIsSimulationMode}
+                setSimulationState={setSimulationState}
+                handleTrizToolSelect={handleTrizToolSelect}
+                handleLssToolSelect={handleLssToolSelect}
+                handleTocToolSelect={handleTocToolSelect}
+                handleSsmToolSelect={handleSsmToolSelect}
+                handleSwotToolSelect={handleSwotToolSelect}
+                handleExplorerToolSelect={handleExplorerToolSelect}
+                handleTagCloudToolSelect={handleTagCloudToolSelect}
+                handleMermaidToolSelect={handleMermaidToolSelect}
+                setSettingsInitialTab={setSettingsInitialTab}
+                setIsSettingsModalOpen={setIsSettingsModalOpen}
+                bulkTagsToAdd={bulkTagsToAdd}
+                setBulkTagsToAdd={setBulkTagsToAdd}
+                bulkTagsToRemove={bulkTagsToRemove}
+                setBulkTagsToRemove={setBulkTagsToRemove}
+                setIsBulkEditActive={setIsBulkEditActive}
+                handleCommandExecution={handleCommandExecution}
+                handleOpenCommandHistory={handleOpenCommandHistory}
+                globalSettings={globalSettings}
+                isDarkMode={isDarkMode}
+                selectedElementId={selectedElementId}
+                handleAnalysisToolSelect={handleAnalysisToolSelect}
+            />
+        )}
+
+        {panelState.isFilterPanelOpen && persistence.currentModelId && !isPresenting && (
+            <FilterPanel 
+                allTags={allTags} 
+                tagCounts={tagCounts} 
+                tagFilter={tagFilter} 
+                dateFilter={dateFilter} 
+                nodeFilter={nodeFilter}
+                elements={elements}
+                onTagFilterChange={setTagFilter} 
+                onDateFilterChange={setDateFilter} 
+                onNodeFilterChange={setNodeFilter}
+                onClose={() => panelState.setIsFilterPanelOpen(false)} 
+                isDarkMode={isDarkMode} 
+            />
+        )}
+        
+        {/* Network Analysis Panel */}
+        {panelState.isNetworkAnalysisOpen && persistence.currentModelId && !isPresenting && (
+             <NetworkAnalysisPanel 
+                 elements={elements}
+                 relationships={relationships}
+                 onBulkTag={handleBulkTagAction}
+                 onHighlight={handleAnalysisHighlight}
+                 onFilter={handleAnalysisFilter}
+                 isSimulationMode={isSimulationMode}
+                 onToggleSimulation={() => setIsSimulationMode(p => !p)}
+                 onResetSimulation={() => setSimulationState({})}
+                 onClose={() => panelState.setIsNetworkAnalysisOpen(false)}
+                 isDarkMode={isDarkMode}
+             />
+        )}
+        
+        {/* Guidance Panel */}
+        {panelState.isGuidancePanelOpen && persistence.currentModelId && !isPresenting && (
+            <div className="fixed left-4 top-40 z-[600] w-[400px] h-[calc(100vh-200px)] shadow-2xl rounded-lg overflow-hidden border border-gray-600 bg-gray-900">
+                <GuidancePanel 
+                    content={panelState.guidanceContent} 
+                    onClose={() => panelState.setIsGuidancePanelOpen(false)} 
+                    isDarkMode={isDarkMode}
+                />
+            </div>
+        )}
+
+        {/* Random Walk Panel */}
+        {isRandomWalkOpen && persistence.currentModelId && !isPresenting && (
+            <RandomWalkPanel 
+                currentNodeName={walkState.currentNodeId ? (elements.find(e => e.id === walkState.currentNodeId)?.name || null) : null}
+                visitedCount={walkState.visitedIds.size}
+                totalCount={elements.length}
+                waitTime={walkState.waitTime}
+                setWaitTime={(t) => setWalkState(prev => ({...prev, waitTime: t}))}
+                isPaused={walkState.isPaused}
+                togglePause={() => setWalkState(prev => ({...prev, isPaused: !prev.isPaused, direction: 'forward', speedMultiplier: 1}))}
+                onStepBack={() => setWalkState(prev => {
+                    const prevIdx = prev.historyIndex - 1;
+                    if (prevIdx >= 0) {
+                        return { ...prev, isPaused: true, historyIndex: prevIdx, currentNodeId: prev.pathHistory[prevIdx] };
+                    }
+                    return { ...prev, isPaused: true };
+                })}
+                onPlayReverse={() => setWalkState(prev => ({ ...prev, isPaused: false, direction: 'backward', speedMultiplier: 4 }))}
+                onStepForward={() => setWalkState(prev => {
+                    const nextIdx = prev.historyIndex + 1;
+                    if (nextIdx < prev.pathHistory.length) {
+                        return { ...prev, isPaused: true, historyIndex: nextIdx, currentNodeId: prev.pathHistory[nextIdx] };
+                    }
+                    return { ...prev, isPaused: false, direction: 'forward', speedMultiplier: 1 };
+                })}
+                onFastForward={() => setWalkState(prev => ({ ...prev, isPaused: false, direction: 'forward', speedMultiplier: 4 }))}
+                onRandomStart={() => {
+                    if (elements.length > 0) {
+                        const randomEl = elements[Math.floor(Math.random() * elements.length)];
+                        setWalkState(prev => ({
+                            ...prev,
+                            currentNodeId: randomEl.id,
+                            pathHistory: [randomEl.id],
+                            historyIndex: 0,
+                            visitedIds: new Set([randomEl.id]),
+                            isPaused: false,
+                            direction: 'forward',
+                            speedMultiplier: 1,
+                            hideDetails: false
+                        }));
+                    }
+                }}
+                onSprint={() => {
+                    // Sprint logic removed for brevity in refactor (same as original)
+                    // Triggering play to keep it simple for now or implement full sprint logic again
+                    setWalkState(prev => ({ ...prev, isPaused: false, speedMultiplier: 5 }));
+                }}
+                hideDetails={walkState.hideDetails}
+                setHideDetails={(s) => setWalkState(prev => ({...prev, hideDetails: s}))}
+                onClose={() => {
+                    setIsRandomWalkOpen(false);
+                    setFocusMode(preWalkFocusMode);
+                }}
+                isDarkMode={isDarkMode}
+                direction={walkState.direction}
+                speedMultiplier={walkState.speedMultiplier}
+                onOpenGuidance={() => tools.handleOpenGuidance('random_walk')}
+            />
+        )}
+
+        {persistence.currentModelId && !isPresenting && (
+            <RightPanelContainer panels={panelDefinitions} layouts={panelLayouts} onLayoutChange={setPanelLayouts} activeDockedId={activeDockedPanelId} onActiveDockedIdChange={setActiveDockedPanelId} globalZIndex={panelZIndex} onGlobalZIndexChange={setPanelZIndex} isDarkMode={isDarkMode} />
+        )}
+
+        {persistence.currentModelId && !isPresenting && ((panelStateUI.view === 'addRelationship' && addRelationshipSourceElement) || selectedRelationship || (selectedElement && (!isRandomWalkOpen || !walkState.hideDetails))) && (
+            <div ref={panelRef} className={`z-[70] flex flex-col pointer-events-none ${detailsPanelPosition ? 'fixed shadow-2xl rounded-lg' : 'absolute top-24'}`} style={detailsPanelPosition ? { left: detailsPanelPosition.x, top: detailsPanelPosition.y, maxHeight: 'calc(100vh - 2rem)' } : { right: isRightPanelOpen ? '620px' : '16px', maxHeight: 'calc(100vh - 8rem)' }}>
+                <div className={`pointer-events-auto flex flex-col h-auto max-h-full shadow-2xl rounded-lg border min-h-0 ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+                    
+                    <div className="rounded-lg overflow-hidden flex flex-col min-h-0 flex-grow">
+                        {panelStateUI.view === 'addRelationship' && addRelationshipSourceElement ? (
+                            <AddRelationshipPanel 
+                                sourceElement={addRelationshipSourceElement} 
+                                targetElementId={panelStateUI.targetElementId} 
+                                isNewTarget={panelStateUI.isNewTarget} 
+                                allElements={elements} 
+                                onCreate={handleCompleteAddRelationship} 
+                                onUpdateElement={handleUpdateElement} 
+                                onCancel={handleCancelAddRelationship} 
+                                suggestedLabels={activeRelationshipLabels} 
+                                defaultLabel={activeColorScheme?.defaultRelationshipLabel} 
+                                colorSchemes={colorSchemes} 
+                                activeSchemeId={activeSchemeId} 
+                                isDarkMode={isDarkMode} 
+                                relationships={relationships} 
+                                onUpdateRelationship={handleUpdateRelationship} 
+                                onDragStart={handlePanelDragStart}
+                            />
+                        ) : selectedRelationship ? (
+                            <RelationshipDetailsPanel 
+                                relationship={selectedRelationship} 
+                                elements={elements} 
+                                onUpdate={handleUpdateRelationship} 
+                                onDelete={handleDeleteRelationship} 
+                                suggestedLabels={activeRelationshipLabels} 
+                                isDarkMode={isDarkMode}
+                                onClose={() => setSelectedRelationshipId(null)}
+                                onDragStart={handlePanelDragStart}
+                            />
+                        ) : selectedElement ? (
+                            <ElementDetailsPanel element={selectedElement} allElements={elements} relationships={relationships} onUpdate={handleUpdateElement} onDelete={handleDeleteElement} onClose={() => setSelectedElementId(null)} colorSchemes={colorSchemes} activeSchemeId={activeSchemeId} isDarkMode={isDarkMode} onDragStart={handlePanelDragStart} />
+                        ) : null}
+                    </div>
+                </div>
+            </div>
+        )}
+
+        <ChatPanel className={(!panelState.isChatPanelOpen || !persistence.currentModelId || isPresenting) ? 'hidden' : ''} isOpen={panelState.isChatPanelOpen} elements={elements} relationships={relationships} colorSchemes={colorSchemes} activeSchemeId={activeSchemeId} onClose={() => panelState.setIsChatPanelOpen(false)} currentModelId={persistence.currentModelId} modelActions={aiActions} onOpenPromptSettings={() => { setSettingsInitialTab('ai_prompts'); setIsSettingsModalOpen(true); }} systemPromptConfig={systemPromptConfig} documents={documents} folders={folders} openDocIds={openDocIds} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onOpenTool={tools.handleOpenTool} initialInput={chatDraftMessage} aiConfig={aiConfig} isDarkMode={isDarkMode} messages={chatConversation} setMessages={setChatConversation} />
+        {isDebugPanelOpen && <DebugPanel messages={debugLog} onClose={() => setIsDebugPanelOpen(false)} isDarkMode={isDarkMode} />}
+        
+        <AppModals 
+            tools={tools}
+            panelState={panelState}
+            persistence={persistence}
+            elements={elements}
+            relationships={relationships}
+            selectedElementId={selectedElementId}
+            modelActions={aiActions}
+            documents={documents}
+            folders={folders}
+            onUpdateDocument={handleUpdateDocument}
+            handleAnalyzeWithChat={handleAnalyzeWithChat}
+            handleLogHistory={handleLogHistory}
+            defaultTags={defaultTags}
+            aiConfig={aiConfig}
+            isDarkMode={isDarkMode}
+            globalSettings={globalSettings}
+            handleGlobalSettingsChange={handleGlobalSettingsChange}
+            systemPromptConfig={systemPromptConfig}
+            setSystemPromptConfig={setSystemPromptConfig}
+            isSettingsModalOpen={isSettingsModalOpen}
+            setIsSettingsModalOpen={setIsSettingsModalOpen}
+            settingsInitialTab={settingsInitialTab}
+            isAboutModalOpen={isAboutModalOpen}
+            setIsAboutModalOpen={setIsAboutModalOpen}
+            isPatternGalleryModalOpen={isPatternGalleryModalOpen}
+            setIsPatternGalleryModalOpen={setIsPatternGalleryModalOpen}
+            isUserGuideModalOpen={isUserGuideModalOpen}
+            setIsUserGuideModalOpen={setIsUserGuideModalOpen}
+            isCsvModalOpen={isCsvModalOpen}
+            setIsCsvModalOpen={setIsCsvModalOpen}
+            handleImportCsv={handleImportCsv}
+            isSelfTestModalOpen={isSelfTestModalOpen}
+            setIsSelfTestModalOpen={setIsSelfTestModalOpen}
+            testLogs={testLogs}
+            testStatus={testStatus}
+            importFileRef={importFileRef}
+            handleCustomStrategiesChange={handleCustomStrategiesChange}
+            getToolPrompt={getToolPrompt}
         />
+
+        {persistence.currentModelId ? (
+            <>
+                <GraphCanvas 
+                    ref={graphCanvasRef} 
+                    elements={filteredElements} 
+                    relationships={filteredRelationships} 
+                    onNodeClick={handleNodeClick} 
+                    onLinkClick={handleLinkClick} 
+                    onCanvasClick={handleCanvasClick} 
+                    onCanvasDoubleClick={handleAddElement} 
+                    onNodeContextMenu={handleNodeContextMenu} 
+                    onLinkContextMenu={handleLinkContextMenu}
+                    onCanvasContextMenu={handleCanvasContextMenu} 
+                    onNodeConnect={handleNodeConnect} 
+                    onNodeConnectToNew={handleNodeConnectToNew} 
+                    activeColorScheme={activeColorScheme} 
+                    selectedElementId={selectedElementId}
+                    setSelectedElementId={setSelectedElementId}
+                    multiSelection={multiSelection}
+                    setMultiSelection={setMultiSelection}
+                    selectedRelationshipId={selectedRelationshipId} 
+                    focusMode={focusMode} 
+                    setElements={setElements} 
+                    isPhysicsModeActive={isPhysicsModeActive} 
+                    layoutParams={layoutParams} 
+                    onJiggleTrigger={jiggleTrigger} 
+                    isBulkEditActive={isBulkEditActive} 
+                    isSimulationMode={isSimulationMode}
+                    simulationState={simulationState} 
+                    analysisHighlights={analysisHighlights} 
+                    isDarkMode={isDarkMode}
+                    nodeShape={nodeShape}
+                />
+                <ContextMenus 
+                    contextMenu={contextMenu}
+                    relationshipContextMenu={relationshipContextMenu}
+                    canvasContextMenu={canvasContextMenu}
+                    relationships={relationships}
+                    panelState={panelState}
+                    persistence={persistence}
+                    onCloseContextMenu={handleCloseContextMenu}
+                    onCloseRelationshipContextMenu={handleCloseRelationshipContextMenu}
+                    onCloseCanvasContextMenu={handleCloseCanvasContextMenu}
+                    onDeleteElement={handleDeleteElement}
+                    onAddRelationshipFromContext={(id) => { setPanelStateUI({ view: 'addRelationship', sourceElementId: id, targetElementId: null, isNewTarget: false }); setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); }}
+                    onDeleteRelationship={handleDeleteRelationship}
+                    onChangeRelationshipDirection={handleChangeRelationshipDirection}
+                    onZoomToFit={handleZoomToFit}
+                    onAutoLayout={handleStaticLayout}
+                    onSaveAsImage={handleSaveAsImage}
+                    importFileRef={importFileRef}
+                    isDarkMode={isDarkMode}
+                />
+            </>
+        ) : (
+            <StartScreen 
+                isDarkMode={isDarkMode} 
+                persistence={persistence} 
+                importFileRef={importFileRef} 
+                onAbout={() => setIsAboutModalOpen(true)}
+                onUserGuide={() => setIsUserGuideModalOpen(true)}
+            />
+        )}
+      </div>
+
+      {/* Status Bar at the bottom */}
+      {persistence.currentModelId && (
+          <StatusBar 
+            nodeCount={filteredElements.length}
+            totalNodeCount={elements.length}
+            edgeCount={filteredRelationships.length}
+            totalEdgeCount={relationships.length}
+            isDarkMode={isDarkMode}
+            
+            sunburstState={panelState.sunburstState}
+            onClearSunburst={() => {
+                if (originalElements) setElements(originalElements);
+                panelState.setSunburstState(prev => ({ ...prev, active: false, centerId: null, hops: 0 }));
+                setIsPhysicsModeActive(false);
+                setOriginalElements(null);
+                panelState.setIsSunburstPanelOpen(false);
+            }}
+            centerNodeName={elements.find(e => e.id === panelState.sunburstState.centerId)?.name}
+
+            nodeFilterState={nodeFilter}
+            onClearNodeFilter={() => setNodeFilter(prev => ({ ...prev, active: false }))}
+            filterCenterNodeName={elements.find(e => e.id === nodeFilter.centerId)?.name}
+
+            selectionCount={multiSelection.size}
+            onClearSelection={() => { setMultiSelection(new Set()); setSelectedElementId(null); }}
+          />
       )}
     </div>
   );

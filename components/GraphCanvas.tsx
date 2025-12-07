@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
+import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo, useState } from 'react';
 import * as d3Import from 'd3';
 import { Element, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection, SimulationNodeState, NodeShape } from '../types';
 import { LINK_DISTANCE, NODE_MAX_WIDTH, NODE_PADDING, DEFAULT_NODE_COLOR } from '../constants';
@@ -20,7 +20,9 @@ interface GraphCanvasProps {
   onNodeConnectToNew: (sourceId: string, coords: { x: number, y: number }) => void;
   activeColorScheme: ColorScheme | undefined;
   selectedElementId: string | null;
+  setSelectedElementId: React.Dispatch<React.SetStateAction<string | null>>;
   multiSelection: Set<string>;
+  setMultiSelection: React.Dispatch<React.SetStateAction<Set<string>>>;
   selectedRelationshipId: string | null;
   focusMode: 'narrow' | 'wide' | 'zoom';
   setElements: React.Dispatch<React.SetStateAction<Element[]>>;
@@ -151,6 +153,9 @@ const createDragHandler = (
     
     // Check if dragging via a quick-add button
     if (target.closest('.quick-add-btn')) return;
+    
+    // If Alt key is pressed, let the canvas handle box selection, don't drag node
+    if (event.sourceEvent.altKey) return;
 
     isMoving = target.classList.contains('move-zone');
     hasMoved = false;
@@ -179,6 +184,7 @@ const createDragHandler = (
   function dragged(this: SVGGElement, event: any, d: D3Node) {
     const target = event.sourceEvent.target as SVGElement;
     if (target.closest('.quick-add-btn')) return;
+    if (event.sourceEvent.altKey) return;
 
     const e = event as any;
     if (!hasMoved && (Math.abs(e.x - startX) > 3 || Math.abs(e.y - startY) > 3)) {
@@ -209,27 +215,28 @@ const createDragHandler = (
         const nodeDataMap = new Map<string, D3Node>();
         d3.select(this.ownerSVGElement).selectAll('.node').each((n: any) => nodeDataMap.set(n.id, n));
 
-        // Update connected Links
+        // Update connected Links efficiently by filtering first
         d3.select(this.ownerSVGElement).selectAll('.link')
+            .filter((l: any) => {
+                const sourceId = typeof l.source === 'object' ? l.source.id : l.source as string;
+                const targetId = typeof l.target === 'object' ? l.target.id : l.target as string;
+                
+                return (isGroupDrag && (multiSelection.has(sourceId) || multiSelection.has(targetId))) || 
+                       (!isGroupDrag && (sourceId === d.id || targetId === d.id));
+            })
             .attr('d', (l: any) => {
                 const sourceId = typeof l.source === 'object' ? l.source.id : l.source as string;
                 const targetId = typeof l.target === 'object' ? l.target.id : l.target as string;
                 
-                // If either end of the link is moving, update it
-                if ((isGroupDrag && (multiSelection.has(sourceId) || multiSelection.has(targetId))) || 
-                    (!isGroupDrag && (sourceId === d.id || targetId === d.id))) {
-                    
-                    const sNode = nodeDataMap.get(sourceId);
-                    const tNode = nodeDataMap.get(targetId);
-                    
-                    if (sNode && tNode) {
-                         const startPoint = getRectIntersection(sNode, tNode);
-                         const endPoint = getRectIntersection(tNode, sNode);
-                         return `M${startPoint.x},${startPoint.y} L${endPoint.x},${endPoint.y}`;
-                    }
+                const sNode = nodeDataMap.get(sourceId);
+                const tNode = nodeDataMap.get(targetId);
+                
+                if (sNode && tNode) {
+                     const startPoint = getRectIntersection(sNode, tNode);
+                     const endPoint = getRectIntersection(tNode, sNode);
+                     return `M${startPoint.x},${startPoint.y} L${endPoint.x},${endPoint.y}`;
                 }
-                // Return existing 'd' if not updated, but d3 attr callback expects a string return
-                return d3.select(`#${l.id}`).attr('d');
+                return null;
             });
 
     } else {
@@ -246,6 +253,7 @@ const createDragHandler = (
   function dragended(this: SVGGElement, event: any, d: D3Node) {
     const target = event.sourceEvent.target as SVGElement;
     if (target.closest('.quick-add-btn')) return;
+    if (event.sourceEvent.altKey) return;
 
     // Cleanup temp line
     if (!isMoving) {
@@ -312,6 +320,7 @@ const createPhysicsDragHandler = (
   function dragstarted(this: SVGGElement, event: any, d: D3Node) {
     const target = event.sourceEvent.target as SVGElement;
     if (target.closest('.quick-add-btn')) return;
+    if (event.sourceEvent.altKey) return;
 
     if (!event.active) {
       simulation.alphaTarget(0.3);
@@ -336,6 +345,7 @@ const createPhysicsDragHandler = (
   function dragged(this: SVGGElement, event: any, d: D3Node) {
     const target = event.sourceEvent.target as SVGElement;
     if (target.closest('.quick-add-btn')) return;
+    if (event.sourceEvent.altKey) return;
 
     const e = event as any;
     if (!hasMoved && (Math.abs(e.x - startX) > 3 || Math.abs(e.y - startY) > 3)) {
@@ -360,6 +370,7 @@ const createPhysicsDragHandler = (
   function dragended(this: SVGGElement, event: any, d: D3Node) {
     const target = event.sourceEvent.target as SVGElement;
     if (target.closest('.quick-add-btn')) return;
+    if (event.sourceEvent.altKey) return;
 
     if (!event.active) simulation.alphaTarget(0);
     
@@ -414,7 +425,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   onNodeConnectToNew,
   activeColorScheme,
   selectedElementId,
+  setSelectedElementId,
   multiSelection,
+  setMultiSelection,
   selectedRelationshipId,
   focusMode,
   setElements,
@@ -433,6 +446,170 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   const simulationRef = useRef<any | null>(null);
   const zoomRef = useRef<any | null>(null);
   
+  // Box Selection State
+  const [selectionBox, setSelectionBox] = useState<{ startX: number; startY: number; currentX: number; currentY: number; } | null>(null);
+  
+  // Refs for selection drag processing
+  const [isSelecting, setIsSelecting] = useState(false);
+  const selectionDragRef = useRef<{ 
+      startX: number; 
+      startY: number; 
+      currentX: number; 
+      currentY: number; 
+      initialSelection: Set<string>;
+  } | null>(null);
+  
+  // Ref to prevent click event on canvas after drag selection
+  const preventClickRef = useRef(false);
+
+  // Use a separate useEffect to attach/detach window listeners for selection drag
+  // This avoids stale closures and re-binding listeners constantly
+  useEffect(() => {
+    if (!isSelecting) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+        if (selectionDragRef.current && svgRef.current && gRef.current) {
+            const rect = svgRef.current.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Update ref for logic
+            selectionDragRef.current = {
+                ...selectionDragRef.current,
+                currentX: x,
+                currentY: y
+            };
+            
+            // Update visual box
+            setSelectionBox({ 
+                startX: selectionDragRef.current.startX, 
+                startY: selectionDragRef.current.startY, 
+                currentX: x, 
+                currentY: y 
+            });
+
+            // --- Dynamic Selection Logic ---
+            const box = selectionDragRef.current;
+            const xMin = Math.min(box.startX, box.currentX);
+            const xMax = Math.max(box.startX, box.currentX);
+            const yMin = Math.min(box.startY, box.currentY);
+            const yMax = Math.max(box.startY, box.currentY);
+
+            if ((xMax - xMin) > 5 && (yMax - yMin) > 5) {
+                 const transform = d3.zoomTransform(svgRef.current);
+                 const boxSelection = new Set<string>();
+
+                 // We iterate through D3 nodes to get current positions
+                 d3.select(gRef.current).selectAll('.node').each(function(d: any) {
+                     if (d.x !== undefined && d.y !== undefined) {
+                         // Convert simulation coords to screen coords
+                         const screenX = d.x * transform.k + transform.x;
+                         const screenY = d.y * transform.k + transform.y;
+                         
+                         // Check intersection
+                         if (screenX >= xMin && screenX <= xMax && screenY >= yMin && screenY <= yMax) {
+                             boxSelection.add(d.id);
+                         }
+                     }
+                 });
+                 
+                 // Determine final selection based on Modifier keys
+                 let finalSelection: Set<string>;
+                 
+                 if (e.metaKey || e.ctrlKey) {
+                     // Invert Selection (XOR)
+                     // Keep everything in initial, toggle everything in box
+                     finalSelection = new Set(box.initialSelection);
+                     boxSelection.forEach(id => {
+                         if (finalSelection.has(id)) {
+                             finalSelection.delete(id);
+                         } else {
+                             finalSelection.add(id);
+                         }
+                     });
+                 } else if (e.shiftKey) {
+                     // Add to selection
+                     finalSelection = new Set([...box.initialSelection, ...boxSelection]);
+                 } else {
+                     // Replace selection
+                     finalSelection = boxSelection;
+                 }
+                 
+                 // Update state if selection changed to trigger visual feedback
+                 setMultiSelection(prev => {
+                     if (prev.size === finalSelection.size && [...prev].every(id => finalSelection.has(id))) {
+                         return prev;
+                     }
+                     return finalSelection;
+                 });
+                 
+                 if (finalSelection.size > 0) {
+                     setSelectedElementId(null);
+                 }
+            }
+        }
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+        if (selectionDragRef.current) {
+             const box = selectionDragRef.current;
+             const width = Math.abs(box.currentX - box.startX);
+             const height = Math.abs(box.currentY - box.startY);
+             
+             // Only clear if it was a tiny drag (click)
+             if (width < 5 && height < 5) {
+                 setMultiSelection(new Set());
+                 setSelectedElementId(null);
+             } else {
+                 // Significant drag happened, keep selection and prevent subsequent click
+                 preventClickRef.current = true;
+                 setTimeout(() => { preventClickRef.current = false; }, 100);
+             }
+        }
+        
+        // Reset State
+        setIsSelecting(false);
+        selectionDragRef.current = null;
+        setSelectionBox(null);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isSelecting, setMultiSelection, setSelectedElementId]);
+
+  const handleSelectionMouseDown = (e: React.MouseEvent) => {
+      // Alt + Left Click starts selection
+      if (e.button === 0 && e.altKey && svgRef.current) {
+          e.preventDefault();
+          e.stopPropagation();
+          
+          const rect = svgRef.current.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+
+          // Capture current selection for adding to it
+          const initialSelection = new Set(multiSelection);
+
+          const initBox = { 
+              startX: x, 
+              startY: y, 
+              currentX: x, 
+              currentY: y,
+              initialSelection
+          };
+          
+          selectionDragRef.current = initBox;
+          // For UI rendering, we just need coords
+          setSelectionBox({ startX: x, startY: y, currentX: x, currentY: y });
+          setIsSelecting(true);
+      }
+  };
+
   const internalZoomToFit = (nodesToFit?: D3Node[], limitMaxZoom = false) => {
     if (!svgRef.current || !gRef.current || !simulationRef.current || !zoomRef.current) return;
 
@@ -688,7 +865,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .attr('stroke', (d: any) => (d.id === selectedRelationshipId ? selectedLinkColor : linkColor))
       .attr('stroke-width', (d: any) => (d.id === selectedRelationshipId ? 3 : 2))
       .attr('fill', 'none')
-      .attr('marker-end', (d: any) => (d.direction === RelationshipDirection.To || d.direction === RelationshipDirection.Both ? (isDarkMode ? 'url(#arrow)' : 'url(#arrow-light)') : null))
+      .attr('marker-end', (d: any) => (d.direction === RelationshipDirection.To || d.direction === RelationshipDirection. Both ? (isDarkMode ? 'url(#arrow)' : 'url(#arrow-light)') : null))
       .attr('marker-start', (d: any) => (d.direction === RelationshipDirection.From || d.direction === RelationshipDirection.Both ? (isDarkMode ? 'url(#arrow-rev)' : 'url(#arrow-rev-light)') : null))
       .style('transition', 'opacity 0.3s ease, stroke 0.2s ease, stroke-width 0.2s ease')
       .attr('opacity', (l: any) => {
@@ -1070,6 +1247,38 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     node.style('cursor', cursorStyle);
     node.select('.move-zone').style('cursor', moveZoneCursor);
 
+    const zoom = d3.zoom()
+        .filter((event: any) => {
+            // Allow zoom if NO buttons are pressed (wheel) OR if left button is pressed WITHOUT Alt
+            return (!event.button && !event.altKey) || (event.button === 0 && !event.altKey);
+        })
+        .on('zoom', (event: any) => {
+          g.attr('transform', event.transform);
+        });
+
+    zoomRef.current = zoom;
+    svg.call(zoom as any);
+    svg.on('click', (event: any) => {
+        if (preventClickRef.current) {
+            preventClickRef.current = false;
+            return;
+        }
+        onCanvasClick();
+    });
+    
+    // Add SVG text/background double click listener
+    svg.on('dblclick.zoom', null)
+      .on('dblclick', (event: any) => {
+        // Check if click target is svg background
+        if (event.target.tagName === 'svg' || event.target === svg.node() || event.target.tagName === 'rect' && event.target.classList.contains('selection-box')) {
+            const node = g.node();
+            if (node) {
+                const [x, y] = d3.pointer(event, node);
+                onCanvasDoubleClick({x, y});
+            }
+        }
+      });
+
     if (isPhysicsModeActive) {
       simulation
         .force('link', d3.forceLink(d3Links).id((d: any) => d.id).distance(layoutParams.linkDistance))
@@ -1110,30 +1319,13 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     
     (simulation.alpha(0.3) as any).restart();
 
-    const zoom = d3.zoom().on('zoom', (event: any) => {
-      g.attr('transform', event.transform);
-    });
-
-    zoomRef.current = zoom;
-    
-    svg.call(zoom as any);
-    svg.on('click', onCanvasClick);
-    svg.on('dblclick.zoom', null)
-      .on('dblclick', (event: any) => {
-        // Check if click target is svg background
-        if (event.target.tagName === 'svg' || event.target === svg.node()) {
-            const node = g.node();
-            if (node) {
-                const [x, y] = d3.pointer(event, node);
-                onCanvasDoubleClick({x, y});
-            }
-        }
-      });
-
   }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, multiSelection, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, onLinkContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState, isSimulationMode, analysisHighlights, isDarkMode, nodeShape]);
 
   return (
-    <div className={`w-full h-full flex-grow cursor-grab active:cursor-grabbing ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`} onContextMenu={handleCanvasContextMenu}>
+    <div className={`w-full h-full flex-grow cursor-grab active:cursor-grabbing select-none ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`} 
+         onContextMenu={handleCanvasContextMenu}
+         onMouseDownCapture={handleSelectionMouseDown}
+    >
       <svg ref={svgRef} className="w-full h-full">
         <defs>
           <marker
@@ -1232,6 +1424,22 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
           </filter>
         </defs>
         <g ref={gRef}></g>
+        
+        {/* Selection Box Overlay */}
+        {selectionBox && (
+            <rect 
+                x={Math.min(selectionBox.startX, selectionBox.currentX)}
+                y={Math.min(selectionBox.startY, selectionBox.currentY)}
+                width={Math.abs(selectionBox.currentX - selectionBox.startX)}
+                height={Math.abs(selectionBox.currentY - selectionBox.startY)}
+                fill="rgba(59, 130, 246, 0.1)" 
+                stroke="#3b82f6" 
+                strokeWidth="1" 
+                strokeDasharray="4"
+                className="selection-box"
+                pointerEvents="none"
+            />
+        )}
       </svg>
     </div>
   );

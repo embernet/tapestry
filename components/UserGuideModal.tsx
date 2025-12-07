@@ -1,6 +1,7 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { TOOL_DOCUMENTATION } from '../documentation';
+import { TAPESTRY_PATTERNS } from './PatternAssets';
 
 interface ModalProps {
   onClose: () => void;
@@ -29,7 +30,7 @@ const INTERFACE_ITEMS = [
     { id: 'interface-report', name: "Report", desc: "Generate a readable text report of the model.", icon: <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /> },
     { id: 'interface-history', name: "History", desc: "View log of AI interactions.", icon: <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /> },
     { id: 'interface-chat', name: "AI Chat", desc: "Chat with the graph using AI.", icon: <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /> },
-    { id: 'interface-settings', name: "Settings", desc: "Configure API keys and prompts.", icon: <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /> },
+    { id: 'interface-settings', name: "Settings", desc: "Configure API keys and prompts.", icon: <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /> },
     { id: 'interface-zoom', name: "Zoom Fit", desc: "Center the graph.", icon: <path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" /> },
 ];
 
@@ -39,12 +40,32 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
     const [windowPos, setWindowPos] = useState({ x: 100, y: 80 });
     const [isMovingWindow, setIsMovingWindow] = useState(false);
     const [isResizingWindow, setIsResizingWindow] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+    
     const dragStartRef = useRef({ x: 0, y: 0 });
     const initialDimRef = useRef({ width: 0, height: 0, x: 0, y: 0 });
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    const [activeTab, setActiveTab] = useState<'interface' | 'tools' | 'index'>('index');
+    const [activeTab, setActiveTab] = useState<'intro' | 'interface' | 'tools' | 'patterns' | 'index'>('intro');
     const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+        const checkMobile = () => {
+            const mobile = window.innerWidth < 768;
+            setIsMobile(mobile);
+            if (mobile) {
+                setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+                setWindowPos({ x: 0, y: 0 });
+            } else {
+                setWindowSize({ width: Math.min(1000, window.innerWidth - 100), height: Math.min(700, window.innerHeight - 100) });
+                setWindowPos({ x: 50, y: 50 });
+            }
+        };
+        
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     // Combine items for index
     const indexItems = useMemo(() => {
@@ -95,6 +116,8 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
 
     // --- Window Interaction Handlers ---
     const handleHeaderMouseDown = (e: React.MouseEvent) => {
+        if (isMobile) return; // Disable drag on mobile
+        
         // Prevent drag if clicking inputs/buttons in header
         if ((e.target as HTMLElement).closest('input, button')) return;
         
@@ -104,6 +127,7 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
     };
 
     const handleResizeMouseDown = (e: React.MouseEvent) => {
+        if (isMobile) return; // Disable resize on mobile
         e.stopPropagation();
         setIsResizingWindow(true);
         dragStartRef.current = { x: e.clientX, y: e.clientY };
@@ -161,27 +185,31 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
     const subItemBg = isDarkMode ? 'bg-gray-900/50' : 'bg-gray-50/50';
     const sectionTitle = isDarkMode ? 'text-blue-400' : 'text-blue-600';
     const searchBg = isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900';
+    const highlightText = isDarkMode ? 'text-blue-200' : 'text-blue-900';
+    const cardBg = isDarkMode ? 'bg-gray-800 hover:bg-gray-750' : 'bg-white hover:bg-gray-50';
+    const svgContainerBg = isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-gray-100 border-gray-300';
 
     return (
-        <div className="fixed inset-0 pointer-events-none z-[1100]">
+        <div className="fixed inset-0 pointer-events-none z-[1100] flex justify-center items-center">
             <div 
-                className={`absolute flex flex-col rounded-lg border ${bgClass} shadow-2xl pointer-events-auto overflow-hidden`}
+                className={`absolute flex flex-col rounded-lg border ${bgClass} shadow-2xl pointer-events-auto overflow-hidden max-w-full max-h-full`}
                 style={{ 
                     width: windowSize.width, 
                     height: windowSize.height,
-                    left: windowPos.x,
-                    top: windowPos.y
+                    left: isMobile ? 0 : windowPos.x,
+                    top: isMobile ? 0 : windowPos.y,
+                    position: isMobile ? 'fixed' : 'absolute'
                 }}
             >
                 {/* Header */}
                 <div 
-                    className={`p-4 border-b flex justify-between items-center ${headerBg} cursor-move select-none`}
+                    className={`p-4 border-b flex justify-between items-center flex-shrink-0 ${headerBg} ${!isMobile ? 'cursor-move' : ''} select-none`}
                     onMouseDown={handleHeaderMouseDown}
                 >
-                    <div className="flex items-center gap-6 flex-grow">
-                        <div>
-                            <h2 className={`text-xl font-bold ${textHeader}`}>User Guide</h2>
-                            <p className={`text-xs ${textDesc}`}>Reference for tools and interface.</p>
+                    <div className="flex items-center gap-4 md:gap-6 flex-grow min-w-0">
+                        <div className="flex-shrink-0">
+                            <h2 className={`text-lg md:text-xl font-bold ${textHeader} truncate`}>User Guide</h2>
+                            <p className={`text-xs ${textDesc} hidden md:block`}>Reference for tools and interface.</p>
                         </div>
                         {/* Search Bar */}
                         <div className="relative flex-grow max-w-md">
@@ -192,7 +220,7 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                                 type="text" 
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search topics (A-Z)..."
+                                placeholder="Search..."
                                 className={`w-full pl-9 pr-8 py-1.5 rounded-full text-sm outline-none border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${searchBg}`}
                             />
                             {searchQuery && (
@@ -201,44 +229,159 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                                     className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors`}
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                                     </svg>
                                 </button>
                             )}
                         </div>
                     </div>
-                    <button onClick={onClose} className={`${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-500 hover:text-black hover:bg-gray-200'} p-2 rounded-full transition-colors`}>
+                    <button onClick={onClose} className={`${isDarkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-500 hover:text-black hover:bg-gray-200'} p-2 rounded-full transition-colors flex-shrink-0 ml-2`}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
 
-                {/* Tabs */}
-                <div className={`flex border-b ${isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'}`}>
+                {/* Tabs - Scrollable on Mobile */}
+                <div className={`flex overflow-x-auto border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}`}>
+                     <button 
+                        onClick={() => setActiveTab('intro')}
+                        className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'intro' ? tabActive : tabInactive}`}
+                    >
+                        Introduction
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('patterns')}
+                        className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'patterns' ? tabActive : tabInactive}`}
+                    >
+                        Patterns
+                    </button>
                     <button 
                         onClick={() => setActiveTab('index')}
-                        className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'index' ? tabActive : tabInactive}`}
+                        className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'index' ? tabActive : tabInactive}`}
                     >
-                        Index (A-Z)
+                        Index
                     </button>
                     <button 
                         onClick={() => setActiveTab('interface')}
-                        className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'interface' ? tabActive : tabInactive}`}
+                        className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'interface' ? tabActive : tabInactive}`}
                     >
-                        Interface & Navigation
+                        Interface
                     </button>
                     <button 
                         onClick={() => setActiveTab('tools')}
-                        className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'tools' ? tabActive : tabInactive}`}
+                        className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'tools' ? tabActive : tabInactive}`}
                     >
-                        Analysis & Creation Tools
+                        Tools
                     </button>
                 </div>
 
                 {/* Content */}
-                <div ref={scrollContainerRef} className={`flex-grow overflow-y-auto p-6 custom-scrollbar ${scrollBg}`}>
+                <div ref={scrollContainerRef} className={`flex-grow overflow-y-auto min-h-0 p-4 md:p-8 custom-scrollbar ${scrollBg}`}>
                     
+                    {activeTab === 'intro' && (
+                        <div className="max-w-4xl mx-auto space-y-10">
+                            {/* Introduction Hero */}
+                            <div className="space-y-4 border-b pb-8 border-gray-700/50">
+                                <h3 className={`text-3xl font-bold ${textHeader}`}>Welcome to Tapestry Studio</h3>
+                                <p className={`text-lg leading-relaxed ${highlightText}`}>
+                                    Tapestry Studio is an AI-powered knowledge graph environment designed for systems thinking. 
+                                    It combines a flexible node-link canvas with structured analytical frameworks.
+                                </p>
+                                <div className={`p-4 rounded-lg text-sm leading-relaxed border ${isDarkMode ? 'bg-blue-900/20 border-blue-800 text-blue-200' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
+                                    <strong>Motivation:</strong> Linear documents and static diagrams often fail to capture the complexity of real-world systems. 
+                                    Tapestry was created to bridge this gap, allowing users to model causal relationships and leverage AI to analyze structure, 
+                                    detect contradictions, and generate solutions.
+                                </div>
+                            </div>
+
+                            {/* Scenarios */}
+                            <div className="space-y-4">
+                                <h4 className={`text-xl font-bold ${textHeader}`}>Common Scenarios</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className={`p-4 rounded-lg border ${itemBg}`}>
+                                        <h5 className={`font-bold mb-2 ${sectionTitle}`}>System Design & Analysis</h5>
+                                        <p className={`text-sm ${textDesc}`}>Mapping software architecture, supply chains, or organizational structures to identify dependencies and single points of failure.</p>
+                                    </div>
+                                    <div className={`p-4 rounded-lg border ${itemBg}`}>
+                                        <h5 className={`font-bold mb-2 ${sectionTitle}`}>Strategic Planning</h5>
+                                        <p className={`text-sm ${textDesc}`}>Using SWOT, PESTEL, or Porter's Five Forces to map external factors against internal capabilities for robust decision making.</p>
+                                    </div>
+                                    <div className={`p-4 rounded-lg border ${itemBg}`}>
+                                        <h5 className={`font-bold mb-2 ${sectionTitle}`}>Innovation & Ideation</h5>
+                                        <p className={`text-sm ${textDesc}`}>Applying TRIZ or SCAMPER methodologies to systematically break out of creative blocks and solve technical contradictions.</p>
+                                    </div>
+                                    <div className={`p-4 rounded-lg border ${itemBg}`}>
+                                        <h5 className={`font-bold mb-2 ${sectionTitle}`}>Process Improvement</h5>
+                                        <p className={`text-sm ${textDesc}`}>Using Lean Six Sigma or Theory of Constraints (TOC) to identify bottlenecks, waste, and root causes in complex workflows.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tool Summary Grid */}
+                            <div className="space-y-4">
+                                <h4 className={`text-xl font-bold ${textHeader}`}>Toolbox Summary</h4>
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    {TOOL_DOCUMENTATION.filter(t => !t.hideInGuide).map(tool => (
+                                        <button 
+                                            key={tool.id}
+                                            onClick={() => handleNavigate('tools', tool.id)}
+                                            className={`p-3 text-left rounded border transition-all group flex flex-col gap-2 ${cardBg} ${isDarkMode ? 'border-gray-700 hover:border-gray-500' : 'border-gray-200 hover:border-blue-300'}`}
+                                        >
+                                            <div className={`flex items-center gap-2 ${tool.color}`}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                    {tool.icon}
+                                                </svg>
+                                                <span className="font-bold text-xs uppercase tracking-wide">{tool.name}</span>
+                                            </div>
+                                            <p className={`text-xs leading-snug line-clamp-2 ${textDesc} group-hover:${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>
+                                                {tool.desc}
+                                            </p>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {activeTab === 'patterns' && (
+                        <div className="space-y-12 max-w-5xl mx-auto pb-10">
+                            {/* Philosophical Intro */}
+                            <div className="max-w-4xl mx-auto space-y-6 border-b border-gray-700/50 pb-8">
+                                <h3 className={`text-3xl font-bold ${textHeader} tracking-tight`}>The Architecture of Thought</h3>
+                                <div className={`text-base md:text-lg leading-relaxed space-y-6 ${textDesc}`}>
+                                    <p>
+                                        Creativity arises when ideas clash and form structure that drives cognition. Blank pages present challenges because they contain no stimulus.
+                                    </p>
+                                    <p className={`pl-4 border-l-4 ${isDarkMode ? 'border-blue-500/50' : 'border-blue-400'} italic ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                                        Patterns, ideas, structure, axes of change, tensions, conflicts of interest, goals, risks, and understanding of the nuances of trade-offs demand and drive creativity as a psychological imperative resulting from evolution of billions of years honing us into problem solvers that can survive in a myriad of unpredictable situations.
+                                    </p>
+                                    <p>
+                                        Seek the edges, the boundaries, the differences, find people with other perspectives and engage in dialogue. Creativity will flow like a river.
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            {/* Gallery */}
+                            <div>
+                                <h4 className={`text-xl font-bold mb-6 ${textHeader}`}>Pattern Gallery</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {TAPESTRY_PATTERNS.map((pattern, idx) => (
+                                        <div key={idx} className={`${itemBg} border rounded-lg p-5 hover:border-blue-500 transition-colors group flex flex-col`}>
+                                            <div className={`h-40 w-full mb-4 rounded flex items-center justify-center overflow-hidden border ${svgContainerBg}`}>
+                                                <div className="w-20 h-20 opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-transform">
+                                                    {pattern.svg}
+                                                </div>
+                                            </div>
+                                            <h3 className="text-lg font-bold text-blue-400 mb-2">{pattern.name}</h3>
+                                            <p className={`text-sm ${textDesc} leading-relaxed`}>{pattern.desc}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'index' && (
                          <div className="columns-1 md:columns-2 lg:columns-3 gap-8 space-y-8">
                              {Object.keys(groupedIndex).sort().map(letter => (
@@ -308,7 +451,7 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                                             </div>
                                         </div>
                                         {tool.summary && (
-                                            <p className={`text-xs leading-relaxed opacity-80 pl-11 ${textDesc}`}>
+                                            <p className={`text-xs leading-relaxed opacity-80 md:pl-11 ${textDesc}`}>
                                                 {tool.summary}
                                             </p>
                                         )}
@@ -357,15 +500,17 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                     )}
                 </div>
 
-                {/* Resize Handle */}
-                <div 
-                    className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-end justify-end p-1 z-50"
-                    onMouseDown={handleResizeMouseDown}
-                >
-                    <svg viewBox="0 0 10 10" className={`w-4 h-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                        <path d="M10 10 L10 2 L2 10 Z" fill="currentColor" />
-                    </svg>
-                </div>
+                {/* Resize Handle - Hidden on Mobile */}
+                {!isMobile && (
+                    <div 
+                        className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-end justify-end p-1 z-50"
+                        onMouseDown={handleResizeMouseDown}
+                    >
+                        <svg viewBox="0 0 10 10" className={`w-4 h-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                            <path d="M10 10 L10 2 L2 10 Z" fill="currentColor" />
+                        </svg>
+                    </div>
+                )}
 
             </div>
         </div>

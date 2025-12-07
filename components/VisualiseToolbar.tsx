@@ -42,6 +42,24 @@ const VisualiseToolbar: React.FC<VisualiseToolbarProps> = ({
       {!isCollapsed && (
           <div className={`absolute top-full left-0 mt-2 w-64 border rounded-lg shadow-2xl z-50 flex flex-col overflow-hidden animate-fade-in-down ${dropdownBg}`}>
                
+               {/* Treemap Button */}
+               <button
+                  onClick={() => onSelectTool('treemap')}
+                  className={`flex items-start text-left p-3 border-b transition-colors group ${itemHover}`}
+               >
+                   <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110 text-rose-400">
+                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                      </svg>
+                   </div>
+                   <div>
+                       <div className={`font-bold text-sm mb-0.5 ${textItem}`}>Treemap</div>
+                       <p className={`text-xs leading-tight ${textDesc}`}>
+                           Hierarchical view of graph structure.
+                       </p>
+                   </div>
+               </button>
+
                {/* Grid Button */}
                <button
                   onClick={() => onSelectTool('grid')}
@@ -60,39 +78,40 @@ const VisualiseToolbar: React.FC<VisualiseToolbarProps> = ({
                    </div>
                </button>
 
-               {/* Sketch Button */}
+               {/* Circle Packing Button */}
                <button
-                  onClick={() => onSelectTool('sketch')}
+                  onClick={() => onSelectTool('circle_packing')}
                   className={`flex items-start text-left p-3 border-b transition-colors group ${itemHover}`}
                >
                    <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110 text-rose-400">
                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          <circle cx="12" cy="12" r="10" />
+                          <circle cx="12" cy="12" r="6" />
+                          <circle cx="12" cy="12" r="2" />
                       </svg>
                    </div>
                    <div>
-                       <div className={`font-bold text-sm mb-0.5 ${textItem}`}>Sketch View</div>
+                       <div className={`font-bold text-sm mb-0.5 ${textItem}`}>Circle Packing</div>
                        <p className={`text-xs leading-tight ${textDesc}`}>
-                           Hand-drawn style visualization.
+                           Grouped bubbles with zoom.
                        </p>
                    </div>
                </button>
 
-               {/* Random Walk Button */}
+               {/* Mermaid Button */}
                <button
-                  onClick={() => onSelectTool('random_walk')}
+                  onClick={() => onSelectTool('mermaid')}
                   className={`flex items-start text-left p-3 transition-colors group ${itemHover}`}
                >
                    <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110 text-rose-400">
                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
                       </svg>
                    </div>
                    <div>
-                       <div className={`font-bold text-sm mb-0.5 ${textItem}`}>Random Walk</div>
+                       <div className={`font-bold text-sm mb-0.5 ${textItem}`}>Diagram Editor</div>
                        <p className={`text-xs leading-tight ${textDesc}`}>
-                           Auto-navigate graph connections.
+                           Create diagrams with Mermaid.js.
                        </p>
                    </div>
                </button>

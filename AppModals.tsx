@@ -120,15 +120,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
             {props.isUserGuideModalOpen && <UserGuideModal onClose={() => props.setIsUserGuideModalOpen(false)} isDarkMode={isDarkMode} />}
             
             {/* Data Tools */}
-            <CsvToolModal 
-                isOpen={props.isCsvModalOpen} 
-                onClose={() => props.setIsCsvModalOpen(false)} 
-                onImport={props.handleImportCsv} 
-                elements={elements} 
-                relationships={relationships} 
-                isDarkMode={isDarkMode}
-                modelName={persistence.currentModelName} 
-            />
+            <CsvToolModal isOpen={props.isCsvModalOpen} onClose={() => props.setIsCsvModalOpen(false)} onImport={props.handleImportCsv} elements={elements} relationships={relationships} isDarkMode={isDarkMode} />
             
             {/* Persistence Modals */}
             {persistence.isCreateModelModalOpen && <CreateModelModal onCreate={persistence.handleCreateModel} onClose={() => persistence.setIsCreateModelModalOpen(false)} isInitialSetup={false} />}

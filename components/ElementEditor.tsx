@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Element, ColorScheme } from '../types';
 import AttributesEditor from './AttributesEditor';
+import ListEditor from './ListEditor';
 
 interface ElementEditorProps {
   elementData: Partial<Element>;
@@ -41,6 +42,23 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
     colorSchemes.filter(s => s.id !== activeSchemeId),
     [colorSchemes, activeSchemeId]
   );
+
+  const mergedCustomLists = useMemo(() => {
+      const elementLists = elementData.customLists || {};
+      const schemaLists = activeScheme?.customLists || {};
+      
+      const merged: Record<string, string[]> = { ...elementLists };
+      
+      // Merge schema definitions if not present on element
+      Object.entries(schemaLists).forEach(([key, defaultItems]) => {
+          if (merged[key] === undefined) {
+               // Cast to string[] to avoid iterator error if TS infers unknown
+               merged[key] = [...(defaultItems as string[])]; 
+          }
+      });
+      
+      return merged;
+  }, [elementData.customLists, activeScheme]);
 
   const displayedOtherTags = useMemo(() => {
     if (otherSchemaView === 'none') return [];
@@ -94,6 +112,10 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
 
   const handleAttributesChange = (newAttributes: Record<string, string>) => {
       onDataChange({ ...elementData, attributes: newAttributes }, true); 
+  };
+
+  const handleCustomListsChange = (newLists: Record<string, string[]>) => {
+      onDataChange({ ...elementData, customLists: newLists }, true);
   };
 
   const currentTags = useMemo(() => [...(elementData.tags || [])].sort((a, b) => a.localeCompare(b)), [elementData.tags]);
@@ -248,6 +270,13 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
       <AttributesEditor 
         attributes={elementData.attributes || {}} 
         onChange={handleAttributesChange}
+        isDarkMode={isDarkMode}
+      />
+      
+      <ListEditor 
+        lists={mergedCustomLists}
+        descriptions={activeScheme?.customListDescriptions || {}}
+        onChange={handleCustomListsChange}
         isDarkMode={isDarkMode}
       />
     </div>

@@ -1,11 +1,12 @@
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
-# Tapestry Studio
+# Run and deploy your AI Studio app
 
-Tapestry Studio is an AI-powered knowledge graph environment designed for systems thinking. It combines a flexible node-link canvas with structured analytical frameworks.
+This contains everything you need to run your app locally.
 
-Motivation: Linear documents and static diagrams often fail to capture the complexity of real-world systems. Tapestry was created to bridge this gap, allowing users to model causal relationships and leverage AI to analyze structure, detect contradictions, and generate solutions.
-
-This contains everything needed to run Tapestry Studio locally.
+View your app in AI Studio: https://ai.studio/apps/drive/1Lbb73O0DeS-v4U7HPA1WenYMFZi9HZ7R
 
 ## Run Locally
 
@@ -17,4 +18,3 @@ This contains everything needed to run Tapestry Studio locally.
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
-
