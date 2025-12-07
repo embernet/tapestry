@@ -8,6 +8,7 @@ interface ContextMenusProps {
   relationshipContextMenu: { x: number, y: number, relationshipId: string } | null;
   canvasContextMenu: { x: number, y: number } | null;
   relationships: Relationship[];
+  elements: Element[];
   panelState: any;
   persistence: any;
   
@@ -24,12 +25,13 @@ interface ContextMenusProps {
   onSaveAsImage: () => void;
   importFileRef: any;
   isDarkMode: boolean;
+  onToggleNodeHighlight?: (id: string) => void;
 }
 
 export const ContextMenus: React.FC<ContextMenusProps> = (props) => {
     const { 
         contextMenu, relationshipContextMenu, canvasContextMenu, 
-        persistence, panelState, isDarkMode 
+        persistence, panelState, isDarkMode, elements
     } = props;
 
     if (!persistence.currentModelId) return null;
@@ -43,6 +45,8 @@ export const ContextMenus: React.FC<ContextMenusProps> = (props) => {
                     onClose={props.onCloseContextMenu} 
                     onDeleteElement={() => { props.onDeleteElement(contextMenu.elementId); props.onCloseContextMenu(); }} 
                     onAddRelationship={() => { props.onAddRelationshipFromContext(contextMenu.elementId); props.onCloseContextMenu(); }} 
+                    onToggleHighlight={props.onToggleNodeHighlight ? () => { props.onToggleNodeHighlight!(contextMenu.elementId); props.onCloseContextMenu(); } : undefined}
+                    isHighlighted={!!elements.find(e => e.id === contextMenu.elementId)?.meta?.highlightColor}
                 />
             )}
 

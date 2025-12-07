@@ -13,6 +13,8 @@ interface NetworkAnalysisPanelProps {
   onResetSimulation: () => void;
   onClose: () => void;
   isDarkMode: boolean;
+  isHighlightToolActive?: boolean;
+  setIsHighlightToolActive?: (active: boolean) => void;
 }
 
 const ANALYSIS_CATEGORIES = [
@@ -26,7 +28,8 @@ const ANALYSIS_CATEGORIES = [
 
 export const NetworkAnalysisPanel: React.FC<NetworkAnalysisPanelProps> = ({ 
     elements, relationships, onBulkTag, onHighlight, onFilter, 
-    isSimulationMode, onToggleSimulation, onResetSimulation, onClose, isDarkMode 
+    isSimulationMode, onToggleSimulation, onResetSimulation, onClose, isDarkMode,
+    isHighlightToolActive, setIsHighlightToolActive
 }) => {
   const [actionType, setActionType] = useState<'tag' | 'highlight' | 'hide' | 'hide_others'>('highlight');
   const [activeCategoryIds, setActiveCategoryIds] = useState<Set<string>>(new Set());
@@ -290,15 +293,15 @@ export const NetworkAnalysisPanel: React.FC<NetworkAnalysisPanelProps> = ({
               </div>
           </div>
 
-          {/* Simulation */}
+          {/* Tools */}
           <div>
-              <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 ${labelClass}`}>Impact Simulation</h3>
+              <h3 className={`text-xs font-bold uppercase tracking-wider mb-2 ${labelClass}`}>Interactive Tools</h3>
               <div className="flex gap-2">
                   <button 
                       onClick={onToggleSimulation}
                       className={`flex-grow py-2 rounded text-xs font-bold border transition-colors flex justify-center items-center gap-2 ${isSimulationMode ? 'bg-blue-600 border-blue-500 text-white animate-pulse' : toggleBtnInactive}`}
                   >
-                      {isSimulationMode ? 'Simulation Active' : 'Start Simulation'}
+                      {isSimulationMode ? 'Simulation Active' : 'Simulation'}
                   </button>
                   {isSimulationMode && (
                       <button 
@@ -308,9 +311,25 @@ export const NetworkAnalysisPanel: React.FC<NetworkAnalysisPanelProps> = ({
                           Reset
                       </button>
                   )}
+                  
+                  {/* Highlighter Toggle */}
+                  {setIsHighlightToolActive && (
+                      <button
+                          onClick={() => setIsHighlightToolActive(!isHighlightToolActive)}
+                          className={`flex-grow py-2 rounded text-xs font-bold border transition-colors flex justify-center items-center gap-2 ${isHighlightToolActive ? 'bg-yellow-500 border-yellow-400 text-black animate-pulse' : toggleBtnInactive}`}
+                          title="Manual Highlighter Pen"
+                      >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="m9 11-6 6v3h3l6-6"/>
+                              <path d="m22 2-2.5 2.5"/>
+                              <path d="M13.5 6.5 8 12"/>
+                          </svg>
+                          {isHighlightToolActive ? 'Highlighting' : 'Highlighter'}
+                      </button>
+                  )}
               </div>
               <p className="text-[10px] text-gray-500 mt-1">
-                  Click a node to see how increase/decrease propagates through causal links.
+                  Use Simulation to test impact flow, or Highlighter to manually mark nodes.
               </p>
           </div>
 

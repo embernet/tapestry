@@ -19,6 +19,9 @@ export const usePanelState = () => {
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
   const [isGuidancePanelOpen, setIsGuidancePanelOpen] = useState(false);
   const [guidanceContent, setGuidanceContent] = useState<GuidanceContent | null>(null);
+  
+  // --- New Script Panel ---
+  const [isScriptPanelOpen, setIsScriptPanelOpen] = useState(false);
 
   // --- Analysis Panels ---
   const [isNetworkAnalysisOpen, setIsNetworkAnalysisOpen] = useState(false);
@@ -52,6 +55,7 @@ export const usePanelState = () => {
     setIsFilterPanelOpen(false);
     setIsChatPanelOpen(false);
     setIsGuidancePanelOpen(false);
+    setIsScriptPanelOpen(false);
     setIsNetworkAnalysisOpen(false);
     setIsTreemapPanelOpen(false);
     setIsTagDistPanelOpen(false);
@@ -81,6 +85,8 @@ export const usePanelState = () => {
     
     isGuidancePanelOpen, setIsGuidancePanelOpen,
     guidanceContent, setGuidanceContent,
+    
+    isScriptPanelOpen, setIsScriptPanelOpen,
     
     isNetworkAnalysisOpen, setIsNetworkAnalysisOpen,
 

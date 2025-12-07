@@ -1,4 +1,3 @@
-
 import { FunctionCall, FunctionResponse } from '@google/genai';
 
 export enum RelationshipDirection {
@@ -18,6 +17,10 @@ export interface Relationship {
   direction: RelationshipDirection;
   tags: string[];
   attributes?: Record<string, string>;
+  meta?: {
+    highlightColor?: string;
+    [key: string]: any;
+  };
 }
 
 export interface Element {
@@ -33,6 +36,10 @@ export interface Element {
   y?: number;
   fx?: number | null;
   fy?: number | null;
+  meta?: {
+    highlightColor?: string;
+    [key: string]: any;
+  };
 }
 
 export interface TapestryDocument {
@@ -174,6 +181,52 @@ export interface GlobalSettings {
   customStrategies: CustomStrategyTool[];
   language: string;
 }
+
+// --- Scripting Types ---
+
+export interface Script {
+  id: string;
+  name: string;
+  code: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScriptSnippet {
+    id: string;
+    name: string;
+    description: string;
+    code: string;
+    isSystem: boolean;
+}
+
+export interface ActionDescriptor {
+  name: string;
+  description?: string;
+  args?: string[]; // Simplified arg list for hints
+}
+
+export interface ToolClient {
+  id: string;
+  listActions(): ActionDescriptor[];
+  invoke(action: string, args: Record<string, any>): Promise<any>;
+}
+
+export interface ToolRegistry {
+  registerTool(tool: ToolClient): void;
+  getTool(id: string): ToolClient | undefined;
+  listTools(): ToolClient[];
+  unregisterTool(id: string): void;
+}
+
+export interface ToolActionEvent {
+  toolId: string;
+  action: string;
+  args: Record<string, any>;
+  result?: any;
+}
+
+// ---
 
 export interface ModelMetadata {
   id: string;

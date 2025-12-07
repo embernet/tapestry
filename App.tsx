@@ -1,8 +1,9 @@
 
+
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import * as d3 from 'd3';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, NodeFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage, VisualiseToolType, NodeShape } from './types';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, NodeFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage, VisualiseToolType, NodeShape, Script } from './types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS, NODE_MAX_WIDTH } from './constants';
 import { TOOL_DOCUMENTATION } from './documentation';
 import { usePanelDefinitions } from './components/usePanelDefinitions';
@@ -26,13 +27,16 @@ import { DebugPanel } from './components/DebugPanel';
 import { RandomWalkPanel } from './components/RandomWalkPanel';
 import { promptStore } from './services/PromptStore';
 import { NetworkAnalysisPanel } from './components/NetworkAnalysisPanel';
+import { useScriptTools } from './hooks/useScriptTools'; // Import script tools hook
+import { useScripts } from './hooks/useScripts'; // Import script data hook
+import { ScriptPanel } from './components/ScriptPanel'; // Import ScriptPanel
 
 // New Extracted Components
 import { StartScreen } from './components/StartScreen';
 import { ToolsOverlay } from './components/ToolsOverlay';
 import { AppModals } from './components/AppModals';
 import { ContextMenus } from './components/ContextMenus';
-import { StatusBar } from './components/StatusBar'; // Import StatusBar
+import { StatusBar } from './components/StatusBar';
 
 // Explicitly define coordinate type to fix type inference issues
 type Coords = { x: number; y: number };
@@ -98,6 +102,9 @@ export default function App() {
   const panelState = usePanelState();
   const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(false);
   
+  // --- Script State Hook ---
+  const { scripts, setScripts, createScript, updateScript, deleteScript } = useScripts();
+  
   // --- Random Walk State ---
   const [isRandomWalkOpen, setIsRandomWalkOpen] = useState(false);
   const [walkState, setWalkState] = useState<{
@@ -145,6 +152,7 @@ export default function App() {
   // --- Analysis Highlights & Filtering ---
   const [analysisHighlights, setAnalysisHighlights] = useState<Map<string, string>>(new Map());
   const [analysisFilterState, setAnalysisFilterState] = useState<{ mode: 'hide' | 'hide_others' | 'none', ids: Set<string> }>({ mode: 'none', ids: new Set() });
+  const [isHighlightToolActive, setIsHighlightToolActive] = useState(false);
 
   // --- Story/Presentation State ---
   const [slides, setSlides] = useState<StorySlide[]>([]);
@@ -209,6 +217,83 @@ export default function App() {
   useEffect(() => { relationshipsRef.current = relationships; }, [relationships]);
   useEffect(() => { documentsRef.current = documents; }, [documents]);
   useEffect(() => { foldersRef.current = folders; }, [folders]);
+  
+  // --- Document Opening Handler (Moved up for useScriptTools) ---
+  const handleOpenDocument = useCallback((docId: string, origin?: 'report') => {
+        const doc = documents.find(d => d.id === docId);
+        if (!doc) return;
+        if (doc.type === 'swot-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('matrix'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; } 
+        else if (doc.type === 'five-forces-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('five_forces'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; } 
+        else if (doc.type === 'pestel-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('pestel'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; } 
+        else if (doc.type === 'steer-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('steer'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; }
+        else if (doc.type === 'destep-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('destep'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; }
+        else if (doc.type === 'longpest-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('longpest'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; }
+        else if (doc.type === 'cage-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('cage'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; }
+        else if (doc.type && doc.type.startsWith('custom-strategy-')) { 
+            // Handle Custom Strategy Document
+            const strategyId = doc.type.replace('custom-strategy-', '');
+            
+            // Check if the strategy definition is embedded in the document
+            if (doc.data && doc.data.strategyDefinition) {
+                // Ensure the strategy exists in global settings, or add it
+                const existing = globalSettings.customStrategies.find(s => s.id === strategyId);
+                if (!existing) {
+                    handleGlobalSettingsChange({ ...globalSettings, customStrategies: [...globalSettings.customStrategies, doc.data.strategyDefinition] });
+                }
+            }
+            
+            tools.setActiveTool('swot'); 
+            tools.setActiveSwotTool(`custom-strategy-${strategyId}`); 
+            tools.setSwotInitialDoc(doc); 
+            tools.setIsSwotModalOpen(true); 
+            return; 
+        }
+        else if (doc.type === 'scamper-analysis') { tools.setActiveTool('scamper'); tools.setScamperInitialDoc(doc); tools.setIsScamperModalOpen(true); return; }
+        else if (doc.type === 'triz-analysis') { tools.setActiveTool('triz'); tools.setTrizInitialParams(null); tools.setIsTrizModalOpen(true); return; } 
+        
+        if (!openDocIds.includes(docId)) { setOpenDocIds(prev => [...prev, docId]); }
+        
+        // Always open as floating by default
+        const panelId = `doc-${docId}`;
+        const nextZ = panelZIndex + 1;
+        setPanelZIndex(nextZ);
+
+        setPanelLayouts(prev => {
+            if (prev[panelId]) {
+                 return { ...prev, [panelId]: { ...prev[panelId], zIndex: nextZ } };
+            }
+            // New floating layout
+            const width = 500;
+            const height = 600;
+            // Simple cascade
+            const offset = (Object.keys(prev).filter(k => k.startsWith('doc-')).length % 8) * 30;
+            let x = (window.innerWidth - width) / 2 + offset;
+            let y = 100 + offset;
+            
+            // Boundary check
+            if (x < 20) x = 20; 
+            if (y < 20) y = 20;
+
+            return { 
+                ...prev, 
+                [panelId]: { x, y, w: width, h: height, zIndex: nextZ, isFloating: true } 
+            };
+        });
+
+  }, [documents, openDocIds, panelLayouts, panelZIndex, tools, globalSettings]);
+
+  // --- Initialize Script Tools ---
+  // Registers app state with ToolRegistry for scripting
+  useScriptTools({
+      elementsRef, setElements,
+      relationshipsRef, setRelationships,
+      documentsRef, setDocuments,
+      graphCanvasRef,
+      setSelectedElementId,
+      setMultiSelection,
+      setAnalysisHighlights,
+      onOpenDocument: handleOpenDocument
+  });
 
   // --- Logger Subscription ---
   useEffect(() => {
@@ -499,12 +584,12 @@ export default function App() {
   const { runSelfTest, isSelfTestModalOpen, setIsSelfTestModalOpen, testLogs, testStatus } = useSelfTest({ panelState, tools, setPanelLayouts });
   
   const persistence = usePersistence({
-      setElements, setRelationships, setDocuments, setFolders, setHistory, setSlides, setMermaidDiagrams,
+      setElements, setRelationships, setDocuments, setFolders, setHistory, setSlides, setMermaidDiagrams, setScripts,
       setColorSchemes, setActiveSchemeId, setSystemPromptConfig, setOpenDocIds, setDetachedHistoryIds,
       setPanelLayouts, setAnalysisHighlights, setAnalysisFilterState, setMultiSelection, setSelectedElementId,
       setTagFilter, setDateFilter, currentFileHandleRef,
       elementsRef, relationshipsRef, documentsRef, foldersRef,
-      colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams
+      colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts
   });
 
   // --- Reset Chat on new model ---
@@ -683,50 +768,6 @@ export default function App() {
   const handleDeleteFolder = useCallback((folderId: string) => { if (confirm("Delete this folder and all its contents?")) { setFolders(prev => prev.filter(f => f.id !== folderId)); setDocuments(prev => prev.filter(d => d.folderId !== folderId)); } }, []);
   const handleUpdateDocument = useCallback((docId: string, updates: Partial<TapestryDocument>) => { setDocuments(prev => prev.map(d => d.id === docId ? { ...d, ...updates, updatedAt: new Date().toISOString() } : d)); }, []);
   
-  const handleOpenDocument = useCallback((docId: string, origin?: 'report') => {
-        const doc = documents.find(d => d.id === docId);
-        if (!doc) return;
-        if (doc.type === 'swot-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('matrix'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; } 
-        else if (doc.type === 'five-forces-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('five_forces'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; } 
-        else if (doc.type === 'pestel-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('pestel'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; } 
-        else if (doc.type === 'steer-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('steer'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; }
-        else if (doc.type === 'destep-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('destep'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; }
-        else if (doc.type === 'longpest-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('longpest'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; }
-        else if (doc.type === 'cage-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('cage'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; }
-        else if (doc.type && doc.type.startsWith('custom-strategy-')) { 
-            // Handle Custom Strategy Document
-            const strategyId = doc.type.replace('custom-strategy-', '');
-            
-            // Check if the strategy definition is embedded in the document
-            if (doc.data && doc.data.strategyDefinition) {
-                // Ensure the strategy exists in global settings, or add it
-                const existing = globalSettings.customStrategies.find(s => s.id === strategyId);
-                if (!existing) {
-                    handleCustomStrategiesChange([...globalSettings.customStrategies, doc.data.strategyDefinition]);
-                }
-            }
-            
-            tools.setActiveTool('swot'); 
-            tools.setActiveSwotTool(`custom-strategy-${strategyId}`); 
-            tools.setSwotInitialDoc(doc); 
-            tools.setIsSwotModalOpen(true); 
-            return; 
-        }
-        else if (doc.type === 'scamper-analysis') { tools.setActiveTool('scamper'); tools.setScamperInitialDoc(doc); tools.setIsScamperModalOpen(true); return; }
-        else if (doc.type === 'triz-analysis') { tools.setActiveTool('triz'); tools.setTrizInitialParams(null); tools.setIsTrizModalOpen(true); return; } 
-        
-        if (!openDocIds.includes(docId)) { setOpenDocIds(prev => [...prev, docId]); }
-        if (origin === 'report') { 
-            const reportLayout = panelLayouts['report']; 
-            let x = 100, y = 100; 
-            if (reportLayout && reportLayout.isFloating) { x = reportLayout.x + reportLayout.w + 20; y = reportLayout.y; } else if (panelState.isReportPanelOpen) { x = window.innerWidth - 600 - 520; y = 100; } 
-            if (x < 20) x = 20; if (x > window.innerWidth - 100) x = window.innerWidth - 600; 
-            const nextZ = panelZIndex + 1; 
-            setPanelZIndex(nextZ); 
-            setPanelLayouts(prev => ({ ...prev, [`doc-${docId}`]: { x, y, w: 500, h: 600, zIndex: nextZ, isFloating: true } })); 
-        }
-  }, [documents, openDocIds, panelLayouts, panelState.isReportPanelOpen, panelZIndex, tools, globalSettings.customStrategies]);
-
   const handleSaveMermaidDiagram = useCallback((diagram: MermaidDiagram) => { setMermaidDiagrams(prev => { const existingIndex = prev.findIndex(d => d.id === diagram.id); if (existingIndex >= 0) { const newDiagrams = [...prev]; newDiagrams[existingIndex] = diagram; return newDiagrams; } else { return [...prev, diagram]; } }); }, []);
   const handleDeleteMermaidDiagram = useCallback((id: string) => { if (confirm("Delete this diagram?")) { setMermaidDiagrams(prev => prev.filter(d => d.id !== id)); } }, []);
   const handleGenerateMermaid = useCallback(async (prompt: string, contextMarkdown?: string) => { 
@@ -777,7 +818,29 @@ export default function App() {
   const handleAnalysisHighlight = useCallback((highlightMap: Map<string, string>) => { setAnalysisHighlights(highlightMap); }, []);
   const handleAnalysisFilter = useCallback((mode: 'hide' | 'hide_others' | 'none', ids: Set<string>) => { setAnalysisFilterState({ mode, ids }); }, []);
 
+  const handleToggleNodeHighlight = useCallback((elementId: string) => {
+      setElements(prev => prev.map(e => {
+          if (e.id === elementId) {
+              const newMeta = { ...(e.meta || {}) };
+              // Toggle highlight: if set, remove it. If not set, add default yellow.
+              if (newMeta.highlightColor) {
+                  delete newMeta.highlightColor;
+              } else {
+                  newMeta.highlightColor = '#facc15'; // Default yellow
+              }
+              return { ...e, meta: newMeta, updatedAt: new Date().toISOString() };
+          }
+          return e;
+      }));
+  }, []);
+
   const handleNodeClick = useCallback((elementId: string, event: MouseEvent) => { 
+      // Manual Highlight Tool Priority
+      if (isHighlightToolActive) {
+          handleToggleNodeHighlight(elementId);
+          return;
+      }
+
       // Random Walk Logic
       if (isRandomWalkOpen) {
           // If manually clicking, treat as starting a new walk or jumping
@@ -813,7 +876,7 @@ export default function App() {
       if (isBulkEditActive) { if (bulkTagsToAdd.length === 0 && bulkTagsToRemove.length === 0) return; setElements(prev => prev.map(el => { if (el.id === elementId) { const currentTags = el.tags; let newTags = [...currentTags]; let changed = false; const lowerToRemove = bulkTagsToRemove.map(t => t.toLowerCase()); const filteredTags = newTags.filter(t => !lowerToRemove.includes(t.toLowerCase())); if (filteredTags.length !== newTags.length) { newTags = filteredTags; changed = true; } const lowerCurrent = newTags.map(t => t.toLowerCase()); const toAdd = bulkTagsToAdd.filter(t => !lowerCurrent.includes(t.toLowerCase())); if (toAdd.length > 0) { newTags = [...newTags, ...toAdd]; changed = true; } if (changed) { return { ...el, tags: newTags, updatedAt: new Date().toISOString() }; } } return el; })); return; } 
       if (event.ctrlKey || event.metaKey) { const newMulti = new Set(multiSelection); if (newMulti.has(elementId)) { newMulti.delete(elementId); } else { newMulti.add(elementId); } setMultiSelection(newMulti); if (newMulti.has(elementId)) { setSelectedElementId(elementId); } else if (selectedElementId === elementId) { setSelectedElementId(newMulti.size > 0 ? Array.from(newMulti).pop() || null : null); } } else { setMultiSelection(new Set([elementId])); setSelectedElementId(elementId); }
       setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseRelationshipContextMenu();
-  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState, multiSelection, selectedElementId, panelState.isSunburstPanelOpen, panelState.sunburstState, elements, originalElements, panelState, handleCloseRelationshipContextMenu, isRandomWalkOpen]);
+  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState, multiSelection, selectedElementId, panelState.isSunburstPanelOpen, panelState.sunburstState, elements, originalElements, panelState, handleCloseRelationshipContextMenu, isRandomWalkOpen, isHighlightToolActive, handleToggleNodeHighlight]);
   
   const handleLinkClick = useCallback((relationshipId: string) => { setSelectedRelationshipId(relationshipId); setSelectedElementId(null); setMultiSelection(new Set()); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseRelationshipContextMenu(); }, [handleCloseContextMenu, handleCloseRelationshipContextMenu]);
   const handleCanvasClick = useCallback(() => { setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseCanvasContextMenu(); handleCloseRelationshipContextMenu(); setAnalysisHighlights(new Map()); }, [handleCloseContextMenu, handleCloseCanvasContextMenu, handleCloseRelationshipContextMenu]);
@@ -1397,6 +1460,18 @@ export default function App() {
               </button>
           </div>
       )}
+      
+      {/* Script Panel */}
+      <ScriptPanel 
+          isOpen={panelState.isScriptPanelOpen}
+          onClose={() => panelState.setIsScriptPanelOpen(false)}
+          scripts={scripts}
+          onSaveScript={updateScript}
+          onCreateScript={createScript}
+          onDeleteScript={deleteScript}
+          isDarkMode={isDarkMode}
+          aiConfig={aiConfig}
+      />
 
       {/* Main Viewport Area */}
       <div className="flex-grow relative w-full overflow-hidden">
@@ -1491,6 +1566,7 @@ export default function App() {
                 isDarkMode={isDarkMode}
                 selectedElementId={selectedElementId}
                 handleAnalysisToolSelect={handleAnalysisToolSelect}
+                handleCreateScript={createScript}
             />
         )}
 
@@ -1523,6 +1599,8 @@ export default function App() {
                  onResetSimulation={() => setSimulationState({})}
                  onClose={() => panelState.setIsNetworkAnalysisOpen(false)}
                  isDarkMode={isDarkMode}
+                 isHighlightToolActive={isHighlightToolActive}
+                 setIsHighlightToolActive={setIsHighlightToolActive}
              />
         )}
         
@@ -1719,6 +1797,7 @@ export default function App() {
                     analysisHighlights={analysisHighlights} 
                     isDarkMode={isDarkMode}
                     nodeShape={nodeShape}
+                    isHighlightToolActive={isHighlightToolActive}
                 />
                 <ContextMenus 
                     contextMenu={contextMenu}
@@ -1739,6 +1818,8 @@ export default function App() {
                     onSaveAsImage={handleSaveAsImage}
                     importFileRef={importFileRef}
                     isDarkMode={isDarkMode}
+                    onToggleNodeHighlight={handleToggleNodeHighlight}
+                    elements={elements} // Pass elements to ContextMenus
                 />
             </>
         ) : (

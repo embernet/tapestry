@@ -1,5 +1,5 @@
 
-import { ColorScheme, SystemPromptConfig } from './types';
+import { ColorScheme, SystemPromptConfig, ScriptSnippet } from './types';
 import { promptStore } from './services/PromptStore';
 
 export const NODE_MAX_WIDTH = 160;
@@ -60,6 +60,410 @@ export const DEFAULT_SYSTEM_PROMPT_CONFIG: SystemPromptConfig = {
   enabledTools: AVAILABLE_AI_TOOLS.map(t => t.id),
   toolPrompts: DEFAULT_TOOL_PROMPTS
 };
+
+export const TSCRIPT_DOCS = `
+TScript Language Reference (Python Syntax Subset):
+- Syntax is strictly Python-like using indentation for blocks.
+- **DO NOT** use 'LET', 'VAR', or 'CONST'. Use direct assignment (e.g., \`x = 10\`).
+- **DO NOT** use 'END', 'ENDIF', 'NEXT'. Blocks are closed by dedenting.
+- Comments start with #.
+- Supported operators: +, ==, !=, >, <, in.
+
+Variables & Lists:
+  x = []
+  x.append("item")
+  
+Logic (Indentation required):
+  if x == 10:
+      print("Equal")
+  else:
+      print("Not Equal")
+  
+Loops (Indentation required):
+  for item in list:
+      print(item.name)
+      sleep(1)
+
+Supported Methods (Standard Library):
+1. Lists (Arrays):
+   - list.append(item)
+   - list.pop()
+   - list.remove(item)
+   - list.clear()
+   - list.length() (returns number)
+
+2. Strings:
+   - str.split(separator)
+   - str.replace(old, new)
+   - str.lower()
+   - str.upper()
+
+Available Tools (Libraries):
+
+1. graph
+   - get_all_nodes() -> returns list of nodes
+   - get_node_by_name(name="...") -> returns node object or null
+   - query_nodes(tag="...", [attribute]="...") -> returns list of nodes
+   - add_node(name="...", tags="...", notes="...") -> returns new node object
+   - delete_node(id="...") -> returns boolean
+   - add_edge(source="ID", target="ID", label="...") -> returns edge object
+   - get_neighbors(id="...") -> returns list of nodes
+   - get_connections(id="...") -> returns list of objects {id, neighbor, label, arrow}
+   - set_attribute(id="...", key="...", value="...") -> returns boolean
+   - add_tag(id="...", tag="...") -> returns boolean
+   - remove_tag(id="...", tag="...") -> returns boolean
+   - set_highlight(id="...", color="#hex") -> sets persistent highlight
+   - clear_highlight(id="...") -> removes persistent highlight
+
+2. canvas
+   - select_node(id="...") -> opens details panel for node
+   - pan_to_node(id="...") -> moves camera to node
+   - highlight_node(id="...", color="#hex") -> applies transient visual highlight (not saved)
+   - clear_highlights() -> clears transient highlights
+   - clear_selection() -> deselects all
+
+3. markdown
+   - create_doc(title="...", content="...") -> creates new doc, returns ID
+   - append_text(doc="ID_OR_TITLE", text="...") -> appends text to doc
+   - open_doc(id="...") -> opens document panel
+
+Example Script:
+found = []
+nodes = graph.query_nodes(tag="Risk")
+for n in nodes:
+  if "High" in n.tags:
+     found.append(n.name)
+
+print("High risks found: " + found.length())
+`;
+
+export const DEFAULT_SNIPPETS: ScriptSnippet[] = [
+    {
+        id: 'sys-walk',
+        name: 'Walk & Highlight',
+        description: 'Walks through all nodes with a specific tag, highlighting them and panning the camera.',
+        isSystem: true,
+        code: `target_tag = "Risk"
+nodes = graph.query_nodes(tag=target_tag)
+print("Found " + nodes.length + " nodes.")
+
+for node in nodes:
+    canvas.pan_to_node(id=node.id)
+    canvas.highlight_node(id=node.id, color="#facc15")
+    sleep(0.8)
+
+canvas.clear_highlights()`
+    },
+    {
+        id: 'sys-report',
+        name: 'Generate Report Doc',
+        description: 'Creates a comprehensive report with separate sections for Goals, Tasks, Risks, etc.',
+        isSystem: true,
+        code: `report = "# System Analysis Report\\n\\n"
+sect_goal = "## Goals\\n"
+sect_uh = "## Useful & Harmful\\n"
+sect_task = "## Tasks & Actions\\n"
+sect_risk = "## Risks & Issues\\n"
+sect_other = "## Other Elements\\n"
+has_other = False
+
+nodes = graph.get_all_nodes()
+print("Analyzing " + nodes.length + " nodes...")
+
+for n in nodes:
+    # 1. Build Details
+    details = "### " + n.name + "\\n"
+    
+    if n.tags.length > 0:
+        details = details + "- **Tags:** "
+        for t in n.tags:
+             details = details + t + ", "
+        details = details + "\\n"
+    
+    if n.notes:
+        details = details + "- **Notes:** " + n.notes + "\\n"
+    
+    # Connections
+    conns = graph.get_connections(id=n.id)
+    if conns.length > 0:
+        details = details + "- **Relationships:**\\n"
+        for c in conns:
+            # Format: - --> TargetName (Label)
+            line = "  - " + "\`" + c.arrow + "\`" + " " + c.neighbor.name
+            if c.label:
+                line = line + " (" + c.label + ")"
+            details = details + line + "\\n"
+    
+    details = details + "\\n"
+
+    # 2. Categorize
+    matched = False
+    
+    if "Goal" in n.tags:
+        sect_goal = sect_goal + details
+        matched = True
+    
+    # Useful/Harmful
+    is_uh = False
+    if "Useful" in n.tags:
+        is_uh = True
+    if "Harmful" in n.tags:
+        is_uh = True
+    
+    if is_uh:
+        sect_uh = sect_uh + details
+        matched = True
+        
+    # Tasks/Actions
+    is_ta = False
+    if "Task" in n.tags:
+        is_ta = True
+    if "Action" in n.tags:
+        is_ta = True
+    
+    if is_ta:
+        sect_task = sect_task + details
+        matched = True
+
+    # Risks/Issues
+    is_ri = False
+    if "Risk" in n.tags:
+        is_ri = True
+    if "Issue" in n.tags:
+        is_ri = True
+    
+    if is_ri:
+        sect_risk = sect_risk + details
+        matched = True
+        
+    if matched == False:
+        sect_other = sect_other + details
+        has_other = True
+
+final_content = report + sect_goal + sect_uh + sect_task + sect_risk
+
+if has_other:
+    final_content = final_content + sect_other
+
+doc_id = markdown.create_doc(title="Full System Report", content=final_content)
+markdown.open_doc(id=doc_id)
+print("Report generated.")`
+    },
+    {
+        id: 'sys-goals-tasks',
+        name: 'Goals & Tasks Report',
+        description: 'Generates a report listing all Goals and their connected Tasks.',
+        isSystem: true,
+        code: `doc_content = "# Goals and Tasks\\n\\n"
+
+goals = graph.query_nodes(tag="Goal")
+
+if goals.length() == 0:
+    doc_content += "No goals found."
+else:
+    for goal in goals:
+        doc_content += "## Goal: " + goal.name + "\\n"
+        connections = graph.get_connections(id=goal.id)
+        
+        has_tasks = False
+        for connection in connections:
+            neighbor_node = connection.neighbor
+            if "Task" in neighbor_node.tags:
+                doc_content += "- " + neighbor_node.name + "\\n"
+                has_tasks = True
+        
+        if not has_tasks:
+            doc_content += "  No tasks associated.\\n"
+        doc_content += "\\n"
+
+new_doc = markdown.create_doc(title="Goals and Tasks Report", content=doc_content)
+markdown.open_doc(id=new_doc.id)`
+    },
+    {
+        id: 'sys-reset',
+        name: 'Reset View',
+        description: 'Clears all selections and highlights.',
+        isSystem: true,
+        code: `canvas.clear_selection()
+canvas.clear_highlights()
+print("View reset.")`
+    },
+    {
+        id: 'sys-audit',
+        name: 'Attribute Audit',
+        description: 'Finds nodes missing a critical attribute and highlights them persistently.',
+        isSystem: true,
+        code: `required_key = "Owner"
+all_nodes = graph.get_all_nodes()
+count = 0
+
+print("Clearing previous persistent highlights...")
+for n in all_nodes:
+    graph.clear_highlight(id=n.id)
+
+print("Checking for missing attribute: " + required_key)
+
+for node in all_nodes:
+    # Check if attribute is missing
+    if node.attributes.Owner == None:
+        # Use graph.set_highlight for persistent highlighting (saved with model)
+        graph.set_highlight(id=node.id, color="#ef4444")
+        print("Missing: " + node.name)
+        count = count + 1
+
+print("Total found: " + count)`
+    },
+    {
+        id: 'sys-tag-neighbors',
+        name: 'Tag Neighbors',
+        description: 'Finds neighbors of a specific node and adds a tag to them.',
+        isSystem: true,
+        code: `center_name = "Project X"
+center = graph.get_node_by_name(name=center_name)
+
+if center != None:
+    neighbors = graph.get_neighbors(id=center.id)
+    for n in neighbors:
+        graph.add_tag(id=n.id, tag="Related-to-X")
+        canvas.highlight_node(id=n.id, color="#4ade80")
+    print("Tagged neighbors.")
+else:
+    print("Center node not found.")`
+    },
+    {
+        id: 'sys-chain',
+        name: 'Create Chain',
+        description: 'Creates three connected nodes in a sequence.',
+        isSystem: true,
+        code: `n1 = graph.add_node(name="Step 1", tags="Process")
+n2 = graph.add_node(name="Step 2", tags="Process")
+n3 = graph.add_node(name="Step 3", tags="Process")
+
+graph.add_edge(source=n1.id, target=n2.id, label="next")
+graph.add_edge(source=n2.id, target=n3.id, label="next")
+
+canvas.pan_to_node(id=n2.id)`
+    },
+    {
+        id: 'sys-cleanup',
+        name: 'Cleanup Tagged',
+        description: 'Deletes all nodes with a specific tag (Use with caution).',
+        isSystem: true,
+        code: `tag_to_delete = "Temporary"
+nodes = graph.query_nodes(tag=tag_to_delete)
+
+for n in nodes:
+    graph.delete_node(id=n.id)
+    print("Deleted " + n.name)`
+    },
+    {
+        id: 'sys-isolate',
+        name: 'Find & Isolate',
+        description: 'Selects a node and clears everything else from view (simulated by highlighting only one).',
+        isSystem: true,
+        code: `target_name = "Core Problem"
+node = graph.get_node_by_name(name=target_name)
+
+if node != None:
+    canvas.clear_selection()
+    canvas.select_node(id=node.id)
+    canvas.pan_to_node(id=node.id)
+    print("Focused on " + node.name)
+else:
+    print("Node not found.")`
+    }
+];
+
+export const EXAMPLE_SCRIPTS = [
+    {
+        id: 'ex-create-walk',
+        name: 'Ex: Create & Walk',
+        code: `# 1. Create a chain of nodes
+start = graph.add_node(name="Start", tags="Step")
+mid = graph.add_node(name="Process", tags="Step")
+end = graph.add_node(name="End", tags="Step")
+
+graph.add_edge(source=start.id, target=mid.id, label="next")
+graph.add_edge(source=mid.id, target=end.id, label="next")
+
+print("Created chain. Starting walk...")
+
+# 2. Query and animate
+steps = graph.query_nodes(tag="Step")
+
+for node in steps:
+    print("Visiting: " + node.name)
+    canvas.pan_to_node(id=node.id)
+    canvas.highlight_node(id=node.id, color="#facc15")
+    sleep(0.8)
+
+canvas.clear_highlights()
+print("Walk complete.")
+`
+    },
+    {
+        id: 'ex-attributes',
+        name: 'Ex: Attribute Logic',
+        code: `# 1. Setup Test Data
+city1 = graph.add_node(name="London Office")
+graph.set_attribute(id=city1.id, key="location", value="UK")
+graph.set_attribute(id=city1.id, key="status", value="active")
+
+city2 = graph.add_node(name="Paris Office")
+graph.set_attribute(id=city2.id, key="location", value="France")
+graph.set_attribute(id=city2.id, key="status", value="active")
+
+city3 = graph.add_node(name="Tokyo Office")
+graph.set_attribute(id=city3.id, key="location", value="Japan")
+graph.set_attribute(id=city3.id, key="status", value="planning")
+
+print("Nodes created.")
+sleep(0.5)
+
+# 2. Query by attribute (Status: active)
+active_nodes = graph.query_nodes(status="active")
+print("Found " + active_nodes.length + " active offices.")
+
+for node in active_nodes:
+    print("Auditing: " + node.name)
+    canvas.select_node(id=node.id)
+    
+    # Mark as audited
+    graph.set_attribute(id=node.id, key="audited", value="true")
+    graph.add_tag(id=node.id, tag="Audited")
+    
+    sleep(0.8)
+
+canvas.clear_selection()
+print("Audit complete.")
+`
+    },
+    {
+        id: 'ex-report',
+        name: 'Ex: Auto-Report',
+        code: `# 1. Ensure we have data
+n1 = graph.add_node(name="Risk A", tags="Risk", notes="High probability")
+n2 = graph.add_node(name="Risk B", tags="Risk", notes="Low impact")
+
+# 2. Query
+risk_nodes = graph.query_nodes(tag="Risk")
+print("Found " + risk_nodes.length + " risks.")
+
+# 3. Build Markdown
+report_text = "# Risk Assessment Report\\n\\n"
+
+for node in risk_nodes:
+    line = "- **" + node.name + "**: " + node.notes + "\\n"
+    report_text = report_text + line
+
+# 4. Create Document
+doc_id = markdown.create_doc(title="Generated Risk Report", content=report_text)
+markdown.open_doc(id=doc_id)
+
+print("Document created.")
+`
+    }
+];
 
 export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
   {
@@ -183,7 +587,7 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
     tagColors: {
       'Context': '#e2e8f0', // slate-200
       'Useful': '#86efac', // green-300
-      'Harmful': '#fca5a5', // red-300
+      'Harmful': '#ef4444', // red-300
       'Emotion': '#fda4af', // rose-300
       'Action': '#93c5fd', // blue-300
       'Trend': '#5eead4', // teal-300

@@ -35,6 +35,7 @@ interface GraphCanvasProps {
   analysisHighlights?: Map<string, string>;
   isDarkMode?: boolean;
   nodeShape?: NodeShape;
+  isHighlightToolActive?: boolean;
 }
 
 export interface GraphCanvasRef {
@@ -439,7 +440,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   simulationState,
   analysisHighlights,
   isDarkMode = true,
-  nodeShape = 'rectangle'
+  nodeShape = 'rectangle',
+  isHighlightToolActive = false
 }, ref) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const gRef = useRef<SVGGElement>(null);
@@ -941,7 +943,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .on('contextmenu', (event: any, d: any) => onNodeContextMenu(event, d.id))
       .on('mouseenter', function(event: any, d: any) {
           // Show Quick Add Buttons
-          if (isBulkEditActive || isPhysicsModeActive) return; // Don't show in special modes
+          if (isBulkEditActive || isPhysicsModeActive || isHighlightToolActive) return; // Don't show in special modes
           
           const group = d3.select(this);
           const width = d.width || NODE_MAX_WIDTH;
@@ -1194,14 +1196,17 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         dNode.width = width;
         dNode.height = height;
             
-        // Scribble Path update
-        if (analysisHighlights && analysisHighlights.has(d.id)) {
-             const color = analysisHighlights.get(d.id);
+        // Scribble Path update: Check META highlight OR Analysis highlight
+        const metaHighlight = d.meta?.highlightColor;
+        const analysisHighlight = analysisHighlights?.get(d.id);
+        const activeHighlightColor = analysisHighlight || metaHighlight;
+
+        if (activeHighlightColor) {
              const scribblePath = generateScribblePath(width, height, d.id);
              
              nodeElement.select('.highlight-scribble')
                 .attr('d', scribblePath)
-                .attr('stroke', color || '#facc15') // Default neon yellow
+                .attr('stroke', activeHighlightColor) 
                 .style('display', 'block');
         } else {
              nodeElement.select('.highlight-scribble')
@@ -1226,6 +1231,10 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     const bulkCursorSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>`);
     const bulkCursor = `url("data:image/svg+xml;charset=utf-8,${bulkCursorSvg}") 12 12, auto`;
 
+    // Custom SVG Cursor for Highlight Pen (yellow highlighter)
+    const highlightCursorSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h3l6-6"/><path d="m22 2-2.5 2.5"/><path d="M13.5 6.5 8 12"/></svg>`);
+    const highlightCursor = `url("data:image/svg+xml;charset=utf-8,${highlightCursorSvg}") 2 22, auto`;
+
     // Custom SVG Cursor for Connect Mode (blue plus circle)
     const connectCursorSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="rgba(255,255,255,0.2)" stroke="#3b82f6" stroke-width="2" /><path d="M12 7v10M7 12h10" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" /></svg>`);
     const connectCursor = `url("data:image/svg+xml;charset=utf-8,${connectCursorSvg}") 12 12, crosshair`;
@@ -1235,6 +1244,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     if (isBulkEditActive) {
         cursorStyle = bulkCursor;
         moveZoneCursor = bulkCursor;
+    } else if (isHighlightToolActive) {
+        cursorStyle = highlightCursor;
+        moveZoneCursor = highlightCursor;
     } else if (isSimulationMode) {
         cursorStyle = 'pointer'; // Click to stimulate
         moveZoneCursor = 'pointer';
@@ -1319,7 +1331,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     
     (simulation.alpha(0.3) as any).restart();
 
-  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, multiSelection, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, onLinkContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState, isSimulationMode, analysisHighlights, isDarkMode, nodeShape]);
+  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, multiSelection, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, onLinkContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState, isSimulationMode, analysisHighlights, isDarkMode, nodeShape, isHighlightToolActive]);
 
   return (
     <div className={`w-full h-full flex-grow cursor-grab active:cursor-grabbing select-none ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`} 

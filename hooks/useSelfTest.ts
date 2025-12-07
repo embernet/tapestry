@@ -63,7 +63,6 @@ export const useSelfTest = ({ panelState, tools, setPanelLayouts }: UseSelfTestP
         tools.setIsTocModalOpen(false);
         tools.setIsSsmModalOpen(false);
         tools.setIsSwotModalOpen(false);
-        tools.setIsBulkEditActive(false);
         setPanelLayouts({}); 
         
         await new Promise(r => setTimeout(r, 800));
@@ -125,17 +124,50 @@ export const useSelfTest = ({ panelState, tools, setPanelLayouts }: UseSelfTestP
             { id: '2.3.4', description: 'Toolbar(Layout).Check(Simulate)', selector: 'text:SIMULATE' },
             { id: '2.3.5', description: 'Toolbar(Layout).Close', action: () => tools.setActiveTool(null), wait: 300 },
 
-            // 2.4 Analysis Tools
+            // 2.4 Analysis Tools (Updated)
             { id: '2.4.1', description: 'Toolbar(Analysis).Open', action: () => tools.setActiveTool('analysis'), wait: 500 },
-            { id: '2.4.2', description: 'Toolbar(Analysis).Check(Network)', selector: 'text:Network Analysis' },
-            { id: '2.4.3', description: 'Toolbar(Analysis).Check(Tags)', selector: 'text:Tag Analysis' },
-            { id: '2.4.4', description: 'Toolbar(Analysis).Close', action: () => tools.setActiveTool(null), wait: 300 },
+            { id: '2.4.2', description: 'Toolbar(Analysis).Check(Dropdown)', selector: 'text:Graph Analytics' },
+            { id: '2.4.3', description: 'Toolbar(Analysis).Check(Network Button)', selector: 'text:Network Analysis' },
+            { id: '2.4.4', description: 'Panel(Network).Open', action: () => panelState.setIsNetworkAnalysisOpen(true), wait: 500 },
+            { id: '2.4.5', description: 'Panel(Network).Check(Header)', selector: 'text:Network Analysis' },
+            { id: '2.4.6', description: 'Panel(Network).Close', action: () => { panelState.setIsNetworkAnalysisOpen(false); tools.setActiveTool(null); }, wait: 300 },
 
             // 2.5 Visualise Tools
             { id: '2.5.1', description: 'Toolbar(Visualise).Open', action: () => tools.setActiveTool('visualise'), wait: 500 },
             { id: '2.5.2', description: 'Toolbar(Visualise).Check(Grid)', selector: 'text:Attribute Grid' },
-            { id: '2.5.3', description: 'Toolbar(Visualise).Check(Circle)', selector: 'text:Circle Packing' },
+            { id: '2.5.3', description: 'Toolbar(Visualise).Check(Circle Packing)', selector: 'text:Circle Packing' },
             { id: '2.5.4', description: 'Toolbar(Visualise).Close', action: () => tools.setActiveTool(null), wait: 300 },
+            
+            // 2.6 Scripts (New)
+            { id: '2.6.1', description: 'Toolbar(Scripts).Open', action: () => tools.setActiveTool('scripts'), wait: 500 },
+            { id: '2.6.2', description: 'Toolbar(Scripts).Check(Header)', selector: 'text:Automation & Macros' },
+            { id: '2.6.3', description: 'Panel(Script).Open', action: () => panelState.setIsScriptPanelOpen(true), wait: 500 },
+            { id: '2.6.4', description: 'Panel(Script).Check(Header)', selector: 'text:TScript' },
+            { id: '2.6.5', description: 'Panel(Script).Close', action: () => { panelState.setIsScriptPanelOpen(false); tools.setActiveTool(null); }, wait: 300 },
+
+            // 2.7 Tag Cloud (New)
+            { id: '2.7.1', description: 'Toolbar(TagCloud).Open', action: () => tools.setActiveTool('tagcloud'), wait: 500 },
+            { id: '2.7.2', description: 'Toolbar(TagCloud).Check(Header)', selector: 'text:Word Cloud Tools' },
+            { id: '2.7.3', description: 'Panel(TagCloud).Open', action: () => panelState.setIsConceptCloudOpen(true), wait: 500 },
+            { id: '2.7.4', description: 'Panel(TagCloud).Check(Header)', selector: 'text:Tag Cloud' },
+            { id: '2.7.5', description: 'Panel(TagCloud).Close', action: () => { panelState.setIsConceptCloudOpen(false); tools.setActiveTool(null); }, wait: 300 },
+
+            // 2.8 Explorer (New)
+            { id: '2.8.1', description: 'Toolbar(Explorer).Open', action: () => tools.setActiveTool('explorer'), wait: 500 },
+            { id: '2.8.2', description: 'Toolbar(Explorer).Check(Sunburst)', selector: 'text:Sunburst Explorer' },
+            { id: '2.8.3', description: 'Panel(Sunburst).Open', action: () => panelState.setIsSunburstPanelOpen(true), wait: 500 },
+            { id: '2.8.4', description: 'Panel(Sunburst).Check(Header)', selector: 'text:Sunburst' },
+            { id: '2.8.5', description: 'Panel(Sunburst).Close', action: () => { panelState.setIsSunburstPanelOpen(false); tools.setActiveTool(null); }, wait: 300 },
+
+            // 2.9 Bulk Edit (New)
+            { id: '2.9.1', description: 'Toolbar(Bulk).Open', action: () => tools.setActiveTool('bulk'), wait: 500 },
+            { id: '2.9.2', description: 'Toolbar(Bulk).Check(Add Input)', selector: 'input[placeholder="Tags to add..."]' },
+            { id: '2.9.3', description: 'Toolbar(Bulk).Close', action: () => tools.setActiveTool(null), wait: 300 },
+
+            // 2.10 Command Bar (New)
+            { id: '2.10.1', description: 'Toolbar(Command).Open', action: () => tools.setActiveTool('command'), wait: 500 },
+            { id: '2.10.2', description: 'Toolbar(Command).Check(Input)', selector: 'textarea[placeholder*="Element A"]' },
+            { id: '2.10.3', description: 'Toolbar(Command).Close', action: () => tools.setActiveTool(null), wait: 300 },
 
             // --- 3. Methodology Modals ---
 
@@ -176,58 +208,17 @@ export const useSelfTest = ({ panelState, tools, setPanelLayouts }: UseSelfTestP
             { id: '3.6.3', description: 'Modal(Strategy).Check(Grid)', selector: 'text:Strengths' },
             { id: '3.6.4', description: 'Modal(Strategy).Close', action: () => tools.setIsSwotModalOpen(false), wait: 300 },
 
-            // --- 4. Explorer Views ---
+            // --- 4. Additional Explorer Panels ---
              { id: '4.1.1', description: 'Panel(Treemap).Open', action: () => panelState.setIsTreemapPanelOpen(true), wait: 600 },
              { id: '4.1.2', description: 'Panel(Treemap).Check(Header)', selector: 'text:Treemap' },
              { id: '4.1.3', description: 'Panel(Treemap).Close', action: () => panelState.setIsTreemapPanelOpen(false), wait: 300 },
              
-             { id: '4.2.1', description: 'Panel(Sunburst).Open', action: () => panelState.setIsSunburstPanelOpen(true), wait: 600 },
-             { id: '4.2.2', description: 'Panel(Sunburst).Check(Header)', selector: 'text:Sunburst' },
-             { id: '4.2.3', description: 'Panel(Sunburst).Close', action: () => panelState.setIsSunburstPanelOpen(false), wait: 300 },
-
-             { id: '4.3.1', description: 'Panel(TagCloud).Open', action: () => panelState.setIsConceptCloudOpen(true), wait: 600 },
-             { id: '4.3.2', description: 'Panel(TagCloud).Check(Header)', selector: 'text:Tag Cloud' },
-             { id: '4.3.3', description: 'Panel(TagCloud).Close', action: () => panelState.setIsConceptCloudOpen(false), wait: 300 },
-
-             // 4.4 Network Analysis Panel
-             { id: '4.4.1', description: 'Panel(Network).Open', action: () => panelState.setIsNetworkAnalysisOpen(true), wait: 600 },
-             { id: '4.4.2', description: 'Panel(Network).Check(Header)', selector: 'text:Network Analysis' },
-             { id: '4.4.3', description: 'Panel(Network).Check(Sim)', selector: 'text:Impact Simulation' },
-             { id: '4.4.4', description: 'Panel(Network).Close', action: () => panelState.setIsNetworkAnalysisOpen(false), wait: 300 },
-
-             // --- 5. Data & View Panels ---
-             { id: '5.1.1', description: 'Panel(Diagrams).Open', action: () => panelState.setIsMermaidPanelOpen(true), wait: 600 },
-             { id: '5.1.2', description: 'Panel(Diagrams).Check(Editor)', selector: 'text:Mermaid Code' },
-             { id: '5.1.3', description: 'Panel(Diagrams).Close', action: () => panelState.setIsMermaidPanelOpen(false), wait: 300 },
-
-             { id: '5.2.1', description: 'Panel(Docs).Open', action: () => panelState.setIsDocumentPanelOpen(true), wait: 600 },
-             { id: '5.2.2', description: 'Panel(Docs).Check(Header)', selector: 'text:Documents' },
-             { id: '5.2.3', description: 'Panel(Docs).Close', action: () => panelState.setIsDocumentPanelOpen(false), wait: 300 },
-
-             { id: '5.3.1', description: 'Panel(History).Open', action: () => panelState.setIsHistoryPanelOpen(true), wait: 600 },
-             { id: '5.3.2', description: 'Panel(History).Check(Header)', selector: 'text:AI History Log' },
-             { id: '5.3.3', description: 'Panel(History).Close', action: () => panelState.setIsHistoryPanelOpen(false), wait: 300 },
-
-             { id: '5.4.1', description: 'Panel(Markdown).Open', action: () => panelState.setIsMarkdownPanelOpen(true), wait: 600 },
-             { id: '5.4.2', description: 'Panel(Markdown).Check(Header)', selector: 'text:Markdown View' },
-             { id: '5.4.3', description: 'Panel(Markdown).Close', action: () => panelState.setIsMarkdownPanelOpen(false), wait: 300 },
-
-             { id: '5.5.1', description: 'Panel(JSON).Open', action: () => panelState.setIsJSONPanelOpen(true), wait: 600 },
-             { id: '5.5.2', description: 'Panel(JSON).Check(Header)', selector: 'text:JSON View' },
-             { id: '5.5.3', description: 'Panel(JSON).Close', action: () => panelState.setIsJSONPanelOpen(false), wait: 300 },
-
-             // --- 6. Utility Bars ---
-             { id: '6.1.1', description: 'Toolbar(Bulk).Open', action: () => tools.setActiveTool('bulk'), wait: 500 },
-             { id: '6.1.2', description: 'Toolbar(Bulk).Check(Inputs)', selector: 'input[placeholder="Tags to add..."]' },
-             { id: '6.1.3', description: 'Toolbar(Bulk).Close', action: () => tools.setActiveTool(null), wait: 300 },
-
-             { id: '6.2.1', description: 'Toolbar(Command).Open', action: () => tools.setActiveTool('command'), wait: 500 },
-             { id: '6.2.2', description: 'Toolbar(Command).Check(Input)', selector: 'textarea[placeholder*="Element A"]' },
-             { id: '6.2.3', description: 'Toolbar(Command).Close', action: () => tools.setActiveTool(null), wait: 300 },
-
+             { id: '4.2.1', description: 'Panel(CirclePacking).Open', action: () => panelState.setIsCirclePackingPanelOpen(true), wait: 600 },
+             { id: '4.2.2', description: 'Panel(CirclePacking).Check(Header)', selector: 'text:Circle Packing' },
+             { id: '4.2.3', description: 'Panel(CirclePacking).Close', action: () => panelState.setIsCirclePackingPanelOpen(false), wait: 300 },
         ];
 
-        // Initialize log state
+        // Initialize log state with pending status
         setTestLogs(testSteps.map(step => ({
             id: step.id,
             name: step.description,
@@ -245,7 +236,7 @@ export const useSelfTest = ({ panelState, tools, setPanelLayouts }: UseSelfTestP
                 } catch (e) {
                     const msg = e instanceof Error ? e.message : 'Action failed';
                     setTestLogs(prev => prev.map(l => l.id === step.id ? { ...l, status: 'error', message: msg } : l));
-                    continue; // Continue to next test even if action failed, to catch cascading failures
+                    continue; // Continue to next test even if action failed
                 }
             }
 

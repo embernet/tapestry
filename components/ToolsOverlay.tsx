@@ -16,6 +16,7 @@ import SwotToolbar from './SwotToolbar';
 import ExplorerToolbar from './ExplorerToolbar';
 import TagCloudToolbar from './TagCloudToolbar';
 import BulkEditToolbar from './BulkEditToolbar';
+import ScriptsToolbar from './ScriptsToolbar';
 import CommandBar from './CommandBar';
 import { Element, Relationship, ColorScheme, CustomStrategyTool, NodeShape } from '../types';
 
@@ -86,6 +87,9 @@ interface ToolsOverlayProps {
   // Command
   handleCommandExecution: (cmd: string) => void;
   handleOpenCommandHistory: () => void;
+
+  // Scripts
+  handleCreateScript: (name: string, code: string) => void;
   
   // Misc
   globalSettings: { customStrategies: CustomStrategyTool[] };
@@ -94,6 +98,10 @@ interface ToolsOverlayProps {
 
   // Analysis
   handleAnalysisToolSelect: (toolId: string) => void;
+  
+  // Highlighting
+  isHighlightToolActive?: boolean;
+  setIsHighlightToolActive?: (active: boolean) => void;
 }
 
 export const ToolsOverlay: React.FC<ToolsOverlayProps> = (props) => {
@@ -161,6 +169,23 @@ export const ToolsOverlay: React.FC<ToolsOverlayProps> = (props) => {
                         onSelectTool={props.handleAiToolSelect}
                         isCollapsed={tools.activeTool !== 'ai'}
                         onToggle={() => tools.toggleTool('ai')}
+                        isDarkMode={isDarkMode}
+                    />
+                )}
+                
+                {isToolVisible('scripts') && (
+                    <ScriptsToolbar 
+                        onOpenEditor={() => {
+                            panelState.setIsScriptPanelOpen(true);
+                            tools.setActiveTool(null);
+                        }}
+                        onLoadExample={(code) => {
+                            props.handleCreateScript(`Example ${new Date().toLocaleTimeString()}`, code);
+                            panelState.setIsScriptPanelOpen(true);
+                            tools.setActiveTool(null);
+                        }}
+                        isCollapsed={tools.activeTool !== 'scripts'}
+                        onToggle={() => tools.toggleTool('scripts')}
                         isDarkMode={isDarkMode}
                     />
                 )}

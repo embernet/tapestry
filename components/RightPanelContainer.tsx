@@ -328,7 +328,7 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
                 {/* Pin/Dock Button */}
                 <button
                   onClick={() => handleDock(panel.id)}
-                  title="Unpin (Dock back to tabs)"
+                  title="Dock"
                   className="text-blue-400 hover:text-blue-300 p-1 rounded hover:bg-opacity-10 hover:bg-black transition-colors"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 transform rotate-45" viewBox="0 0 20 20" fill="currentColor">

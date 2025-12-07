@@ -46,7 +46,7 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
     const initialDimRef = useRef({ width: 0, height: 0, x: 0, y: 0 });
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    const [activeTab, setActiveTab] = useState<'intro' | 'interface' | 'tools' | 'patterns' | 'index'>('intro');
+    const [activeTab, setActiveTab] = useState<'intro' | 'interface' | 'tools' | 'patterns' | 'scripting' | 'index'>('intro');
     const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
@@ -188,6 +188,7 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
     const highlightText = isDarkMode ? 'text-blue-200' : 'text-blue-900';
     const cardBg = isDarkMode ? 'bg-gray-800 hover:bg-gray-750' : 'bg-white hover:bg-gray-50';
     const svgContainerBg = isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-gray-100 border-gray-300';
+    const codeBlockBg = isDarkMode ? 'bg-black text-green-400' : 'bg-gray-800 text-green-300';
 
     return (
         <div className="fixed inset-0 pointer-events-none z-[1100] flex justify-center items-center">
@@ -273,6 +274,12 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                         className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'tools' ? tabActive : tabInactive}`}
                     >
                         Tools
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('scripting')}
+                        className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'scripting' ? tabActive : tabInactive}`}
+                    >
+                        Scripting
                     </button>
                 </div>
 
@@ -496,6 +503,162 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                                     )}
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {activeTab === 'scripting' && (
+                        <div className="max-w-4xl mx-auto space-y-8">
+                             {/* Intro */}
+                            <div className="border-b border-gray-700/50 pb-6">
+                                <h3 className={`text-2xl font-bold mb-4 ${textHeader}`}>Tapestry Script (TScript)</h3>
+                                <p className={`text-base leading-relaxed mb-4 ${textDesc}`}>
+                                    Tapestry Script (TScript) is a domain-specific language based on a strict subset of Python. It allows you to programmatically automate graph operations, analyze connectivity, and build custom workflows. It uses Python-style indentation for blocks (if/else/for) and standard assignment syntax.
+                                </p>
+                            </div>
+                            
+                            {/* Syntax Reference */}
+                            <div className="space-y-4">
+                                <h4 className={`text-xl font-bold ${sectionTitle}`}>Language Syntax</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className={`p-4 rounded border ${itemBg}`}>
+                                        <h5 className="font-bold text-sm mb-2 text-green-400">Variables & Assignment</h5>
+                                        <pre className={`text-xs font-mono p-2 rounded mb-2 ${codeBlockBg}`}>
+{`name = "My Node"
+count = 10
+count += 5`}
+                                        </pre>
+                                        <p className={`text-xs ${textDesc}`}>Direct assignment. Supports strings, numbers, lists, and booleans.</p>
+                                    </div>
+                                    <div className={`p-4 rounded border ${itemBg}`}>
+                                        <h5 className="font-bold text-sm mb-2 text-purple-400">Loops</h5>
+                                        <pre className={`text-xs font-mono p-2 rounded mb-2 ${codeBlockBg}`}>
+{`for node in nodes:
+    print(node.name)`}
+                                        </pre>
+                                        <p className={`text-xs ${textDesc}`}>Iterate over collections. Blocks are defined by indentation.</p>
+                                    </div>
+                                    <div className={`p-4 rounded border ${itemBg}`}>
+                                        <h5 className="font-bold text-sm mb-2 text-orange-400">Control Flow</h5>
+                                        <pre className={`text-xs font-mono p-2 rounded mb-2 ${codeBlockBg}`}>
+{`if count > 5:
+    print("Many")
+else:
+    print("Few")`}
+                                        </pre>
+                                        <p className={`text-xs ${textDesc}`}>Conditional logic using standard Python syntax.</p>
+                                    </div>
+                                    <div className={`p-4 rounded border ${itemBg}`}>
+                                        <h5 className="font-bold text-sm mb-2 text-blue-400">Standard Methods</h5>
+                                        <pre className={`text-xs font-mono p-2 rounded mb-2 ${codeBlockBg}`}>
+{`list.append(item)
+str.split(",")
+print("Log")
+sleep(0.5)`}
+                                        </pre>
+                                        <p className={`text-xs ${textDesc}`}>Built-in methods for data manipulation and flow control.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* API Reference */}
+                            <div className="space-y-4">
+                                <h4 className={`text-xl font-bold ${sectionTitle}`}>API Reference</h4>
+                                
+                                <div className={`border rounded-lg overflow-hidden ${groupBg}`}>
+                                    <div className={`p-3 font-bold text-sm border-b ${groupHeaderBg} ${textHeader}`}>Graph Operations (graph.*)</div>
+                                    <table className={`w-full text-xs text-left ${textDesc}`}>
+                                        <tbody className="divide-y divide-gray-700">
+                                            <tr><td className="p-2 font-mono text-blue-400">graph.get_all_nodes()</td><td className="p-2">Returns list of all nodes.</td></tr>
+                                            <tr><td className="p-2 font-mono text-blue-400">graph.get_node_by_name(name="X")</td><td className="p-2">Finds a single node by name.</td></tr>
+                                            <tr><td className="p-2 font-mono text-blue-400">graph.query_nodes(tag="Risk")</td><td className="p-2">Returns nodes matching tag or attributes.</td></tr>
+                                            <tr><td className="p-2 font-mono text-blue-400">graph.add_node(name="X", tags="A,B")</td><td className="p-2">Creates a new node. Returns the object.</td></tr>
+                                            <tr><td className="p-2 font-mono text-blue-400">graph.delete_node(id="...")</td><td className="p-2">Deletes a node by ID.</td></tr>
+                                            <tr><td className="p-2 font-mono text-blue-400">graph.add_edge(source="ID", target="ID")</td><td className="p-2">Connects two nodes.</td></tr>
+                                            <tr><td className="p-2 font-mono text-blue-400">graph.get_neighbors(id="...")</td><td className="p-2">Returns directly connected nodes.</td></tr>
+                                            <tr><td className="p-2 font-mono text-blue-400">graph.set_attribute(id="...", key="...", value="...")</td><td className="p-2">Updates/Sets a custom attribute.</td></tr>
+                                            <tr><td className="p-2 font-mono text-blue-400">graph.set_highlight(id="...", color="#f00")</td><td className="p-2">Sets a persistent highlight color.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div className={`border rounded-lg overflow-hidden ${groupBg}`}>
+                                    <div className={`p-3 font-bold text-sm border-b ${groupHeaderBg} ${textHeader}`}>Canvas Operations (canvas.*)</div>
+                                    <table className={`w-full text-xs text-left ${textDesc}`}>
+                                        <tbody className="divide-y divide-gray-700">
+                                            <tr><td className="p-2 font-mono text-green-400">canvas.select_node(id="...")</td><td className="p-2">Selects a node (showing details panel).</td></tr>
+                                            <tr><td className="p-2 font-mono text-green-400">canvas.pan_to_node(id="...")</td><td className="p-2">Centers the camera on a node.</td></tr>
+                                            <tr><td className="p-2 font-mono text-green-400">canvas.highlight_node(id="...", color="#f00")</td><td className="p-2">Applies a temporary visual highlight (transient).</td></tr>
+                                            <tr><td className="p-2 font-mono text-green-400">canvas.clear_highlights()</td><td className="p-2">Removes all transient highlights.</td></tr>
+                                            <tr><td className="p-2 font-mono text-green-400">canvas.clear_selection()</td><td className="p-2">Deselects all nodes.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div className={`border rounded-lg overflow-hidden ${groupBg}`}>
+                                    <div className={`p-3 font-bold text-sm border-b ${groupHeaderBg} ${textHeader}`}>Document Operations (markdown.*)</div>
+                                    <table className={`w-full text-xs text-left ${textDesc}`}>
+                                        <tbody className="divide-y divide-gray-700">
+                                            <tr><td className="p-2 font-mono text-purple-400">markdown.create_doc(title="T", content="...")</td><td className="p-2">Creates a new text document. Returns ID.</td></tr>
+                                            <tr><td className="p-2 font-mono text-purple-400">markdown.open_doc(id="...")</td><td className="p-2">Opens the document editor panel.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Examples */}
+                            <div>
+                                <h4 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Examples</h4>
+                                
+                                <div className={`p-4 rounded border mb-4 ${itemBg}`}>
+                                    <h5 className={`font-bold text-sm mb-2 ${textHeader}`}>Walk & Highlight</h5>
+                                    <pre className={`text-xs font-mono p-3 rounded overflow-x-auto ${codeBlockBg}`}>
+{`target_tag = "Risk"
+nodes = graph.query_nodes(tag=target_tag)
+print("Found " + nodes.length + " nodes.")
+
+for node in nodes:
+    canvas.pan_to_node(id=node.id)
+    canvas.highlight_node(id=node.id, color="#facc15")
+    sleep(0.8)
+
+canvas.clear_highlights()`}
+                                    </pre>
+                                </div>
+
+                                <div className={`p-4 rounded border ${itemBg}`}>
+                                    <h5 className={`font-bold text-sm mb-2 ${textHeader}`}>Attribute Audit</h5>
+                                    <pre className={`text-xs font-mono p-3 rounded overflow-x-auto ${codeBlockBg}`}>
+{`required_key = "Owner"
+all_nodes = graph.get_all_nodes()
+count = 0
+
+for node in all_nodes:
+    if node.attributes.Owner == None:
+        graph.set_highlight(id=node.id, color="#ef4444")
+        print("Missing Owner: " + node.name)
+        count += 1
+
+print("Total found: " + count)`}
+                                    </pre>
+                                </div>
+                                
+                                <div className={`p-4 rounded border mt-4 ${itemBg}`}>
+                                    <h5 className={`font-bold text-sm mb-2 ${textHeader}`}>Generate Report</h5>
+                                    <pre className={`text-xs font-mono p-3 rounded overflow-x-auto ${codeBlockBg}`}>
+{`report = "# System Analysis Report\\n\\n"
+nodes = graph.get_all_nodes()
+
+for n in nodes:
+    details = "### " + n.name + "\\n"
+    if n.notes:
+        details += "- **Notes:** " + n.notes + "\\n"
+    report += details + "\\n"
+
+doc_id = markdown.create_doc(title="Full Report", content=report)
+markdown.open_doc(id=doc_id)`}
+                                    </pre>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>

@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { ModelMetadata, ColorScheme, SystemPromptConfig, Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, DateFilterState, PanelLayout } from '../types';
+import { ModelMetadata, ColorScheme, SystemPromptConfig, Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, DateFilterState, PanelLayout, Script } from '../types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG } from '../constants';
 import { generateUUID, computeContentHash, isInIframe } from '../utils';
 
@@ -17,6 +17,7 @@ interface UsePersistenceProps {
     setHistory: React.Dispatch<React.SetStateAction<HistoryEntry[]>>;
     setSlides: React.Dispatch<React.SetStateAction<StorySlide[]>>;
     setMermaidDiagrams: React.Dispatch<React.SetStateAction<MermaidDiagram[]>>;
+    setScripts: React.Dispatch<React.SetStateAction<Script[]>>;
     setColorSchemes: React.Dispatch<React.SetStateAction<ColorScheme[]>>;
     setActiveSchemeId: React.Dispatch<React.SetStateAction<string | null>>;
     setSystemPromptConfig: React.Dispatch<React.SetStateAction<SystemPromptConfig>>;
@@ -42,15 +43,16 @@ interface UsePersistenceProps {
     history: HistoryEntry[];
     slides: StorySlide[];
     mermaidDiagrams: MermaidDiagram[];
+    scripts: Script[];
 }
 
 export const usePersistence = ({
-    setElements, setRelationships, setDocuments, setFolders, setHistory, setSlides, setMermaidDiagrams,
+    setElements, setRelationships, setDocuments, setFolders, setHistory, setSlides, setMermaidDiagrams, setScripts,
     setColorSchemes, setActiveSchemeId, setSystemPromptConfig, setOpenDocIds, setDetachedHistoryIds,
     setPanelLayouts, setAnalysisHighlights, setAnalysisFilterState, setMultiSelection, setSelectedElementId,
     setTagFilter, setDateFilter, currentFileHandleRef,
     elementsRef, relationshipsRef, documentsRef, foldersRef,
-    colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams
+    colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts
 }: UsePersistenceProps) => {
     
     const [modelsIndex, setModelsIndex] = useState<ModelMetadata[]>([]);
@@ -123,6 +125,7 @@ export const usePersistence = ({
         setHistory(data.history || []);
         setSlides(data.slides || []);
         setMermaidDiagrams(data.mermaidDiagrams || []);
+        setScripts(data.scripts || []);
         setOpenDocIds([]); 
         setDetachedHistoryIds([]);
         setPanelLayouts({});
@@ -221,7 +224,8 @@ export const usePersistence = ({
                 systemPromptConfig, 
                 history, 
                 slides, 
-                mermaidDiagrams 
+                mermaidDiagrams,
+                scripts
             }; 
             const currentContentHash = computeContentHash(modelData); 
             const currentMeta = modelsIndex.find(m => m.id === currentModelId); 
@@ -234,11 +238,11 @@ export const usePersistence = ({
                 }); 
             } 
         } 
-    }, [elementsRef.current, relationshipsRef.current, documentsRef.current, foldersRef.current, colorSchemes, activeSchemeId, currentModelId, isInitialLoad, modelsIndex, systemPromptConfig, history, slides, mermaidDiagrams]);
+    }, [elementsRef.current, relationshipsRef.current, documentsRef.current, foldersRef.current, colorSchemes, activeSchemeId, currentModelId, isInitialLoad, modelsIndex, systemPromptConfig, history, slides, mermaidDiagrams, scripts]);
 
     const handleCreateModel = useCallback((name: string, description: string) => { 
         const now = new Date().toISOString(); 
-        const newModelData = { elements: [], relationships: [], documents: [], folders: [], colorSchemes: DEFAULT_COLOR_SCHEMES, activeSchemeId: DEFAULT_COLOR_SCHEMES[0]?.id || null, systemPromptConfig: DEFAULT_SYSTEM_PROMPT_CONFIG, history: [], slides: [], mermaidDiagrams: [] }; 
+        const newModelData = { elements: [], relationships: [], documents: [], folders: [], colorSchemes: DEFAULT_COLOR_SCHEMES, activeSchemeId: DEFAULT_COLOR_SCHEMES[0]?.id || null, systemPromptConfig: DEFAULT_SYSTEM_PROMPT_CONFIG, history: [], slides: [], mermaidDiagrams: [], scripts: [] }; 
         const initialHash = computeContentHash(newModelData); 
         const newModel: ModelMetadata = { id: generateUUID(), name, description, createdAt: now, updatedAt: now, filename: `${name.replace(/ /g, '_')}.json`, contentHash: initialHash, }; 
         setModelsIndex(prevIndex => [...prevIndex, newModel]); 
@@ -263,7 +267,8 @@ export const usePersistence = ({
             systemPromptConfig, 
             history, 
             slides, 
-            mermaidDiagrams 
+            mermaidDiagrams,
+            scripts
         };
         const currentHash = computeContentHash(modelData);
         const updatedMetadata = { ...modelMetadata, updatedAt: now, filename: modelMetadata.filename || `${modelMetadata.name.replace(/ /g, '_')}.json`, contentHash: currentHash, lastDiskHash: currentHash };
@@ -300,7 +305,7 @@ export const usePersistence = ({
                 alert("Failed to save file."); 
             } 
         }
-    }, [currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, currentFileHandleRef]);
+    }, [currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, currentFileHandleRef]);
 
     const handleSaveAs = useCallback((name: string, description: string) => {
         if (!currentModelId) return;
@@ -316,7 +321,8 @@ export const usePersistence = ({
             systemPromptConfig, 
             history, 
             slides, 
-            mermaidDiagrams 
+            mermaidDiagrams,
+            scripts
         };
         const currentHash = computeContentHash(modelData);
         const newMetadata: ModelMetadata = { id: newId, name, description, createdAt: now, updatedAt: now, filename: `${name.replace(/ /g, '_')}.json`, contentHash: currentHash };
@@ -330,7 +336,7 @@ export const usePersistence = ({
             console.error("Save As failed", e);
             alert("Failed to save copy. Local storage might be full.");
         }
-    }, [currentModelId, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, currentFileHandleRef]);
+    }, [currentModelId, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, currentFileHandleRef]);
 
     const processImportedData = useCallback((text: string, filename?: string) => {
         try {
@@ -411,6 +417,7 @@ export const usePersistence = ({
                 history: dataToImport.history || [], 
                 slides: dataToImport.slides || [], 
                 mermaidDiagrams: dataToImport.mermaidDiagrams || [], 
+                scripts: dataToImport.scripts || [],
                 colorSchemes: dataToImport.colorSchemes || DEFAULT_COLOR_SCHEMES, 
                 activeSchemeId: dataToImport.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null, 
                 systemPromptConfig: dataToImport.systemPromptConfig || DEFAULT_SYSTEM_PROMPT_CONFIG, 
@@ -473,7 +480,8 @@ export const usePersistence = ({
                 systemPromptConfig, 
                 history, 
                 slides, 
-                mermaidDiagrams 
+                mermaidDiagrams,
+                scripts
             }; 
             const currentHash = computeContentHash(modelData); 
             const isDirty = currentMeta?.lastDiskHash !== currentHash; 
@@ -485,7 +493,7 @@ export const usePersistence = ({
             } 
         } 
         setIsCreateModelModalOpen(true); 
-    }, [currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, handleDiskSave]);
+    }, [currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, handleDiskSave]);
 
     const hasUnsavedChanges = useMemo(() => {
         const currentMeta = modelsIndex.find(m => m.id === currentModelId);
