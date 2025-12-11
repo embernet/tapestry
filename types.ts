@@ -1,3 +1,4 @@
+
 import { FunctionCall, FunctionResponse } from '@google/genai';
 
 export enum RelationshipDirection {
@@ -81,6 +82,8 @@ export interface HistoryEntry {
 export interface PlanStep {
   id: string;
   description: string;
+  prompt: string; // The specific instruction for the AI agent for this step
+  dependencies: string[]; // IDs of steps that must finish first
   status: 'pending' | 'in_progress' | 'completed' | 'error';
   result?: string;
 }
@@ -95,6 +98,7 @@ export interface ChatMessage {
   rawJson?: any;
   requestPayload?: any; // Store the raw request sent to the AI
   plan?: PlanStep[]; // If this message proposed a plan
+  isVerbose?: boolean; // Debug logging for plan execution
 }
 
 export interface RelationshipDefinition {
@@ -155,6 +159,14 @@ export interface AIConnection {
   modelId: string;
 }
 
+export interface AIConfig {
+    provider: string;
+    apiKey: string;
+    modelId: string;
+    baseUrl?: string;
+    language?: string;
+}
+
 export interface CustomStrategyCategory {
   id: string;
   label: string;
@@ -180,6 +192,7 @@ export interface GlobalSettings {
   aiConnections: Record<AIProvider, AIConnection>;
   customStrategies: CustomStrategyTool[];
   language: string;
+  githubToken?: string;
 }
 
 // --- Scripting Types ---
@@ -226,7 +239,33 @@ export interface ToolActionEvent {
   result?: any;
 }
 
-// ---
+// --- Views ---
+
+export interface TagFilterState {
+    included: string[]; 
+    excluded: string[];
+}
+
+export interface GraphView {
+  id: string;
+  name: string;
+  description?: string;
+  // Visual Identity
+  tapestryPrompt?: string; 
+  tapestrySvg?: string;    
+  tapestryVisible: boolean;
+  // Configuration
+  filters: {
+     tags: TagFilterState;
+     date: DateFilterState;
+     nodeFilter: NodeFilterState;
+  };
+  // Curated Content
+  explicitInclusions: string[]; 
+  explicitExclusions: string[]; 
+  // Camera State
+  camera?: { x: number, y: number, k: number };
+}
 
 export interface ModelMetadata {
   id: string;
@@ -260,7 +299,7 @@ export interface NodeFilterState {
 }
 
 export interface ModelActions {
-  addElement: (data: { name: string; notes?: string; tags?: string[]; attributes?: Record<string, string>; customLists?: Record<string, string[]> }) => string;
+  addElement: (data: { name: string; notes?: string; tags?: string[]; attributes?: Record<string, string>; customLists?: Record<string, string[]>; x?: number; y?: number }) => string;
   updateElement: (name: string, data: Partial<Element>) => boolean;
   deleteElement: (name: string) => boolean;
   addRelationship: (sourceName: string, targetName: string, label: string, direction?: string) => boolean;
@@ -347,6 +386,7 @@ export type SsmToolType = 'rich_picture' | 'catwoe' | 'activity_models' | 'compa
 export type SwotToolType = 'matrix' | 'pestel' | 'steer' | 'destep' | 'longpest' | 'five_forces' | 'cage' | 'custom_create' | string | null;
 export type ExplorerToolType = 'tags' | 'relationships' | 'sunburst' | 'matrix' | 'table' | 'random_walk' | null;
 export type TagCloudToolType = 'tags' | 'nodes' | 'words' | 'full_text' | null;
+export type DataToolType = 'csv' | 'markdown' | 'json' | null;
 export type MiningToolType = 'dashboard' | null;
 export type MermaidToolType = 'editor' | null;
 export type VisualiseToolType = 'grid' | 'mermaid' | 'circle_packing' | 'treemap' | null;

@@ -1,7 +1,8 @@
-
 import React, { useState, useRef } from 'react';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { HelpMenu } from './HelpMenu';
+import { ViewSelect } from './ViewSelect';
+import { GraphView } from '../types';
 
 interface AppHeaderProps {
   currentModelName: string;
@@ -12,6 +13,7 @@ interface AppHeaderProps {
   onCopy: () => void;
   onPaste: () => void;
   onOpenCsvTool: () => void;
+  onSaveGist: () => void;
   
   tools: {
     activeTool: string | null;
@@ -59,6 +61,8 @@ interface AppHeaderProps {
     setIsFilterPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
     isChatPanelOpen: boolean;
     setIsChatPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
+    isDebugPanelOpen: boolean;
+    setIsDebugPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
   };
 
   focusMode: 'narrow' | 'wide' | 'zoom';
@@ -77,6 +81,16 @@ interface AppHeaderProps {
   onToggleDebug: () => void;
   onOpenKanban: () => void;
   hasUnsavedChanges: boolean;
+
+  // View Management
+  views: GraphView[];
+  activeViewId: string;
+  onSelectView: (id: string) => void;
+  onCreateView: () => void;
+  onDuplicateView: () => void;
+  onRenameView: (id: string, name: string) => void;
+  onDeleteView: (id: string) => void;
+  onEditView: () => void;
 }
 
 const AppHeader: React.FC<AppHeaderProps> = ({
@@ -88,6 +102,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   onCopy,
   onPaste,
   onOpenCsvTool,
+  onSaveGist,
   tools,
   panelState,
   focusMode,
@@ -103,7 +118,15 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   onToggleTheme,
   onToggleDebug,
   onOpenKanban,
-  hasUnsavedChanges
+  hasUnsavedChanges,
+  views,
+  activeViewId,
+  onSelectView,
+  onCreateView,
+  onDuplicateView,
+  onRenameView,
+  onDeleteView,
+  onEditView
 }) => {
   const [isMainMenuOpen, setIsMainMenuOpen] = useState(false);
   const [isSystemMenuOpen, setIsSystemMenuOpen] = useState(false);
@@ -393,6 +416,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                     onAbout={onAbout}
                     onPatternGallery={onPatternGallery}
                     onUserGuide={onUserGuide}
+                    onSelfTest={onSelfTest}
                     isDarkMode={isDarkMode}
                 />
             )}

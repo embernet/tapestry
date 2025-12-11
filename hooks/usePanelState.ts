@@ -17,8 +17,10 @@ export const usePanelState = () => {
   const [isMermaidPanelOpen, setIsMermaidPanelOpen] = useState(false);
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [isChatPanelOpen, setIsChatPanelOpen] = useState(false);
+  const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(false);
   const [isGuidancePanelOpen, setIsGuidancePanelOpen] = useState(false);
   const [guidanceContent, setGuidanceContent] = useState<GuidanceContent | null>(null);
+  const [isViewDetailsPanelOpen, setIsViewDetailsPanelOpen] = useState(false);
   
   // --- New Script Panel ---
   const [isScriptPanelOpen, setIsScriptPanelOpen] = useState(false);
@@ -54,6 +56,7 @@ export const usePanelState = () => {
     setIsMermaidPanelOpen(false);
     setIsFilterPanelOpen(false);
     setIsChatPanelOpen(false);
+    setIsDebugPanelOpen(false);
     setIsGuidancePanelOpen(false);
     setIsScriptPanelOpen(false);
     setIsNetworkAnalysisOpen(false);
@@ -66,6 +69,7 @@ export const usePanelState = () => {
     setIsInfluenceCloudOpen(false);
     setIsTextAnalysisOpen(false);
     setIsFullTextAnalysisOpen(false);
+    setIsViewDetailsPanelOpen(false);
   };
 
   return {
@@ -82,9 +86,11 @@ export const usePanelState = () => {
     isMermaidPanelOpen, setIsMermaidPanelOpen,
     isFilterPanelOpen, setIsFilterPanelOpen,
     isChatPanelOpen, setIsChatPanelOpen,
+    isDebugPanelOpen, setIsDebugPanelOpen,
     
     isGuidancePanelOpen, setIsGuidancePanelOpen,
     guidanceContent, setGuidanceContent,
+    isViewDetailsPanelOpen, setIsViewDetailsPanelOpen,
     
     isScriptPanelOpen, setIsScriptPanelOpen,
     

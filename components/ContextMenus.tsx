@@ -26,6 +26,10 @@ interface ContextMenusProps {
   importFileRef: any;
   isDarkMode: boolean;
   onToggleNodeHighlight?: (id: string) => void;
+  onHideFromView?: (id: string) => void;
+  
+  multiSelection: Set<string>;
+  onAddToKanban: (ids: string[], coords: { x: number; y: number }) => void;
 }
 
 export const ContextMenus: React.FC<ContextMenusProps> = (props) => {
@@ -47,6 +51,11 @@ export const ContextMenus: React.FC<ContextMenusProps> = (props) => {
                     onAddRelationship={() => { props.onAddRelationshipFromContext(contextMenu.elementId); props.onCloseContextMenu(); }} 
                     onToggleHighlight={props.onToggleNodeHighlight ? () => { props.onToggleNodeHighlight!(contextMenu.elementId); props.onCloseContextMenu(); } : undefined}
                     isHighlighted={!!elements.find(e => e.id === contextMenu.elementId)?.meta?.highlightColor}
+                    onHideFromView={props.onHideFromView ? () => { props.onHideFromView!(contextMenu.elementId); props.onCloseContextMenu(); } : undefined}
+                    
+                    multiSelection={props.multiSelection}
+                    onAddToKanban={props.onAddToKanban}
+                    elementId={contextMenu.elementId}
                 />
             )}
 
@@ -89,6 +98,10 @@ export const ContextMenus: React.FC<ContextMenusProps> = (props) => {
                     isTableOpen={panelState.isTablePanelOpen} 
                     isGridOpen={panelState.isGridPanelOpen} 
                     isDarkMode={isDarkMode} 
+                    
+                    multiSelection={props.multiSelection}
+                    onAddToKanban={props.onAddToKanban}
+                    allElementIds={elements.map(e => e.id)}
                 />
             )}
         </>

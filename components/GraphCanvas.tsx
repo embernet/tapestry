@@ -193,10 +193,10 @@ const createDragHandler = (
     }
 
     if (isMoving) {
-        // Adjust sensitivity based on current zoom level
-        const transform = d3.zoomTransform(this.ownerSVGElement as unknown as globalThis.Element);
-        const dx = event.dx / transform.k;
-        const dy = event.dy / transform.k;
+        // D3 v6+ automatically handles transforms for us in event.dx/dy if attached correctly
+        // so we do not divide by transform.k here.
+        const dx = event.dx;
+        const dy = event.dy;
 
         const isGroupDrag = multiSelection.has(d.id);
         const nodesToMove = d3.select(this.ownerSVGElement)
@@ -354,9 +354,9 @@ const createPhysicsDragHandler = (
     }
 
     // Update fx/fy for all selected nodes
-    const transform = d3.zoomTransform(this.ownerSVGElement as unknown as globalThis.Element);
-    const dx = event.dx / transform.k;
-    const dy = event.dy / transform.k;
+    // D3 v6+ handles zoom transform in dx/dy automatically
+    const dx = event.dx;
+    const dy = event.dy;
 
     const isGroupDrag = multiSelection.has(d.id);
     d3.select(this.ownerSVGElement).selectAll('.node')
@@ -762,8 +762,13 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
             ids.add(rel.target as string);
         }
     }
+
+    if (analysisHighlights) {
+        analysisHighlights.forEach((_, id) => ids.add(id));
+    }
+
     return ids;
-  }, [selectedElementId, selectedRelationshipId, relationships, multiSelection]);
+  }, [selectedElementId, selectedRelationshipId, relationships, multiSelection, analysisHighlights]);
 
   useEffect(() => {
     if (focusMode === 'zoom' && highlightedNodeIds.size > 0 && simulationRef.current) {

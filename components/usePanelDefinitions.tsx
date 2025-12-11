@@ -1,13 +1,13 @@
 
 import React, { useMemo } from 'react';
 import { PanelDefinition } from './RightPanelContainer';
-import { Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, ModelActions, ColorScheme, PanelLayout, ChatMessage, GuidanceContent } from '../types';
+import { Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, ModelActions, ColorScheme, PanelLayout, ChatMessage, GuidanceContent, GraphView, DateFilterState, NodeFilterState } from '../types';
 import { ReportPanel } from './ReportPanel';
 import { DocumentManagerPanel, DocumentEditorPanel } from './DocumentPanel';
 import TablePanel from './TablePanel';
 import MatrixPanel from './MatrixPanel';
 import GridPanel from './GridPanel';
-import KanbanPanel from './KanbanPanel';
+import { KanbanPanel } from './KanbanPanel';
 import PresentationPanel from './PresentationPanel';
 import { MermaidPanel } from './MermaidPanel';
 import MarkdownPanel from './MarkdownPanel';
@@ -19,7 +19,7 @@ import { TagCloudPanel } from './TagCloudModal';
 import { CirclePackingPanel } from './CirclePackingPanel';
 import HistoryItemPanel from './HistoryItemPanel';
 import { DebugPanel } from './DebugPanel';
-import { GuidancePanel } from './GuidancePanel';
+import { ViewDetailsPanel } from './ViewDetailsPanel';
 import { generateMarkdownFromGraph, AIConfig } from '../utils';
 
 interface UsePanelDefinitionsProps {
@@ -51,7 +51,19 @@ interface UsePanelDefinitionsProps {
   isGuidancePanelOpen: boolean;
   setIsGuidancePanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
   guidanceContent: GuidanceContent | null;
+  isViewDetailsPanelOpen: boolean;
+  setIsViewDetailsPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  isFilterPanelOpen: boolean;
+  setIsFilterPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
   
+  // New Script Panel
+  isScriptPanelOpen: boolean;
+  setIsScriptPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
+
+  // Analysis Panels
+  isNetworkAnalysisOpen: boolean;
+  setIsNetworkAnalysisOpen: React.Dispatch<React.SetStateAction<boolean>>;
+
   // Explorer State
   isTreemapPanelOpen: boolean;
   setIsTreemapPanelOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -96,6 +108,16 @@ interface UsePanelDefinitionsProps {
   selectedElementId: string | null;
   multiSelection: Set<string>;
   chatMessages: ChatMessage[];
+
+  // View Data
+  activeView: GraphView | undefined;
+  onUpdateView: (updates: Partial<GraphView>) => void;
+  onGenerateTapestry: (prompt: string) => void;
+  isGeneratingTapestry: boolean;
+  
+  // Tag Stats (Calculated in Parent now)
+  allTags: string[];
+  tagCounts: Map<string, number>;
   
   // Actions
   onNodeClick: (elementId: string, event: MouseEvent) => void;
@@ -140,46 +162,12 @@ interface UsePanelDefinitionsProps {
   
   // Theme
   isDarkMode: boolean;
+  
+  // Filter Handlers
+  onTagFilterChange: (newFilter: { included: Set<string>; excluded: Set<string> }) => void;
+  onDateFilterChange: (newFilter: DateFilterState) => void;
+  onNodeFilterChange: (newFilter: NodeFilterState) => void;
 }
-
-// Helper to calculate max depth from center node
-const calculateMaxDepth = (centerId: string, relationships: Relationship[]) => {
-    if (!centerId) return 0;
-    
-    // Build adjacency list
-    const adj = new Map<string, string[]>();
-    relationships.forEach(r => {
-        const s = r.source as string;
-        const t = r.target as string;
-        if (!adj.has(s)) adj.set(s, []);
-        if (!adj.has(t)) adj.set(t, []);
-        adj.get(s)!.push(t);
-        adj.get(t)!.push(s);
-    });
-
-    let depth = 0;
-    let currentLayer = [centerId];
-    const visited = new Set<string>([centerId]);
-
-    while (true) {
-        const nextLayer: string[] = [];
-        for (const nodeId of currentLayer) {
-            const neighbors = adj.get(nodeId) || [];
-            for (const neighbor of neighbors) {
-                if (!visited.has(neighbor)) {
-                    visited.add(neighbor);
-                    nextLayer.push(neighbor);
-                }
-            }
-        }
-        
-        if (nextLayer.length === 0) break;
-        depth++;
-        currentLayer = nextLayer;
-    }
-    
-    return depth;
-};
 
 export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
   return useMemo(() => {
@@ -202,6 +190,25 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
             isOpen: props.isReportPanelOpen, 
             onToggle: () => props.setIsReportPanelOpen(prev => !prev) 
         },
+        { 
+            id: 'view-details', 
+            title: 'View Details', 
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z" /></svg>, 
+            content: <ViewDetailsPanel 
+                        view={props.activeView}
+                        onUpdateView={props.onUpdateView}
+                        onGenerateTapestry={props.onGenerateTapestry}
+                        isGeneratingTapestry={props.isGeneratingTapestry}
+                        allTags={props.allTags}
+                        tagCounts={props.tagCounts}
+                        elements={props.elements}
+                        isDarkMode={props.isDarkMode}
+                        onClose={() => props.setIsViewDetailsPanelOpen(false)}
+                     />, 
+            isOpen: props.isViewDetailsPanelOpen, 
+            onToggle: () => props.setIsViewDetailsPanelOpen(prev => !prev) 
+        },
+        // Filter Panel Removed from here - it is now a floating control in App.tsx
         { 
             id: 'documents', 
             title: 'Documents', 
@@ -381,50 +388,35 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
             isOpen: props.isDebugPanelOpen, 
             onToggle: () => props.setIsDebugPanelOpen(prev => !prev) 
         },
-        // --- Explorer Panels ---
-        { 
-            id: 'treemap', 
-            title: 'Treemap', 
-            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>, 
-            content: <TreemapPanel 
-                        elements={props.filteredElements} 
-                        relationships={props.filteredRelationships} 
-                        onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))} 
-                        isDarkMode={props.isDarkMode}
-                     />, 
-            isOpen: props.isTreemapPanelOpen, 
-            onToggle: () => props.setIsTreemapPanelOpen(p => !p) 
-        },
-        { 
-            id: 'sunburst', 
-            title: 'Sunburst', 
+        {
+            id: 'sunburst',
+            title: 'Sunburst',
             icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
             content: <SunburstPanel
-                        centerNodeName={props.elements.find(e => e.id === props.sunburstState.centerId)?.name || null}
+                        centerNodeName={props.sunburstState.centerId ? (props.elements.find(e => e.id === props.sunburstState.centerId)?.name || 'Unknown') : null}
                         hops={props.sunburstState.hops}
                         visibleCount={props.filteredElements.length}
-                        maxHops={props.sunburstState.centerId ? calculateMaxDepth(props.sunburstState.centerId, props.relationships) : 0}
+                        maxHops={6} 
                         onHopsChange={(newHops) => props.setSunburstState(prev => ({ ...prev, hops: newHops }))}
                         onRestart={() => {
-                            if (props.originalElements) {
-                                props.setElements(props.originalElements);
-                            }
-                            props.setSunburstState(prev => ({ ...prev, centerId: null, hops: 0 }));
+                            if (props.originalElements) props.setElements(props.originalElements);
+                            props.setSunburstState(prev => ({ ...prev, centerId: null, hops: 1 }));
                             props.setIsPhysicsModeActive(false);
-                            props.setOriginalElements(null);
                         }}
                         onReset={() => {
-                             props.setSunburstState(prev => ({ ...prev, hops: 0 }));
-                             props.graphCanvasRef.current?.setCamera(0,0,1);
+                             if (props.sunburstState.centerId && props.graphCanvasRef.current) {
+                                 const el = props.elements.find(e => e.id === props.sunburstState.centerId);
+                                 if (el) {
+                                     props.graphCanvasRef.current.setCamera(-(el.x || 0) + window.innerWidth/2, -(el.y || 0) + window.innerHeight/2, 1);
+                                 }
+                             }
                         }}
                         onClose={() => {
-                            if (props.originalElements) {
-                                props.setElements(props.originalElements);
-                            }
                             props.setIsSunburstPanelOpen(false);
-                            props.setSunburstState(prev => ({ ...prev, active: false }));
-                            props.setIsPhysicsModeActive(false);
+                            if (props.originalElements) props.setElements(props.originalElements);
                             props.setOriginalElements(null);
+                            props.setSunburstState(prev => ({ ...prev, active: false, centerId: null, hops: 0 }));
+                            props.setIsPhysicsModeActive(false);
                         }}
                         isDarkMode={props.isDarkMode}
                      />,
@@ -432,116 +424,129 @@ export const usePanelDefinitions = (props: UsePanelDefinitionsProps) => {
             onToggle: () => {
                 const willOpen = !props.isSunburstPanelOpen;
                 props.setIsSunburstPanelOpen(willOpen);
-                if (willOpen) {
-                    props.setSunburstState(prev => ({ ...prev, active: true }));
-                } else {
-                    if (props.originalElements) {
-                        props.setElements(props.originalElements);
-                    }
-                    props.setSunburstState(prev => ({ ...prev, active: false }));
-                    props.setIsPhysicsModeActive(false);
+                if (!willOpen) {
+                    if (props.originalElements) props.setElements(props.originalElements);
                     props.setOriginalElements(null);
+                    props.setSunburstState(prev => ({ ...prev, active: false, centerId: null, hops: 0 }));
+                    props.setIsPhysicsModeActive(false);
+                } else {
+                     props.setSunburstState(prev => ({ ...prev, active: true }));
                 }
             }
         },
-        { 
-            id: 'circle_packing', 
-            title: 'Circle Packing', 
+        {
+            id: 'treemap',
+            title: 'Treemap',
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z" /></svg>,
+            content: <TreemapPanel
+                        elements={props.elements}
+                        relationships={props.relationships}
+                        onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))}
+                        isDarkMode={props.isDarkMode}
+                     />,
+            isOpen: props.isTreemapPanelOpen,
+            onToggle: () => props.setIsTreemapPanelOpen(prev => !prev)
+        },
+        {
+            id: 'circle_packing',
+            title: 'Circle Packing',
             icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>,
             content: <CirclePackingPanel
-                        elements={props.filteredElements}
-                        relationships={props.filteredRelationships}
-                        onNodeClick={(id) => props.onNodeClick(id, new MouseEvent('click'))}
+                        elements={props.elements}
+                        relationships={props.relationships}
                         onClose={() => props.setIsCirclePackingPanelOpen(false)}
+                        onNodeClick={(id) => props.onNodeClick(id, new MouseEvent('click'))}
                         isDarkMode={props.isDarkMode}
                         activeColorScheme={props.activeColorScheme}
                      />,
             isOpen: props.isCirclePackingPanelOpen,
-            onToggle: () => props.setIsCirclePackingPanelOpen(p => !p)
+            onToggle: () => props.setIsCirclePackingPanelOpen(prev => !prev)
+        },
+        {
+            id: 'concept-cloud',
+            title: 'Tag Cloud',
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>,
+            content: <TagCloudPanel
+                        mode='tags'
+                        elements={props.elements}
+                        relationships={props.relationships}
+                        onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))}
+                        isDarkMode={props.isDarkMode}
+                        aiConfig={props.aiConfig}
+                        onLogHistory={props.onLogHistory}
+                     />,
+            isOpen: props.isConceptCloudOpen,
+            onToggle: () => props.setIsConceptCloudOpen(prev => !prev)
+        },
+        {
+            id: 'influence-cloud',
+            title: 'Relationship Cloud',
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>,
+            content: <TagCloudPanel
+                        mode='nodes'
+                        elements={props.elements}
+                        relationships={props.relationships}
+                        onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))}
+                        isDarkMode={props.isDarkMode}
+                        aiConfig={props.aiConfig}
+                        onLogHistory={props.onLogHistory}
+                     />,
+            isOpen: props.isInfluenceCloudOpen,
+            onToggle: () => props.setIsInfluenceCloudOpen(prev => !prev)
+        },
+        {
+            id: 'text-cloud',
+            title: 'Node Name Analysis',
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+            content: <TagCloudPanel
+                        mode='words'
+                        elements={props.elements}
+                        relationships={props.relationships}
+                        onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))}
+                        isDarkMode={props.isDarkMode}
+                        aiConfig={props.aiConfig}
+                        onLogHistory={props.onLogHistory}
+                     />,
+            isOpen: props.isTextAnalysisOpen,
+            onToggle: () => props.setIsTextAnalysisOpen(prev => !prev)
+        },
+        {
+            id: 'full-text-cloud',
+            title: 'Full Text Analysis',
+            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>,
+            content: <TagCloudPanel
+                        mode='full_text'
+                        elements={props.elements}
+                        relationships={props.relationships}
+                        onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))}
+                        isDarkMode={props.isDarkMode}
+                        aiConfig={props.aiConfig}
+                        onLogHistory={props.onLogHistory}
+                     />,
+            isOpen: props.isFullTextAnalysisOpen,
+            onToggle: () => props.setIsFullTextAnalysisOpen(prev => !prev)
         },
         { 
             id: 'tag-dist', 
-            title: 'Tag Analysis', 
+            title: 'Tag Distribution', 
             icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>, 
-            content: <TagDistributionPanel elements={props.filteredElements} isDarkMode={props.isDarkMode} />, 
+            content: <TagDistributionPanel 
+                        elements={props.elements} 
+                        isDarkMode={props.isDarkMode}
+                     />, 
             isOpen: props.isTagDistPanelOpen, 
-            onToggle: () => props.setIsTagDistPanelOpen(p => !p) 
+            onToggle: () => props.setIsTagDistPanelOpen(prev => !prev) 
         },
         { 
             id: 'rel-dist', 
-            title: 'Relationship Analysis', 
+            title: 'Relationship Distribution', 
             icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>, 
-            content: <RelationshipDistributionPanel relationships={props.filteredRelationships} isDarkMode={props.isDarkMode} />, 
+            content: <RelationshipDistributionPanel 
+                        relationships={props.relationships} 
+                        isDarkMode={props.isDarkMode}
+                     />, 
             isOpen: props.isRelDistPanelOpen, 
-            onToggle: () => props.setIsRelDistPanelOpen(p => !p) 
-        },
-        { 
-            id: 'concept-cloud', 
-            title: 'Tag Cloud', 
-            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>, 
-            content: <TagCloudPanel 
-                        mode='tags' 
-                        elements={props.filteredElements} 
-                        relationships={props.filteredRelationships} 
-                        onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))} 
-                        isDarkMode={props.isDarkMode}
-                        aiConfig={props.aiConfig}
-                        onOpenGuidance={props.onOpenWordCloudGuidance}
-                        onLogHistory={props.onLogHistory}
-                     />, 
-            isOpen: props.isConceptCloudOpen, 
-            onToggle: () => props.setIsConceptCloudOpen(p => !p) 
-        },
-        { 
-            id: 'influence-cloud', 
-            title: 'Relationship Cloud', 
-            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>, 
-            content: <TagCloudPanel 
-                        mode='nodes' 
-                        elements={props.filteredElements} 
-                        relationships={props.filteredRelationships} 
-                        onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))} 
-                        isDarkMode={props.isDarkMode}
-                        aiConfig={props.aiConfig}
-                        onOpenGuidance={props.onOpenWordCloudGuidance}
-                        onLogHistory={props.onLogHistory}
-                     />, 
-            isOpen: props.isInfluenceCloudOpen, 
-            onToggle: () => props.setIsInfluenceCloudOpen(p => !p) 
-        },
-        { 
-            id: 'text-cloud', 
-            title: 'Node Name Analysis', 
-            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>, 
-            content: <TagCloudPanel 
-                        mode='words' 
-                        elements={props.filteredElements} 
-                        relationships={props.filteredRelationships} 
-                        onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))} 
-                        isDarkMode={props.isDarkMode}
-                        aiConfig={props.aiConfig}
-                        onOpenGuidance={props.onOpenWordCloudGuidance}
-                        onLogHistory={props.onLogHistory}
-                     />, 
-            isOpen: props.isTextAnalysisOpen, 
-            onToggle: () => props.setIsTextAnalysisOpen(p => !p) 
-        },
-        { 
-            id: 'full-text-cloud', 
-            title: 'Full Text Analysis', 
-            icon: <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>, 
-            content: <TagCloudPanel 
-                        mode='full_text' 
-                        elements={props.filteredElements} 
-                        relationships={props.filteredRelationships} 
-                        onNodeSelect={(id) => props.onNodeClick(id, new MouseEvent('click'))} 
-                        isDarkMode={props.isDarkMode}
-                        aiConfig={props.aiConfig}
-                        onOpenGuidance={props.onOpenWordCloudGuidance}
-                        onLogHistory={props.onLogHistory}
-                     />, 
-            isOpen: props.isFullTextAnalysisOpen, 
-            onToggle: () => props.setIsFullTextAnalysisOpen(p => !p) 
+            onToggle: () => props.setIsRelDistPanelOpen(prev => !prev) 
         }
     ];
 

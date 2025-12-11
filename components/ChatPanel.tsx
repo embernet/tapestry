@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Content, FunctionCall, FunctionResponse, Type, Schema } from '@google/genai';
 import { Element, Relationship, ModelActions, ColorScheme, SystemPromptConfig, TapestryDocument, TapestryFolder, ChatMessage, PlanStep } from '../types';
@@ -203,16 +204,7 @@ const TOOL_REGISTRY: Record<string, ToolDefinition> = {
   }
 };
 
-// Construct the tool schemas for the 'anyOf' array
-const ACTION_SCHEMAS: Schema[] = Object.entries(TOOL_REGISTRY).map(([toolName, def]) => ({
-  type: Type.OBJECT,
-  properties: {
-    tool: { type: Type.STRING, enum: [toolName] },
-    parameters: def.parameters
-  },
-  required: ["tool", "parameters"]
-}));
-
+// Updated Schema to support DAG Plans
 const CHAT_RESPONSE_SCHEMA: Schema = {
   type: Type.OBJECT,
   properties: {
@@ -220,14 +212,32 @@ const CHAT_RESPONSE_SCHEMA: Schema = {
     message: { type: Type.STRING, description: "The conversational response to show to the user." },
     plan: {
       type: Type.ARRAY,
-      description: "List of sequential steps for complex tasks.",
-      items: { type: Type.STRING }
+      description: "A Directed Acyclic Graph (DAG) of execution steps for complex tasks. Each step is a self-contained instruction.",
+      items: { 
+          type: Type.OBJECT,
+          properties: {
+              id: { type: Type.STRING, description: "Unique ID for this step (e.g. '1', 'search-step')." },
+              description: { type: Type.STRING, description: "Short description of what this step does." },
+              prompt: { type: Type.STRING, description: "The specific, self-contained instruction to send to the AI for this step." },
+              dependencies: { 
+                  type: Type.ARRAY, 
+                  items: { type: Type.STRING }, 
+                  description: "IDs of steps that must be completed before this step starts." 
+              }
+          },
+          required: ["id", "description", "prompt", "dependencies"]
+      }
     },
     actions: {
       type: Type.ARRAY,
-      description: "List of actions to perform.",
+      description: "List of immediate actions to perform (if no plan is needed).",
       items: {
-        anyOf: ACTION_SCHEMAS
+        type: Type.OBJECT,
+        properties: {
+            tool: { type: Type.STRING, description: "The name of the tool to use (e.g., addElement)." },
+            parameters: { type: Type.STRING, description: "JSON string of key-value pairs for the tool arguments." }
+        },
+        required: ["tool", "parameters"]
       }
     }
   },
@@ -250,15 +260,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const [activePlan, setActivePlan] = useState<PlanStep[] | null>(null);
   const [planStatus, setPlanStatus] = useState<'proposed' | 'executing' | 'completed' | 'paused'>('proposed');
   const [executionStats, setExecutionStats] = useState<{ actions: number }>({ actions: 0 });
-  
-  // Accumulate intermediate context during plan execution
-  const planContextRef = useRef<Content[]>([]);
+  const [isVerboseMode, setIsVerboseMode] = useState(false);
   
   // Ref to track latest documents state for the async planner loop
   const documentsRef = useRef<TapestryDocument[]>([]);
   useEffect(() => {
       if (documents) documentsRef.current = documents;
   }, [documents]);
+
+  const planContextRef = useRef<string[]>([]);
 
   // Track decisions for pending actions: index -> status
   const [actionDecisions, setActionDecisions] = useState<Record<number, 'pending' | 'accepted' | 'rejected'>>({});
@@ -280,11 +290,19 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   const resizeStartRef = useRef({ x: 0, y: 0, w: 0, h: 0 });
 
   useEffect(() => {
-      if (initialInput && isOpen) {
-          setInput(initialInput);
+      if (isOpen) {
+          if (initialInput) {
+            setInput(initialInput);
+          }
+          
           setTimeout(() => {
-              textareaRef.current?.focus();
-              textareaRef.current?.setSelectionRange(initialInput.length, initialInput.length);
+              if (textareaRef.current) {
+                  textareaRef.current.focus();
+                  if (initialInput) {
+                     const len = initialInput.length;
+                     textareaRef.current.setSelectionRange(len, len);
+                  }
+              }
           }, 100);
       }
   }, [initialInput, isOpen]);
@@ -323,35 +341,96 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
       }).join('\n');
   }, []);
 
-  // --- Plan Execution Loop ---
+  const parseParameters = (params: any) => {
+      if (typeof params === 'string') {
+          try {
+              return JSON.parse(params);
+          } catch (e) {
+              console.warn("Failed to parse tool parameters JSON:", params);
+              return {};
+          }
+      }
+      return params || {};
+  };
+
+  // --- Plan Execution Loop (DAG) ---
   useEffect(() => {
       if (planStatus === 'executing' && activePlan) {
-          // CRITICAL: Check if any step is currently in progress to strictly serialize operations.
-          const inProgress = activePlan.some(s => s.status === 'in_progress');
-          if (inProgress) return;
+          // 1. Identify ready steps: Status Pending AND all dependencies are Completed
+          const readySteps = activePlan.filter(step => 
+              step.status === 'pending' && 
+              step.dependencies.every(depId => 
+                  activePlan.find(p => p.id === depId)?.status === 'completed'
+              )
+          );
 
-          const nextStepIdx = activePlan.findIndex(s => s.status === 'pending');
+          // 2. Check if we are done
+          const allDone = activePlan.every(s => s.status === 'completed');
+          if (allDone) {
+              setPlanStatus('completed');
+              setMessages(prev => [...prev, { 
+                  role: 'model', 
+                  text: `**Plan Completed.**\n\nExecuted ${activePlan.length} steps with ${executionStats.actions} total actions.` 
+              }]);
+              return;
+          }
+
+          // 3. Stop if stuck (pending steps but dependencies failed/error)
+          const stuck = activePlan.filter(s => s.status === 'pending').length > 0 && readySteps.length === 0 && !activePlan.some(s => s.status === 'in_progress');
+          if (stuck) {
+              setPlanStatus('paused');
+               setMessages(prev => [...prev, { 
+                  role: 'model', 
+                  text: `**Plan Paused.**\n\nDependency chain broken. Check for errors.` 
+              }]);
+              return;
+          }
+
+          // 4. Execute ready steps (For now, we pick the FIRST ready step to serialize execution and avoid rate limits/race conditions)
+          // Ideally, we could execute parallel ready steps, but we'll keep it safe.
+          const stepToExecute = readySteps[0];
           
-          if (nextStepIdx !== -1) {
+          if (stepToExecute) {
               const executeStep = async () => {
-                  const step = activePlan[nextStepIdx];
+                  const stepIndex = activePlan.findIndex(s => s.id === stepToExecute.id);
                   
-                  // Update UI to in_progress
-                  setActivePlan(prev => prev ? prev.map((s, i) => i === nextStepIdx ? { ...s, status: 'in_progress' } : s) : null);
+                  // Mark as in progress
+                  setActivePlan(prev => prev ? prev.map((s, i) => i === stepIndex ? { ...s, status: 'in_progress' } : s) : null);
+                  
+                  if (isVerboseMode) {
+                      setMessages(prev => [...prev, {
+                          role: 'model',
+                          text: `[SYSTEM] Starting Step ${stepToExecute.id}: "${stepToExecute.description}"`,
+                          isVerbose: true
+                      }]);
+                  }
                   
                   try {
-                      // Construct prompt for this specific step
-                      const stepPrompt = promptStore.get('plan:execute_step', {
-                        current: String(nextStepIdx + 1),
-                        total: String(activePlan.length),
-                        description: step.description
+                      // Gather outputs from dependencies
+                      let dependencyContext = "";
+                      stepToExecute.dependencies.forEach(depId => {
+                          const depStep = activePlan.find(p => p.id === depId);
+                          if (depStep && depStep.result) {
+                              dependencyContext += `\nOutput from Step '${depId}':\n${depStep.result}\n`;
+                          }
                       });
 
-                      // Build context: Chat history + Accumulated Plan Execution History
-                      const contents = [...buildApiHistory(messages), ...planContextRef.current];
+                      // Construct prompt for this specific step (Self-Contained)
+                      // We do NOT send the full chat history. We only send system instruction + specific prompt.
+                      const isolatedPrompt = `
+                      TASK: ${stepToExecute.prompt}
                       
-                      // Add current step prompt to context for this call
-                      contents.push({ role: 'user', parts: [{ text: stepPrompt }] });
+                      CONTEXT FROM PREVIOUS STEPS:
+                      ${dependencyContext || "(None)"}
+                      `;
+
+                      if (isVerboseMode) {
+                          setMessages(prev => [...prev, {
+                              role: 'model',
+                              text: `[SYSTEM] Execution Prompt:\n${isolatedPrompt}`,
+                              isVerbose: true
+                          }]);
+                      }
 
                       // Construct dynamic system instructions with FRESH graph/doc state
                       const modelMarkdown = generateMarkdownFromGraph(elements, relationships);
@@ -364,108 +443,120 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
                       const systemInstruction = promptStore.get('chat:system', {
                         defaultPrompt: systemPromptConfig.defaultPrompt,
-                        modeContext: "CONTEXT: You are executing a multi-step plan. Focus ONLY on the current step.",
-                        schemaContext: "", // Not passing active schema here to keep it simpler for now, usually handled in main flow
+                        modeContext: "CONTEXT: You are an autonomous agent executing a specific step of a plan. You MUST output JSON. If the step implies modifying the graph (adding nodes, edges), you MUST use the provided tools in the 'actions' array.",
+                        schemaContext: "", 
                         docContext: docContext,
                         toolsContext: toolsContextString,
                         graphData: modelMarkdown
                       });
 
-                      // First Attempt
-                      let result = await callAI(
-                          aiConfig,
-                          contents,
-                          systemInstruction,
-                          undefined,
-                          CHAT_RESPONSE_SCHEMA,
-                          false
-                      );
+                      // Helper: AI Call with Retry Logic
+                      const performAiCall = async (msgs: any[]) => {
+                          let retries = 3;
+                          while (retries > 0) {
+                              try {
+                                  return await callAI(
+                                      aiConfig,
+                                      msgs,
+                                      systemInstruction,
+                                      undefined,
+                                      CHAT_RESPONSE_SCHEMA,
+                                      false
+                                  );
+                              } catch (err: any) {
+                                  const isServerError = err.message && (err.message.includes('500') || err.message.includes('Internal') || err.message.includes('Overloaded'));
+                                  if (isServerError) {
+                                      retries--;
+                                      if (retries === 0) throw err;
+                                      const delay = Math.pow(2, 3 - retries) * 1000;
+                                      console.warn(`AI Service Error (${err.message}). Retrying in ${delay}ms...`);
+                                      await new Promise(resolve => setTimeout(resolve, delay));
+                                  } else {
+                                      throw err;
+                                  }
+                              }
+                          }
+                          throw new Error("AI unavailable after retries");
+                      };
+
+                      // Call AI with isolated prompt
+                      const contents = [{ role: 'user', parts: [{ text: isolatedPrompt }] }];
+                      
+                      let result = await performAiCall(contents);
+
+                      if (isVerboseMode) {
+                          setMessages(prev => [...prev, {
+                              role: 'model',
+                              text: `[SYSTEM] Raw AI Response:\n${result.text}`,
+                              isVerbose: true
+                          }]);
+                      }
 
                       let responseJson;
                       try {
-                        responseJson = JSON.parse(result.text);
+                        const cleanJson = result.text.replace(/```json\n?|```/g, '').trim();
+                        responseJson = JSON.parse(cleanJson);
                       } catch (e) {
-                        responseJson = { actions: [] };
-                      }
-                      let toolRequests = responseJson.actions || [];
-
-                      // RETRY LOGIC: If no actions generated but step likely implies action
-                      if (toolRequests.length === 0) {
-                          console.warn("Plan execution: No actions generated. Retrying with stronger prompt.");
-                          const retryPrompt = promptStore.get('plan:retry');
-                          contents.push({ role: 'model', parts: [{ text: result.text }] }); // Push previous response
-                          contents.push({ role: 'user', parts: [{ text: retryPrompt }] }); // Push retry demand
-                          
-                          result = await callAI(
-                              aiConfig,
-                              contents,
-                              systemInstruction,
-                              undefined,
-                              CHAT_RESPONSE_SCHEMA, // Enforce JSON
-                              false
-                          );
-                          try {
-                             responseJson = JSON.parse(result.text);
-                          } catch(e) {
-                             responseJson = { actions: [] };
-                          }
-                          toolRequests = responseJson.actions || [];
+                        responseJson = { message: result.text, actions: [] };
                       }
                       
-                      // Update Plan Context
-                      planContextRef.current.push({ role: 'user', parts: [{ text: stepPrompt }] });
-                      planContextRef.current.push({ role: 'model', parts: [{ text: result.text }] });
+                      const toolRequests = responseJson.actions || [];
+                      const message = responseJson.message || "";
 
+                      // Execute Tools
+                      let actionResultsText = "";
                       if (toolRequests.length > 0) {
-                          // Automatically execute actions for the plan step
                           const calls = toolRequests.map((req: any) => ({
                               name: req.tool,
-                              args: req.parameters,
+                              args: parseParameters(req.parameters),
                               id: generateUUID()
                           }));
                           
                           const responses = executeFunctionCalls(calls);
-
-                          // Update Plan Context with Tool Results
-                          const toolResultText = `Tool Outputs for Step ${nextStepIdx + 1}:\n${responses.map(r => JSON.stringify(r.response.result)).join('\n')}`;
-                          planContextRef.current.push({ role: 'user', parts: [{ text: toolResultText }] });
                           
-                          // Update stats
+                          // Format results for the next step's context
+                          actionResultsText = responses.map(r => `Action ${r.name} Result: ${JSON.stringify(r.response.result)}`).join('\n');
+                          
+                          if (isVerboseMode) {
+                              setMessages(prev => [...prev, {
+                                  role: 'model',
+                                  text: `[SYSTEM] Tools Executed:\n${actionResultsText}`,
+                                  isVerbose: true
+                              }]);
+                          }
+                          
                           setExecutionStats(prev => ({ actions: prev.actions + calls.length }));
-                          
-                          // Wait for state to settle before next step (Give React time to process setDocuments etc)
-                          await new Promise(resolve => setTimeout(resolve, 1500));
-                          
-                          // Mark complete
-                          setActivePlan(prev => prev ? prev.map((s, i) => i === nextStepIdx ? { ...s, status: 'completed', result: `Executed ${calls.length} actions.` } : s) : null);
-                      } else {
-                          // FAILURE MODE: If no actions after retry, pause the plan
-                          planContextRef.current.push({ role: 'user', parts: [{ text: `Step ${nextStepIdx + 1} failed to generate actions.` }] });
-                          
-                          // We pause here so the user can intervene
-                          setActivePlan(prev => prev ? prev.map((s, i) => i === nextStepIdx ? { ...s, status: 'error', result: "No actions generated. Plan paused." } : s) : null);
-                          setPlanStatus('paused');
                       }
 
-                  } catch (e) {
+                      // Wait for state to settle
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      
+                      // Mark complete and pass result to next step
+                      const finalResult = message + (actionResultsText ? `\n\nTOOL RESULTS:\n${actionResultsText}` : "");
+                      
+                      setActivePlan(prev => prev ? prev.map((s, i) => i === stepIndex ? { 
+                          ...s, 
+                          status: 'completed', 
+                          result: finalResult
+                      } : s) : null);
+
+                  } catch (e: any) {
                       console.error("Plan execution error", e);
-                      setActivePlan(prev => prev ? prev.map((s, i) => i === nextStepIdx ? { ...s, status: 'error', result: "Failed to execute." } : s) : null);
-                      setPlanStatus('paused'); // Pause on error
+                      if (isVerboseMode) {
+                          setMessages(prev => [...prev, {
+                              role: 'model',
+                              text: `[SYSTEM] Execution Error: ${e.message}`,
+                              isVerbose: true
+                          }]);
+                      }
+                      setActivePlan(prev => prev ? prev.map((s, i) => i === stepIndex ? { ...s, status: 'error', result: `Error: ${e.message}` } : s) : null);
                   }
               };
               
               executeStep();
-          } else {
-              // All steps done
-              setPlanStatus('completed');
-              // Add a completion message to chat
-              setMessages(prev => [...prev, { 
-                  role: 'model', 
-                  text: `**Plan Completed.**\n\nExecuted ${activePlan.length} steps with ${executionStats.actions} total actions.` 
-              }]);
           }
       }
-  }, [planStatus, activePlan, aiConfig, messages, systemPromptConfig, executionStats, documents, elements, relationships]);
+  }, [planStatus, activePlan, aiConfig, messages, systemPromptConfig, executionStats, documents, elements, relationships, isVerboseMode]);
 
 
   // --- Drag & Resize Handlers ---
@@ -631,7 +722,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 ).join('\n');
                 history.push({ role: 'user', parts: [{ text: resultsText }] });
             } else {
-                history.push({ role: 'user', parts: [{ text: msg.text || '' }] });
+                // IMPORTANT: Filter out empty text to avoid API errors
+                const text = msg.text || '';
+                if (text.trim()) {
+                    history.push({ role: 'user', parts: [{ text }] });
+                }
             }
         } else {
             // Model Role
@@ -639,7 +734,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             if (msg.rawJson) {
                 history.push({ role: 'model', parts: [{ text: JSON.stringify(msg.rawJson) }] });
             } else {
-                history.push({ role: 'model', parts: [{ text: msg.text || '' }] });
+                // Ensure model text isn't empty if no JSON, though model messages can be just function calls
+                // If it was just function calls, the next turn would be user function responses.
+                // Here we just use what we have stored.
+                const text = msg.text || '';
+                if (text.trim()) {
+                    history.push({ role: 'model', parts: [{ text }] });
+                }
             }
         }
     }
@@ -647,7 +748,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   const getActionTitle = (fc: FunctionCall) => {
-      const args = fc.args as any;
+      const args = parseParameters(fc.args);
       switch(fc.name) {
           case 'addElement': return `Add Element: "${args.name}"`;
           case 'addRelationship': return `Add Connection`;
@@ -663,7 +764,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   const renderActionContent = (fc: FunctionCall, isDark: boolean) => {
-      const args = fc.args as any;
+      const args = parseParameters(fc.args);
       const labelClass = isDark ? 'text-gray-400' : 'text-gray-500';
       const textClass = isDark ? 'text-gray-300' : 'text-gray-700';
 
@@ -747,15 +848,20 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         try {
              const contents = buildApiHistory(messages);
              const systemInstruction = `You are a planning assistant. Update the plan based on user feedback.
-             OUTPUT FORMAT: JSON with a 'plan' array of strings.`;
+             OUTPUT FORMAT: JSON with a 'plan' array of objects matching the schema.`;
              
+             // Ensure prompt is valid
+             if (!modificationPrompt || !modificationPrompt.trim()) throw new Error("Modification prompt is empty");
+
              const result = await callAI(aiConfig, [{role: 'user', parts: [{text: modificationPrompt}]}], systemInstruction, undefined, CHAT_RESPONSE_SCHEMA, false);
              const responseJson = JSON.parse(result.text);
              
              if (responseJson.plan) {
-                 const newPlan: PlanStep[] = responseJson.plan.map((desc: string) => ({
-                    id: generateUUID(),
-                    description: desc,
+                 const newPlan: PlanStep[] = responseJson.plan.map((p: any) => ({
+                    id: p.id || generateUUID(),
+                    description: p.description,
+                    prompt: p.prompt,
+                    dependencies: p.dependencies || [],
                     status: 'pending'
                 }));
                 setActivePlan(newPlan);
@@ -771,6 +877,8 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     }
 
     const userMessageText = customPrompt || input.trim();
+    if (!userMessageText) return; // double check
+
     const userMessage: ChatMessage = { role: 'user', text: userMessageText };
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
@@ -824,7 +932,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
             schema: CHAT_RESPONSE_SCHEMA
         };
 
-        // Pass generated schema to force strictly typed JSON output
+        // Pass generated schema to force strictly typed JSON output (with params as string)
         const result = await callAI(aiConfig, contents, systemInstruction, undefined, CHAT_RESPONSE_SCHEMA, false);
 
         const responseJson = JSON.parse(result.text);
@@ -832,9 +940,11 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         // Handle Plan
         let planSteps: PlanStep[] | undefined = undefined;
         if (responseJson.plan && Array.isArray(responseJson.plan) && responseJson.plan.length > 0) {
-            planSteps = responseJson.plan.map((desc: string) => ({
-                id: generateUUID(),
-                description: desc,
+            planSteps = responseJson.plan.map((p: any) => ({
+                id: p.id || generateUUID(),
+                description: p.description,
+                prompt: p.prompt,
+                dependencies: p.dependencies || [],
                 status: 'pending'
             }));
             setActivePlan(planSteps);
@@ -846,7 +956,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
         const toolRequests = responseJson.actions || [];
         const functionCalls = toolRequests.map((req: any) => ({
             name: req.tool,
-            args: req.parameters,
+            args: parseParameters(req.parameters),
             id: generateUUID()
         }));
 
@@ -970,7 +1080,18 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
         {/* Messages */}
         <div className="flex-grow overflow-y-auto p-4 space-y-4 custom-scrollbar flex flex-col">
-            {messages.map((msg, idx) => (
+            {messages.map((msg, idx) => {
+                if (msg.isVerbose) {
+                    return (
+                        <div key={idx} className="w-full px-4 mb-2">
+                            <div className={`text-[10px] font-mono whitespace-pre-wrap p-2 rounded border-l-2 ${isDarkMode ? 'bg-black/20 text-green-400 border-green-600' : 'bg-gray-100 text-green-700 border-green-500'}`}>
+                                {msg.text}
+                            </div>
+                        </div>
+                    );
+                }
+
+                return (
                 <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                     {msg.text && (
                         <div className={`p-3 rounded-lg max-w-[90%] text-sm whitespace-pre-wrap ${msg.role === 'user' ? messageUserBg : messageModelBg}`}>
@@ -985,14 +1106,32 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             <div className="space-y-2">
                                 {msg.plan.map((step, i) => (
                                     <div key={i} className="flex gap-2 text-xs text-gray-300">
-                                        <span className="font-mono text-gray-500">{i + 1}.</span>
-                                        <span>{step.description}</span>
+                                        <span className="font-mono text-gray-500 w-6">{step.id}.</span>
+                                        <div className="flex flex-col">
+                                            <span>{step.description}</span>
+                                            {step.dependencies.length > 0 && (
+                                                <span className="text-[10px] text-gray-500">Wait for: {step.dependencies.join(', ')}</span>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
-                            <div className="mt-3 flex gap-2 justify-end">
-                                <button onClick={handleDiscardPlan} className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1">Discard</button>
-                                <button onClick={handleExecutePlan} className="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1 rounded text-xs font-bold">Execute Plan</button>
+                            <div className="mt-3 flex flex-col gap-2">
+                                <div className="flex justify-end gap-2 items-center">
+                                    <label className="flex items-center gap-1.5 text-[10px] text-gray-500 cursor-pointer select-none hover:text-blue-500 transition-colors">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={isVerboseMode} 
+                                            onChange={(e) => setIsVerboseMode(e.target.checked)} 
+                                            className="rounded border-gray-600 bg-transparent focus:ring-0 w-3 h-3 text-blue-500"
+                                        />
+                                        Verbose Mode (Debug)
+                                    </label>
+                                </div>
+                                <div className="flex gap-2 justify-end">
+                                    <button onClick={handleDiscardPlan} className="text-xs text-gray-400 hover:text-gray-200 px-2 py-1">Discard</button>
+                                    <button onClick={handleExecutePlan} className="bg-purple-600 hover:bg-purple-500 text-white px-3 py-1 rounded text-xs font-bold">Execute Plan</button>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1044,7 +1183,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                         </div>
                     )}
                 </div>
-            ))}
+            )})}
             {isLoading && (
                 <div className="flex items-center gap-2 text-gray-500 text-xs animate-pulse">
                     <div className="w-2 h-2 bg-gray-500 rounded-full"></div>
@@ -1062,9 +1201,12 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                     <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
                         {activePlan.map((step, i) => (
                             <div key={i} className="flex gap-2 items-center text-xs">
-                                <span className="font-mono text-gray-500 w-4">{i+1}.</span>
+                                <span className="font-mono text-gray-500 min-w-[20px]">{step.id}</span>
                                 <div className="flex-grow truncate text-gray-300">
                                     {step.description}
+                                    {step.status === 'pending' && step.dependencies.length > 0 && 
+                                       <span className="text-gray-600 ml-2">(waits for {step.dependencies.join(', ')})</span>
+                                    }
                                 </div>
                                 <div className="w-4">
                                     {step.status === 'pending' && <span className="text-gray-600">○</span>}
@@ -1094,7 +1236,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                             handleSendMessage();
                         }
                     }}
-                    placeholder={planStatus === 'proposed' ? "Type to modify the proposed plan..." : "Ask to create nodes, analyze connections..."}
+                    placeholder={planStatus === 'proposed' ? "Type to modify the proposed plan..." : "Ask a question or request changes..."}
                     className={`w-full ${inputBg} text-sm rounded p-2 border focus:border-blue-500 outline-none resize-none max-h-32 scrollbar-thin ${planStatus === 'proposed' ? 'border-purple-500 ring-1 ring-purple-500' : ''}`}
                     rows={1}
                 />

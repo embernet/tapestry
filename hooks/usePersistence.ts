@@ -1,8 +1,8 @@
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { ModelMetadata, ColorScheme, SystemPromptConfig, Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, DateFilterState, PanelLayout, Script } from '../types';
+import { ModelMetadata, ColorScheme, SystemPromptConfig, Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, DateFilterState, PanelLayout, Script, GraphView } from '../types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG } from '../constants';
-import { generateUUID, computeContentHash, isInIframe } from '../utils';
+import { generateUUID, computeContentHash, isInIframe, createDefaultView } from '../utils';
 
 // Keys
 const MODELS_INDEX_KEY = 'tapestry_models_index';
@@ -32,6 +32,10 @@ interface UsePersistenceProps {
     setDateFilter: React.Dispatch<React.SetStateAction<DateFilterState>>;
     currentFileHandleRef: React.MutableRefObject<any>;
     
+    // View State Setters
+    setViews: React.Dispatch<React.SetStateAction<GraphView[]>>;
+    setActiveViewId: React.Dispatch<React.SetStateAction<string>>;
+
     // Read-only refs/state for saving
     elementsRef: React.MutableRefObject<Element[]>;
     relationshipsRef: React.MutableRefObject<Relationship[]>;
@@ -44,15 +48,21 @@ interface UsePersistenceProps {
     slides: StorySlide[];
     mermaidDiagrams: MermaidDiagram[];
     scripts: Script[];
+    views: GraphView[];
+    activeViewId: string;
+    
+    // GitHub Integration
+    githubToken?: string;
 }
 
 export const usePersistence = ({
     setElements, setRelationships, setDocuments, setFolders, setHistory, setSlides, setMermaidDiagrams, setScripts,
     setColorSchemes, setActiveSchemeId, setSystemPromptConfig, setOpenDocIds, setDetachedHistoryIds,
     setPanelLayouts, setAnalysisHighlights, setAnalysisFilterState, setMultiSelection, setSelectedElementId,
-    setTagFilter, setDateFilter, currentFileHandleRef,
+    setTagFilter, setDateFilter, currentFileHandleRef, setViews, setActiveViewId,
     elementsRef, relationshipsRef, documentsRef, foldersRef,
-    colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts
+    colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, views, activeViewId,
+    githubToken
 }: UsePersistenceProps) => {
     
     const [modelsIndex, setModelsIndex] = useState<ModelMetadata[]>([]);
@@ -159,6 +169,17 @@ export const usePersistence = ({
         } else {
             setSystemPromptConfig(DEFAULT_SYSTEM_PROMPT_CONFIG);
         }
+
+        // Initialize Views
+        if (data.views && Array.isArray(data.views) && data.views.length > 0) {
+             setViews(data.views);
+             setActiveViewId(data.activeViewId || data.views[0].id);
+        } else {
+             // Create Default View
+             const defaultView = createDefaultView();
+             setViews([defaultView]);
+             setActiveViewId(defaultView.id);
+        }
         
         setCurrentModelId(modelId);
         localStorage.setItem(LAST_OPENED_MODEL_ID_KEY, modelId);
@@ -225,7 +246,9 @@ export const usePersistence = ({
                 history, 
                 slides, 
                 mermaidDiagrams,
-                scripts
+                scripts,
+                views,
+                activeViewId
             }; 
             const currentContentHash = computeContentHash(modelData); 
             const currentMeta = modelsIndex.find(m => m.id === currentModelId); 
@@ -238,11 +261,18 @@ export const usePersistence = ({
                 }); 
             } 
         } 
-    }, [elementsRef.current, relationshipsRef.current, documentsRef.current, foldersRef.current, colorSchemes, activeSchemeId, currentModelId, isInitialLoad, modelsIndex, systemPromptConfig, history, slides, mermaidDiagrams, scripts]);
+    }, [elementsRef.current, relationshipsRef.current, documentsRef.current, foldersRef.current, colorSchemes, activeSchemeId, currentModelId, isInitialLoad, modelsIndex, systemPromptConfig, history, slides, mermaidDiagrams, scripts, views, activeViewId]);
 
     const handleCreateModel = useCallback((name: string, description: string) => { 
         const now = new Date().toISOString(); 
-        const newModelData = { elements: [], relationships: [], documents: [], folders: [], colorSchemes: DEFAULT_COLOR_SCHEMES, activeSchemeId: DEFAULT_COLOR_SCHEMES[0]?.id || null, systemPromptConfig: DEFAULT_SYSTEM_PROMPT_CONFIG, history: [], slides: [], mermaidDiagrams: [], scripts: [] }; 
+        const defaultView = createDefaultView();
+        const newModelData = { 
+            elements: [], relationships: [], documents: [], folders: [], 
+            colorSchemes: DEFAULT_COLOR_SCHEMES, activeSchemeId: DEFAULT_COLOR_SCHEMES[0]?.id || null, 
+            systemPromptConfig: DEFAULT_SYSTEM_PROMPT_CONFIG, history: [], slides: [], 
+            mermaidDiagrams: [], scripts: [],
+            views: [defaultView], activeViewId: defaultView.id
+        }; 
         const initialHash = computeContentHash(newModelData); 
         const newModel: ModelMetadata = { id: generateUUID(), name, description, createdAt: now, updatedAt: now, filename: `${name.replace(/ /g, '_')}.json`, contentHash: initialHash, }; 
         setModelsIndex(prevIndex => [...prevIndex, newModel]); 
@@ -268,7 +298,9 @@ export const usePersistence = ({
             history, 
             slides, 
             mermaidDiagrams,
-            scripts
+            scripts,
+            views,
+            activeViewId
         };
         const currentHash = computeContentHash(modelData);
         const updatedMetadata = { ...modelMetadata, updatedAt: now, filename: modelMetadata.filename || `${modelMetadata.name.replace(/ /g, '_')}.json`, contentHash: currentHash, lastDiskHash: currentHash };
@@ -305,7 +337,94 @@ export const usePersistence = ({
                 alert("Failed to save file."); 
             } 
         }
-    }, [currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, currentFileHandleRef]);
+    }, [currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, views, activeViewId, currentFileHandleRef]);
+
+    const handleSaveToGist = useCallback(async () => {
+        if (!githubToken) {
+            alert("Please configure your GitHub Token in Settings > General first.");
+            return;
+        }
+        if (!currentModelId) {
+            alert("No active model to save.");
+            return;
+        }
+
+        const modelMetadata = modelsIndex.find(m => m.id === currentModelId);
+        if (!modelMetadata) return;
+
+        const now = new Date().toISOString();
+        const modelData = { 
+            elements: elementsRef.current, 
+            relationships: relationshipsRef.current, 
+            documents: documentsRef.current, 
+            folders: foldersRef.current, 
+            colorSchemes, 
+            activeSchemeId, 
+            systemPromptConfig, 
+            history, 
+            slides, 
+            mermaidDiagrams,
+            scripts,
+            views,
+            activeViewId
+        };
+        
+        // Update metadata for export
+        const currentHash = computeContentHash(modelData);
+        const updatedMetadata = { 
+            ...modelMetadata, 
+            updatedAt: now, 
+            filename: modelMetadata.filename || `${modelMetadata.name.replace(/ /g, '_')}.json`,
+            contentHash: currentHash 
+        };
+        
+        const exportData = { metadata: updatedMetadata, data: modelData };
+        const jsonString = JSON.stringify(exportData, null, 2);
+        const filename = updatedMetadata.filename || "tapestry_model.json";
+
+        const payload = {
+            description: `Tapestry Studio Model: ${modelMetadata.name}`,
+            public: false,
+            files: {
+                [filename]: {
+                    content: jsonString
+                }
+            }
+        };
+
+        try {
+            const response = await fetch('https://api.github.com/gists', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `token ${githubToken}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.message || 'GitHub API error');
+            }
+
+            const data = await response.json();
+            const gistUrl = data.html_url;
+            
+            // Open the new gist
+            window.open(gistUrl, '_blank');
+            alert("Successfully saved to GitHub Gist!");
+            
+            // Sync local index
+            setModelsIndex(prev => prev.map(m => m.id === currentModelId ? updatedMetadata : m));
+            localStorage.setItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
+
+        } catch (e: any) {
+            console.error("Gist Save Error", e);
+            alert(`Failed to save to GitHub: ${e.message}`);
+        }
+    }, [githubToken, currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, views, activeViewId]);
+
 
     const handleSaveAs = useCallback((name: string, description: string) => {
         if (!currentModelId) return;
@@ -322,7 +441,9 @@ export const usePersistence = ({
             history, 
             slides, 
             mermaidDiagrams,
-            scripts
+            scripts,
+            views,
+            activeViewId
         };
         const currentHash = computeContentHash(modelData);
         const newMetadata: ModelMetadata = { id: newId, name, description, createdAt: now, updatedAt: now, filename: `${name.replace(/ /g, '_')}.json`, contentHash: currentHash };
@@ -336,7 +457,7 @@ export const usePersistence = ({
             console.error("Save As failed", e);
             alert("Failed to save copy. Local storage might be full.");
         }
-    }, [currentModelId, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, currentFileHandleRef]);
+    }, [currentModelId, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, views, activeViewId, currentFileHandleRef]);
 
     const processImportedData = useCallback((text: string, filename?: string) => {
         try {
@@ -421,6 +542,8 @@ export const usePersistence = ({
                 colorSchemes: dataToImport.colorSchemes || DEFAULT_COLOR_SCHEMES, 
                 activeSchemeId: dataToImport.activeSchemeId || DEFAULT_COLOR_SCHEMES[0]?.id || null, 
                 systemPromptConfig: dataToImport.systemPromptConfig || DEFAULT_SYSTEM_PROMPT_CONFIG, 
+                views: dataToImport.views || [],
+                activeViewId: dataToImport.activeViewId || (dataToImport.views && dataToImport.views.length > 0 ? dataToImport.views[0].id : null)
             };
             
             loadModelData(newModelData, newModelId, newMetadata);
@@ -481,7 +604,9 @@ export const usePersistence = ({
                 history, 
                 slides, 
                 mermaidDiagrams,
-                scripts
+                scripts,
+                views,
+                activeViewId
             }; 
             const currentHash = computeContentHash(modelData); 
             const isDirty = currentMeta?.lastDiskHash !== currentHash; 
@@ -493,7 +618,7 @@ export const usePersistence = ({
             } 
         } 
         setIsCreateModelModalOpen(true); 
-    }, [currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, handleDiskSave]);
+    }, [currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, views, activeViewId, handleDiskSave]);
 
     const hasUnsavedChanges = useMemo(() => {
         const currentMeta = modelsIndex.find(m => m.id === currentModelId);
@@ -524,6 +649,7 @@ export const usePersistence = ({
         handleLoadModel,
         handleCreateModel,
         handleDiskSave,
+        handleSaveToGist,
         handleSaveAs,
         handleImportClick,
         handleImportInputChange,

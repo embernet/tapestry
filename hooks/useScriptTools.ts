@@ -46,7 +46,10 @@ export const useScriptTools = ({
                 { name: 'add_tag', description: 'Add a tag to a node', args: ['id', 'tag'] },
                 { name: 'remove_tag', description: 'Remove a tag from a node', args: ['id', 'tag'] },
                 { name: 'set_highlight', description: 'Set persistent node highlight', args: ['id', 'color'] },
-                { name: 'clear_highlight', description: 'Remove persistent node highlight', args: ['id'] }
+                { name: 'clear_highlight', description: 'Remove persistent node highlight', args: ['id'] },
+                { name: 'get_date', description: 'Get current date string' },
+                { name: 'get_formatted_attributes', description: 'Get attributes as list of strings', args: ['id'] },
+                { name: 'get_formatted_lists', description: 'Get custom lists as list of strings', args: ['id'] }
             ],
             invoke: async (action, args) => {
                 const elements = elementsRef.current;
@@ -150,7 +153,8 @@ export const useScriptTools = ({
                                 id: r.id,
                                 neighbor: safeNeighbor,
                                 label: r.label || '',
-                                arrow: arrow
+                                arrow: arrow,
+                                isSource: isSource
                             };
                         });
 
@@ -225,6 +229,21 @@ export const useScriptTools = ({
                             return e;
                         }));
                         return true;
+                        
+                    case 'get_date':
+                        return new Date().toLocaleDateString();
+                        
+                    case 'get_formatted_attributes': {
+                        const n = elements.find(e => e.id === args.id);
+                        if (!n || !n.attributes) return [];
+                        return Object.entries(n.attributes).map(([k, v]) => `${k}: ${v}`);
+                    }
+                    
+                    case 'get_formatted_lists': {
+                        const n = elements.find(e => e.id === args.id);
+                        if (!n || !n.customLists) return [];
+                        return Object.entries(n.customLists).map(([k, v]) => `${k}: ${(v as string[]).join(', ')}`);
+                    }
 
                     default:
                         throw new Error(`Unknown action: ${action}`);

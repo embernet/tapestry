@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { 
     TrizToolType, LssToolType, TocToolType, SsmToolType, 
     ExplorerToolType, TagCloudToolType, SwotToolType, 
-    MermaidToolType, HistoryEntry, TapestryDocument, VisualiseToolType
+    MermaidToolType, HistoryEntry, TapestryDocument, VisualiseToolType, DataToolType
 } from '../types';
 import { TOOL_DOCUMENTATION } from '../documentation';
 
@@ -39,6 +39,9 @@ export const useTools = (panelState?: any) => {
   const [activeSwotTool, setActiveSwotTool] = useState<SwotToolType>(null);
   const [isSwotModalOpen, setIsSwotModalOpen] = useState(false);
   const [swotInitialDoc, setSwotInitialDoc] = useState<TapestryDocument | null>(null);
+  
+  // Data Tools
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
 
   // SCAMPER
   const [isScamperModalOpen, setIsScamperModalOpen] = useState(false);
@@ -83,6 +86,10 @@ export const useTools = (panelState?: any) => {
           if (subTool === 'circle_packing') panelState.setIsCirclePackingPanelOpen(true);
           else if (subTool === 'treemap') panelState.setIsTreemapPanelOpen(true);
           else panelState.setIsGridPanelOpen(true); // Default or grid
+      } else if (tool === 'data' && panelState) {
+          if (subTool === 'csv') setIsCsvModalOpen(true);
+          else if (subTool === 'markdown') panelState.setIsMarkdownPanelOpen(true);
+          else if (subTool === 'json') panelState.setIsJSONPanelOpen(true);
       } else if (tool === 'analysis' && panelState) {
           if (subTool === 'network') panelState.setIsNetworkAnalysisOpen(true);
           else if (subTool === 'tags') panelState.setIsTagDistPanelOpen(true);
@@ -191,6 +198,9 @@ export const useTools = (panelState?: any) => {
     activeSwotTool, setActiveSwotTool,
     isSwotModalOpen, setIsSwotModalOpen,
     swotInitialDoc, setSwotInitialDoc,
+    
+    // Data Tools
+    isCsvModalOpen, setIsCsvModalOpen,
 
     // SCAMPER
     isScamperModalOpen, setIsScamperModalOpen,

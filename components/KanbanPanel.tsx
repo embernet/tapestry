@@ -47,7 +47,11 @@ export const KanbanPanel: React.FC<KanbanPanelProps> = ({
 
     elements.forEach(el => {
         let status = el.attributes?.[GROUP_BY_ATTRIBUTE];
-        if (!status || !columns.includes(status)) {
+        
+        // If status is undefined, do not show on board (Empty by default behavior)
+        if (!status) return;
+
+        if (!columns.includes(status)) {
             status = 'Unassigned';
         }
         
@@ -237,7 +241,8 @@ export const KanbanPanel: React.FC<KanbanPanelProps> = ({
       const elName = elements.find(e => e.id === elementId)?.name || '';
       
       if (targetCol === 'Unassigned') {
-          modelActions.deleteElementAttribute(elName, GROUP_BY_ATTRIBUTE);
+          // Explicitly set to Unassigned string to keep it visible in Unassigned col
+          modelActions.setElementAttribute(elName, GROUP_BY_ATTRIBUTE, 'Unassigned');
       } else {
           modelActions.setElementAttribute(elName, GROUP_BY_ATTRIBUTE, targetCol);
       }
@@ -247,7 +252,7 @@ export const KanbanPanel: React.FC<KanbanPanelProps> = ({
       modelActions.setElementAttribute(elementId, KANBAN_ORDER_ATTR, order.toString());
       const elName = elements.find(e => e.id === elementId)?.name || '';
       if (colName === 'Unassigned') {
-          modelActions.deleteElementAttribute(elName, GROUP_BY_ATTRIBUTE);
+           modelActions.setElementAttribute(elName, GROUP_BY_ATTRIBUTE, 'Unassigned');
       } else {
           modelActions.setElementAttribute(elName, GROUP_BY_ATTRIBUTE, colName);
       }
@@ -500,5 +505,3 @@ export const KanbanPanel: React.FC<KanbanPanelProps> = ({
     </div>
   );
 };
-
-export default KanbanPanel;

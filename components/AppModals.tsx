@@ -10,7 +10,7 @@ import SettingsModal from './SettingsModal';
 import { SchemaUpdateModal } from './SchemaUpdateModal';
 import { SelfTestModal } from './SelfTestModal';
 import { UserGuideModal } from './UserGuideModal';
-import { AboutModal, PatternGalleryModal, ConflictResolutionModal, CreateModelModal, SaveAsModal, OpenModelModal } from './ModalComponents';
+import { AboutModal, PatternGalleryModal, ConflictResolutionModal, CreateModelModal, SaveAsModal, OpenModelModal, ChangelogModal } from './ModalComponents';
 import { CsvToolModal } from './CsvToolModal';
 import { Element, Relationship, ModelActions, TapestryDocument, TapestryFolder, SystemPromptConfig, GlobalSettings, CustomStrategyTool } from '../types';
 
@@ -47,6 +47,8 @@ interface AppModalsProps {
   setIsPatternGalleryModalOpen: (open: boolean) => void;
   isUserGuideModalOpen: boolean;
   setIsUserGuideModalOpen: (open: boolean) => void;
+  isChangelogModalOpen: boolean;
+  setIsChangelogModalOpen: (open: boolean) => void;
   
   // CSV Import
   isCsvModalOpen: boolean;
@@ -58,6 +60,11 @@ interface AppModalsProps {
   setIsSelfTestModalOpen: (open: boolean) => void;
   testLogs: any[];
   testStatus: any;
+  onSelfTestPlay: () => void;
+  onSelfTestStop: () => void;
+  onSelfTestRunSingle: (index: number) => void;
+  onSelfTestSelectStep: (index: number) => void;
+  selfTestSelectedIndex: number | null;
   
   // Imports
   importFileRef: any;
@@ -116,8 +123,20 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
             />
             <SettingsModal isOpen={props.isSettingsModalOpen} onClose={() => props.setIsSettingsModalOpen(false)} initialTab={props.settingsInitialTab} globalSettings={props.globalSettings} onGlobalSettingsChange={props.handleGlobalSettingsChange} modelSettings={props.systemPromptConfig} onModelSettingsChange={props.setSystemPromptConfig} isDarkMode={isDarkMode} />
             {persistence.isSchemaUpdateModalOpen && <SchemaUpdateModal changes={persistence.schemaUpdateChanges} onClose={() => persistence.setIsSchemaUpdateModalOpen(false)} />}
-            <SelfTestModal isOpen={props.isSelfTestModalOpen} onClose={() => props.setIsSelfTestModalOpen(false)} logs={props.testLogs} status={props.testStatus} isDarkMode={isDarkMode} />
+            <SelfTestModal 
+                isOpen={props.isSelfTestModalOpen} 
+                onClose={() => props.setIsSelfTestModalOpen(false)} 
+                logs={props.testLogs} 
+                status={props.testStatus} 
+                onPlay={props.onSelfTestPlay}
+                onStop={props.onSelfTestStop}
+                onRunSingle={props.onSelfTestRunSingle}
+                onSelectStep={props.onSelfTestSelectStep}
+                selectedIndex={props.selfTestSelectedIndex}
+                isDarkMode={isDarkMode} 
+            />
             {props.isUserGuideModalOpen && <UserGuideModal onClose={() => props.setIsUserGuideModalOpen(false)} isDarkMode={isDarkMode} />}
+            {props.isChangelogModalOpen && <ChangelogModal onClose={() => props.setIsChangelogModalOpen(false)} isDarkMode={isDarkMode} />}
             
             {/* Data Tools */}
             <CsvToolModal 
@@ -126,7 +145,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
                 onImport={props.handleImportCsv} 
                 elements={elements} 
                 relationships={relationships} 
-                isDarkMode={isDarkMode}
+                isDarkMode={isDarkMode} 
                 modelName={persistence.currentModelName} 
             />
             
@@ -137,7 +156,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
             {persistence.pendingImport && (
                 <ConflictResolutionModal localMetadata={persistence.pendingImport.localMetadata} diskMetadata={persistence.pendingImport.diskMetadata} localData={persistence.pendingImport.localData} diskData={persistence.pendingImport.diskData} onCancel={() => persistence.setPendingImport(null)} onChooseLocal={() => { persistence.handleLoadModel(persistence.pendingImport!.localMetadata.id); persistence.setPendingImport(null); }} onChooseDisk={() => { persistence.loadModelData(persistence.pendingImport!.diskData, persistence.pendingImport!.diskMetadata.id, persistence.pendingImport!.diskMetadata); persistence.setPendingImport(null); }} />
             )}
-            {props.isAboutModalOpen && <AboutModal onClose={() => props.setIsAboutModalOpen(false)} onUserGuideClick={() => { props.setIsAboutModalOpen(false); props.setIsUserGuideModalOpen(true); }} isDarkMode={isDarkMode} />}
+            {props.isAboutModalOpen && <AboutModal onClose={() => props.setIsAboutModalOpen(false)} onUserGuideClick={() => { props.setIsAboutModalOpen(false); props.setIsUserGuideModalOpen(true); }} onChangelogClick={() => { props.setIsAboutModalOpen(false); props.setIsChangelogModalOpen(true); }} isDarkMode={isDarkMode} />}
             {props.isPatternGalleryModalOpen && <PatternGalleryModal onClose={() => props.setIsPatternGalleryModalOpen(false)} isDarkMode={isDarkMode} />}
         </>
     );

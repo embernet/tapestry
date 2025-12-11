@@ -1,10 +1,9 @@
 
-
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import * as d3 from 'd3';
-import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, NodeFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage, VisualiseToolType, NodeShape, Script } from './types';
-import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS, NODE_MAX_WIDTH } from './constants';
+import { Element, Relationship, ColorScheme, RelationshipDirection, ModelMetadata, PanelState, DateFilterState, NodeFilterState, ModelActions, RelationshipDefinition, ScamperSuggestion, SystemPromptConfig, TapestryDocument, TapestryFolder, PanelLayout, TrizToolType, LssToolType, TocToolType, SsmToolType, ExplorerToolType, TagCloudToolType, SwotToolType, MermaidToolType, HistoryEntry, SimulationNodeState, StorySlide, GlobalSettings, MermaidDiagram, CustomStrategyTool, ChatMessage, VisualiseToolType, NodeShape, Script, GraphView, TagFilterState } from './types';
+import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, AVAILABLE_AI_TOOLS, DEFAULT_TOOL_PROMPTS, NODE_MAX_WIDTH, APP_VERSION } from './constants';
 import { TOOL_DOCUMENTATION } from './documentation';
 import { usePanelDefinitions } from './components/usePanelDefinitions';
 import GraphCanvas, { GraphCanvasRef } from './components/GraphCanvas';
@@ -14,7 +13,7 @@ import AddRelationshipPanel from './components/AddRelationshipPanel';
 import FilterPanel from './components/FilterPanel';
 import ChatPanel from './components/ChatPanel';
 import RightPanelContainer from './components/RightPanelContainer';
-import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe, generateSelectionReport, callAI, AIConfig, aiLogger } from './utils';
+import { generateUUID, generateMarkdownFromGraph, computeContentHash, isInIframe, generateSelectionReport, callAI, AIConfig, aiLogger, createDefaultView, normalizeTag } from './utils';
 import { useModelActions } from './hooks/useModelActions';
 import { usePanelState } from './hooks/usePanelState';
 import { useTools } from './hooks/useTools';
@@ -27,9 +26,9 @@ import { DebugPanel } from './components/DebugPanel';
 import { RandomWalkPanel } from './components/RandomWalkPanel';
 import { promptStore } from './services/PromptStore';
 import { NetworkAnalysisPanel } from './components/NetworkAnalysisPanel';
-import { useScriptTools } from './hooks/useScriptTools'; // Import script tools hook
-import { useScripts } from './hooks/useScripts'; // Import script data hook
-import { ScriptPanel } from './components/ScriptPanel'; // Import ScriptPanel
+import { useScriptTools } from './hooks/useScriptTools'; 
+import { useScripts } from './hooks/useScripts'; 
+import { ScriptPanel } from './components/ScriptPanel'; 
 
 // New Extracted Components
 import { StartScreen } from './components/StartScreen';
@@ -38,12 +37,20 @@ import { AppModals } from './components/AppModals';
 import { ContextMenus } from './components/ContextMenus';
 import { StatusBar } from './components/StatusBar';
 
-// Explicitly define coordinate type to fix type inference issues
+// New Refactored Hooks & Utils
+import { parseMarkdownToGraph } from './utils/markdownParser';
+import { useGraphView } from './hooks/useGraphView';
+import { useImpactAnalysis } from './hooks/useImpactAnalysis';
+import { useGraphLayout } from './hooks/useGraphLayout';
+import { useAppSettings } from './hooks/useAppSettings';
+import { useViewManagement } from './hooks/useViewManagement';
+import { useSelection } from './hooks/useSelection';
+import { useHistory } from './hooks/useHistory';
+import { useDiagrams } from './hooks/useDiagrams';
+import { useWindowManagement } from './hooks/useWindowManagement';
+import { useToolHandlers } from './hooks/useToolHandlers';
+
 type Coords = { x: number; y: number };
-
-const GLOBAL_SETTINGS_KEY = 'tapestry_global_settings';
-
-// --- Main App Component ---
 
 export default function App() {
   const [elements, setElements] = useState<Element[]>([]);
@@ -52,239 +59,290 @@ export default function App() {
   const [activeSchemeId, setActiveSchemeId] = useState<string | null>(DEFAULT_COLOR_SCHEMES[0]?.id || null);
   const [defaultTags, setDefaultTags] = useState<string[]>([]);
   
-  // --- Settings State ---
-  const [globalSettings, setGlobalSettings] = useState<GlobalSettings>({
-      toolsBarOpenByDefault: true,
-      theme: 'dark',
-      activeProvider: 'gemini',
-      aiConnections: {
-          gemini: { provider: 'gemini', apiKey: '', modelId: 'gemini-2.5-flash' },
-          openai: { provider: 'openai', apiKey: '', modelId: 'gpt-4o' },
-          anthropic: { provider: 'anthropic', apiKey: '', modelId: 'claude-3-5-sonnet-20240620' },
-          grok: { provider: 'grok', apiKey: '', modelId: 'grok-beta' },
-          ollama: { provider: 'ollama', apiKey: 'ollama', baseUrl: 'http://localhost:11434', modelId: 'llama3' },
-          custom: { provider: 'custom', apiKey: '', baseUrl: '', modelId: '' }
-      },
-      customStrategies: [],
-      language: 'British English'
-  });
-  const [systemPromptConfig, setSystemPromptConfig] = useState<SystemPromptConfig>(DEFAULT_SYSTEM_PROMPT_CONFIG);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'ai_settings' | 'ai_prompts' | 'ai_tools' | 'prompts'>('general');
+  // Notification State
+  const [notification, setNotification] = useState<{ x: number; y: number; message: string } | null>(null);
 
-  // --- Theme State ---
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-      try {
-          const saved = localStorage.getItem(GLOBAL_SETTINGS_KEY);
-          if (saved) {
-              const parsed = JSON.parse(saved);
-              return parsed.theme === 'light' ? false : true;
-          }
-      } catch(e) {}
-      return true;
-  });
+  // --- Version Check ---
+  const [isChangelogModalOpen, setIsChangelogModalOpen] = useState(false);
 
-  // --- Documents State ---
-  const [documents, setDocuments] = useState<TapestryDocument[]>([]);
-  const [folders, setFolders] = useState<TapestryFolder[]>([]);
-  const [openDocIds, setOpenDocIds] = useState<string[]>([]);
+  useEffect(() => {
+    const lastRunVersion = localStorage.getItem('tapestry_last_run_version');
+    if (!lastRunVersion || lastRunVersion !== APP_VERSION) {
+      setIsChangelogModalOpen(true);
+      localStorage.setItem('tapestry_last_run_version', APP_VERSION);
+    }
+  }, []);
 
-  // --- History State ---
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [detachedHistoryIds, setDetachedHistoryIds] = useState<string[]>([]);
+  // --- Settings & Theme Hook ---
+  const {
+      globalSettings,
+      systemPromptConfig,
+      setSystemPromptConfig,
+      isSettingsModalOpen,
+      setIsSettingsModalOpen,
+      settingsInitialTab,
+      setSettingsInitialTab,
+      isDarkMode,
+      handleThemeToggle,
+      handleGlobalSettingsChange,
+      handleCustomStrategiesChange,
+      aiConfig,
+      getToolPrompt
+  } = useAppSettings();
 
-  // --- Layout Parameters State ---
-  const [layoutParams, setLayoutParams] = useState({ linkDistance: 250, repulsion: -400 });
-  const [jiggleTrigger, setJiggleTrigger] = useState(0);
-  const [nodeShape, setNodeShape] = useState<NodeShape>('rectangle');
-
-  // --- Panel State Hook ---
+  // --- View Management Hook ---
+  const {
+      views,
+      setViews,
+      activeViewId,
+      setActiveViewId,
+      activeView,
+      tagFilter,
+      dateFilter,
+      nodeFilter,
+      handleCreateView: _handleCreateView,
+      handleDuplicateView: _handleDuplicateView,
+      handleDeleteView,
+      handleRenameView,
+      handleUpdateActiveView,
+      handleHideFromView,
+      handleGenerateTapestry,
+      isGeneratingTapestry,
+      setTagFilter,
+      setDateFilter,
+      setNodeFilter
+  } = useViewManagement({ aiConfig, isDarkMode });
+  
+  // --- Panels & Tools State ---
   const panelState = usePanelState();
-  const [isDebugPanelOpen, setIsDebugPanelOpen] = useState(false);
-  
-  // --- Script State Hook ---
-  const { scripts, setScripts, createScript, updateScript, deleteScript } = useScripts();
-  
-  // --- Random Walk State ---
-  const [isRandomWalkOpen, setIsRandomWalkOpen] = useState(false);
-  const [walkState, setWalkState] = useState<{
-      currentNodeId: string | null;
-      pathHistory: string[]; // Track history of walk
-      historyIndex: number; // Current position in history
-      visitedIds: Set<string>;
-      isPaused: boolean;
-      waitTime: number;
-      hideDetails: boolean;
-      direction: 'forward' | 'backward';
-      speedMultiplier: number;
-  }>({
-      currentNodeId: null,
-      pathHistory: [],
-      historyIndex: -1,
-      visitedIds: new Set(),
-      isPaused: true,
-      waitTime: 3,
-      hideDetails: false,
-      direction: 'forward',
-      speedMultiplier: 1
-  });
-
-  // --- Tools State Hook ---
   const tools = useTools(panelState);
-  const { isBulkEditActive, setIsBulkEditActive } = tools;
+  
+  // Window Management Hook
+  const {
+      panelLayouts, setPanelLayouts,
+      panelZIndex, setPanelZIndex,
+      activeDockedPanelId, setActiveDockedPanelId,
+      openPanelAt, bringToFront
+  } = useWindowManagement();
 
-  // --- Chat & Debug State ---
-  // chatConversation: For the AI Assistant UI (persists only for session, shows User <-> AI chat)
-  const [chatConversation, setChatConversation] = useState<ChatMessage[]>([]);
-  // debugLog: For the Debug Panel (shows raw traffic from ALL tools via aiLogger)
-  const [debugLog, setDebugLog] = useState<ChatMessage[]>([]);
-  // chatDraftMessage: To prepopulate chat from other tools
-  const [chatDraftMessage, setChatDraftMessage] = useState('');
+  // Sync tools panel default state from global settings on load
+  useEffect(() => {
+      if (globalSettings.toolsBarOpenByDefault !== undefined) {
+          tools.setIsToolsPanelOpen(globalSettings.toolsBarOpenByDefault);
+      }
+  }, []); // Run once on mount
 
-  // --- Bulk Edit State ---
+  // Helper to force View Details panel to open as floating
+  const openViewDetails = useCallback(() => {
+      const width = 450;
+      const height = 650;
+      const x = Math.max(50, (window.innerWidth - width) / 2);
+      const y = 100;
+      
+      setPanelLayouts(prev => ({
+          ...prev,
+          'view-details': {
+              x, y, w: width, h: height,
+              zIndex: panelZIndex + 1,
+              isFloating: true
+          }
+      }));
+      setPanelZIndex(prev => prev + 1);
+      panelState.setIsViewDetailsPanelOpen(true);
+  }, [setPanelLayouts, setPanelZIndex, panelZIndex, panelState]);
+
+  // View Handler Wrappers to integrate UI (Panel opening)
+  const handleCreateView = useCallback(() => {
+      _handleCreateView();
+      openViewDetails();
+  }, [_handleCreateView, openViewDetails]);
+
+  const handleDuplicateView = useCallback(() => {
+      if (_handleDuplicateView()) {
+          openViewDetails();
+      }
+  }, [_handleDuplicateView, openViewDetails]);
+
+  // --- Refs ---
+  const elementsRef = useRef<Element[]>(elements);
+  const relationshipsRef = useRef<Relationship[]>(relationships);
+  const graphCanvasRef = useRef<GraphCanvasRef>(null);
+
+  // 1. Layout Hook
+  const {
+      layoutParams, setLayoutParams, isPhysicsModeActive, setIsPhysicsModeActive,
+      originalElements, setOriginalElements, jiggleTrigger, setJiggleTrigger,
+      handleStaticLayout, handleStartPhysicsLayout, handleAcceptLayout, handleRejectLayout, handleScaleLayout
+  } = useGraphLayout({ elementsRef, relationshipsRef, setElements, graphCanvasRef });
+
+  // 2. Impact Analysis Hook
+  const {
+      isSimulationMode, setIsSimulationMode, simulationState, setSimulationState, runImpactSimulation
+  } = useImpactAnalysis({ relationships });
+
+  const [isBulkEditActive, setIsBulkEditActive] = useState(false);
   const [bulkTagsToAdd, setBulkTagsToAdd] = useState<string[]>([]);
   const [bulkTagsToRemove, setBulkTagsToRemove] = useState<string[]>([]);
-
-  // --- Simulation State ---
-  const [simulationState, setSimulationState] = useState<Record<string, SimulationNodeState>>({});
-  const [isSimulationMode, setIsSimulationMode] = useState(false);
-  
-  // --- Analysis Highlights & Filtering ---
-  const [analysisHighlights, setAnalysisHighlights] = useState<Map<string, string>>(new Map());
-  const [analysisFilterState, setAnalysisFilterState] = useState<{ mode: 'hide' | 'hide_others' | 'none', ids: Set<string> }>({ mode: 'none', ids: new Set() });
-  const [isHighlightToolActive, setIsHighlightToolActive] = useState(false);
-
-  // --- Story/Presentation State ---
-  const [slides, setSlides] = useState<StorySlide[]>([]);
   const [isPresenting, setIsPresenting] = useState(false);
   const [currentSlideIndex, setCurrentSlideIndex] = useState<number | null>(null);
+  const [analysisHighlights, setAnalysisHighlights] = useState<Map<string, string>>(new Map());
+  const [analysisFilterState, setAnalysisFilterState] = useState<{ mode: 'hide' | 'hide_others' | 'none', ids: Set<string> }>({ mode: 'none', ids: new Set() });
+  const [chatDraftMessage, setChatDraftMessage] = useState('');
+  const [chatConversation, setChatConversation] = useState<ChatMessage[]>([]);
+  const [nodeShape, setNodeShape] = useState<NodeShape>('rectangle');
+  const [isHighlightToolActive, setIsHighlightToolActive] = useState(false);
 
-  // --- Mermaid State ---
-  const [mermaidDiagrams, setMermaidDiagrams] = useState<MermaidDiagram[]>([]);
-  const [isMermaidGenerating, setIsMermaidGenerating] = useState(false);
-
-  // --- Internal Clipboard for Copy/Paste ---
-  const [internalClipboard, setInternalClipboard] = useState<{ elements: Element[], relationships: Relationship[] } | null>(null);
-
-  // --- Selection State ---
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-  const [multiSelection, setMultiSelection] = useState<Set<string>>(new Set()); 
-  const [selectedRelationshipId, setSelectedRelationshipId] = useState<string | null>(null);
-  const [focusMode, setFocusMode] = useState<'narrow' | 'wide' | 'zoom'>('narrow');
+  // Random Walk State
+  const [isRandomWalkOpen, setIsRandomWalkOpen] = useState(false);
+  const [walkState, setWalkState] = useState<{
+    currentNodeId: string | null;
+    visitedIds: Set<string>;
+    pathHistory: string[];
+    historyIndex: number;
+    waitTime: number;
+    isPaused: boolean;
+    hideDetails: boolean;
+    direction: 'forward' | 'backward';
+    speedMultiplier: number;
+  }>({
+    currentNodeId: null,
+    visitedIds: new Set(),
+    pathHistory: [],
+    historyIndex: -1,
+    waitTime: 2,
+    isPaused: true,
+    hideDetails: false,
+    direction: 'forward',
+    speedMultiplier: 1
+  });
   const [preWalkFocusMode, setPreWalkFocusMode] = useState<'narrow' | 'wide' | 'zoom'>('narrow');
 
-  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, elementId: string } | null>(null);
-  const [relationshipContextMenu, setRelationshipContextMenu] = useState<{ x: number, y: number, relationshipId: string } | null>(null);
-  const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number, y: number } | null>(null);
-  const [panelStateUI, setPanelStateUI] = useState<PanelState>({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
+  const handleToggleNodeHighlight = useCallback((id: string) => {
+       setElements(prev => prev.map(e => {
+          if (e.id === id) {
+              const newMeta = { ...(e.meta || {}) };
+              if (newMeta.highlightColor) {
+                  delete newMeta.highlightColor;
+              } else {
+                  newMeta.highlightColor = '#facc15'; 
+              }
+              return { ...e, meta: newMeta, updatedAt: new Date().toISOString() };
+          }
+          return e;
+      }));
+  }, []);
+
+  // 3. Selection & Interaction Hook
+  const {
+      selectedElementId, setSelectedElementId,
+      multiSelection, setMultiSelection,
+      selectedRelationshipId, setSelectedRelationshipId,
+      panelStateUI, setPanelStateUI,
+      focusMode, setFocusMode,
+      selectedElement, selectedRelationship, addRelationshipSourceElement,
+      handleNodeClick, handleLinkClick, handleCanvasClick, handleNodeConnect, handleNodeConnectToNew,
+      handleCompleteAddRelationship, handleCancelAddRelationship, handleToggleFocusMode, handleFocusSingle
+  } = useSelection({
+      elements, setElements,
+      relationships, setRelationships,
+      activeView,
+      colorSchemes, activeSchemeId, defaultTags,
+      isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove,
+      isSimulationMode, runImpactSimulation,
+      isRandomWalkOpen, setWalkState,
+      graphCanvasRef,
+      isSunburstPanelOpen: panelState.isSunburstPanelOpen, sunburstState: panelState.sunburstState, setSunburstState: panelState.setSunburstState,
+      setOriginalElements, originalElements, setIsPhysicsModeActive,
+      isHighlightToolActive,
+      handleToggleNodeHighlight
+  });
   
-  // --- Modal States ---
+  // 4. Graph View Hook (Filtered Data)
+  const { filteredElements, filteredRelationships } = useGraphView({
+      elements, relationships, activeView, panelState, analysisFilterState
+  });
+
+  // 5. History Hook
+  const {
+      history, setHistory, detachedHistoryIds, setDetachedHistoryIds,
+      handleLogHistory, handleDeleteHistory, handleDetachHistory
+  } = useHistory({ panelZIndex, setPanelZIndex, setPanelLayouts });
+
+  // 6. Diagrams Hook
+  const {
+      mermaidDiagrams, setMermaidDiagrams, isMermaidGenerating,
+      handleSaveMermaidDiagram, handleDeleteMermaidDiagram, handleGenerateMermaid
+  } = useDiagrams({ elements, relationships, aiConfig });
+
+  // 7. Tool Handlers Hook (New)
+  const {
+      handleTrizToolSelect,
+      handleLssToolSelect,
+      handleTocToolSelect,
+      handleSsmToolSelect,
+      handleAnalysisToolSelect,
+      handleExplorerToolSelect,
+      handleVisualiseToolSelect,
+      handleTagCloudToolSelect,
+      handleSwotToolSelect,
+      handleMermaidToolSelect,
+      handleAiToolSelect,
+      handleDataToolSelect
+  } = useToolHandlers({
+      tools,
+      panelState,
+      windowManagement: { openPanelAt, setPanelZIndex },
+      focusMode,
+      setFocusMode,
+      isRandomWalkOpen,
+      setIsRandomWalkOpen,
+      setWalkState,
+      setPreWalkFocusMode,
+      setChatDraftMessage,
+      elements,
+      selectedElementId,
+      promptStore
+  });
+
+  // Clipboard & Refs
+  const [internalClipboard, setInternalClipboard] = useState<{ elements: Element[], relationships: Relationship[] } | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const currentFileHandleRef = useRef<any>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragStartRef = useRef<{ x: number, y: number } | null>(null);
+  const [detailsPanelPosition, setDetailsPanelPosition] = useState<{ x: number, y: number } | null>(null);
+  
+  // Persistence Refs (for clean saving)
+  
+  const documentsRef = useRef<TapestryDocument[]>([]);
+  const foldersRef = useRef<TapestryFolder[]>([]);
+  
+  // Effect to sync state to refs
+  useEffect(() => { elementsRef.current = elements; }, [elements]);
+  useEffect(() => { relationshipsRef.current = relationships; }, [relationships]);
+
+  const [documents, setDocuments] = useState<TapestryDocument[]>([]);
+  useEffect(() => { documentsRef.current = documents; }, [documents]);
+
+  const [folders, setFolders] = useState<TapestryFolder[]>([]);
+  useEffect(() => { foldersRef.current = folders; }, [folders]);
+  
+  const [slides, setSlides] = useState<StorySlide[]>([]);
+  const [openDocIds, setOpenDocIds] = useState<string[]>([]);
+  
+  // Modals State
   const [isAboutModalOpen, setIsAboutModalOpen] = useState(false);
   const [isPatternGalleryModalOpen, setIsPatternGalleryModalOpen] = useState(false);
   const [isUserGuideModalOpen, setIsUserGuideModalOpen] = useState(false);
-  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   
-  const [tagFilter, setTagFilter] = useState<{ included: Set<string>, excluded: Set<string> }>({ included: new Set(), excluded: new Set() });
-  const [dateFilter, setDateFilter] = useState<DateFilterState>({ createdAfter: '', createdBefore: '', updatedAfter: '', updatedBefore: '' });
-  const [nodeFilter, setNodeFilter] = useState<NodeFilterState>({ centerId: null, hops: 1, active: false });
-  
-  const [isPhysicsModeActive, setIsPhysicsModeActive] = useState(false);
-  const [originalElements, setOriginalElements] = useState<Element[] | null>(null);
-  
-  // --- Refs ---
-  const graphCanvasRef = useRef<GraphCanvasRef>(null);
-  const importFileRef = useRef<HTMLInputElement>(null);
-  const currentFileHandleRef = useRef<any>(null);
-  
-  // --- Panel System State ---
-  const [panelLayouts, setPanelLayouts] = useState<Record<string, PanelLayout>>({});
-  const [activeDockedPanelId, setActiveDockedPanelId] = useState<string | null>(null);
-  const [panelZIndex, setPanelZIndex] = useState(100);
+  // Context Menus State
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; elementId: string } | null>(null);
+  const [relationshipContextMenu, setRelationshipContextMenu] = useState<{ x: number; y: number; relationshipId: string } | null>(null);
+  const [canvasContextMenu, setCanvasContextMenu] = useState<{ x: number; y: number } | null>(null);
 
-  // Floating Panel State
-  const [floatingPanelPos, setFloatingPanelPos] = useState<{x: number, y: number} | null>(null);
-  const dragStartRef = useRef<{x: number, y: number} | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [detailsPanelPosition, setDetailsPanelPosition] = useState<{x: number, y: number} | null>(null);
-
-  // --- Refs for Synchronous Access in Hooks ---
-  const elementsRef = useRef<Element[]>([]);
-  const relationshipsRef = useRef<Relationship[]>([]);
-  const documentsRef = useRef<TapestryDocument[]>([]);
-  const foldersRef = useRef<TapestryFolder[]>([]);
-
-  useEffect(() => { elementsRef.current = elements; }, [elements]);
-  useEffect(() => { relationshipsRef.current = relationships; }, [relationships]);
-  useEffect(() => { documentsRef.current = documents; }, [documents]);
-  useEffect(() => { foldersRef.current = folders; }, [folders]);
-  
-  // --- Document Opening Handler (Moved up for useScriptTools) ---
-  const handleOpenDocument = useCallback((docId: string, origin?: 'report') => {
-        const doc = documents.find(d => d.id === docId);
-        if (!doc) return;
-        if (doc.type === 'swot-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('matrix'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; } 
-        else if (doc.type === 'five-forces-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('five_forces'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; } 
-        else if (doc.type === 'pestel-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('pestel'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; } 
-        else if (doc.type === 'steer-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('steer'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; }
-        else if (doc.type === 'destep-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('destep'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; }
-        else if (doc.type === 'longpest-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('longpest'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; }
-        else if (doc.type === 'cage-analysis') { tools.setActiveTool('swot'); tools.setActiveSwotTool('cage'); tools.setSwotInitialDoc(doc); tools.setIsSwotModalOpen(true); return; }
-        else if (doc.type && doc.type.startsWith('custom-strategy-')) { 
-            // Handle Custom Strategy Document
-            const strategyId = doc.type.replace('custom-strategy-', '');
-            
-            // Check if the strategy definition is embedded in the document
-            if (doc.data && doc.data.strategyDefinition) {
-                // Ensure the strategy exists in global settings, or add it
-                const existing = globalSettings.customStrategies.find(s => s.id === strategyId);
-                if (!existing) {
-                    handleGlobalSettingsChange({ ...globalSettings, customStrategies: [...globalSettings.customStrategies, doc.data.strategyDefinition] });
-                }
-            }
-            
-            tools.setActiveTool('swot'); 
-            tools.setActiveSwotTool(`custom-strategy-${strategyId}`); 
-            tools.setSwotInitialDoc(doc); 
-            tools.setIsSwotModalOpen(true); 
-            return; 
-        }
-        else if (doc.type === 'scamper-analysis') { tools.setActiveTool('scamper'); tools.setScamperInitialDoc(doc); tools.setIsScamperModalOpen(true); return; }
-        else if (doc.type === 'triz-analysis') { tools.setActiveTool('triz'); tools.setTrizInitialParams(null); tools.setIsTrizModalOpen(true); return; } 
-        
-        if (!openDocIds.includes(docId)) { setOpenDocIds(prev => [...prev, docId]); }
-        
-        // Always open as floating by default
-        const panelId = `doc-${docId}`;
-        const nextZ = panelZIndex + 1;
-        setPanelZIndex(nextZ);
-
-        setPanelLayouts(prev => {
-            if (prev[panelId]) {
-                 return { ...prev, [panelId]: { ...prev[panelId], zIndex: nextZ } };
-            }
-            // New floating layout
-            const width = 500;
-            const height = 600;
-            // Simple cascade
-            const offset = (Object.keys(prev).filter(k => k.startsWith('doc-')).length % 8) * 30;
-            let x = (window.innerWidth - width) / 2 + offset;
-            let y = 100 + offset;
-            
-            // Boundary check
-            if (x < 20) x = 20; 
-            if (y < 20) y = 20;
-
-            return { 
-                ...prev, 
-                [panelId]: { x, y, w: width, h: height, zIndex: nextZ, isFloating: true } 
-            };
-        });
-
-  }, [documents, openDocIds, panelLayouts, panelZIndex, tools, globalSettings]);
-
-  // --- Initialize Script Tools ---
-  // Registers app state with ToolRegistry for scripting
-  useScriptTools({
+  // Scripting
+  const { scripts, createScript, updateScript, deleteScript, setScripts } = useScripts();
+  const scriptTools = useScriptTools({
       elementsRef, setElements,
       relationshipsRef, setRelationships,
       documentsRef, setDocuments,
@@ -292,312 +350,99 @@ export default function App() {
       setSelectedElementId,
       setMultiSelection,
       setAnalysisHighlights,
-      onOpenDocument: handleOpenDocument
+      onOpenDocument: (id) => {
+         if (!openDocIds.includes(id)) setOpenDocIds(prev => [...prev, id]);
+         // Document logic handled in panel definitions
+      }
   });
+  
+  // Pre-calculate tag counts for Filter and View Details
+  const { allTags, tagCounts } = useMemo(() => {
+        const counts = new Map<string, number>();
+        const tags = new Set<string>();
+        elements.forEach(element => { 
+            element.tags.forEach(tag => { 
+                tags.add(tag);
+                counts.set(tag, (counts.get(tag) || 0) + 1); 
+            }); 
+        });
+        return { allTags: Array.from(tags).sort(), tagCounts: counts };
+  }, [elements]);
 
-  // --- Logger Subscription ---
-  useEffect(() => {
-      const unsubscribe = aiLogger.subscribe((msg: ChatMessage) => {
-          // Log to Debug Panel only
-          setDebugLog(prev => [...prev, msg]);
+  // Calculate filtered tag counts for Filter tool display
+  const filteredTagCounts = useMemo(() => {
+      const counts = new Map<string, number>();
+      filteredElements.forEach(element => {
+          element.tags.forEach(tag => {
+              counts.set(tag, (counts.get(tag) || 0) + 1);
+          });
       });
-      return unsubscribe;
-  }, []);
-
-  // --- Load Global Settings ---
-  useEffect(() => {
-      try {
-          const savedSettings = localStorage.getItem(GLOBAL_SETTINGS_KEY);
-          if (savedSettings) {
-              const parsed = JSON.parse(savedSettings);
-              // Ensure customStrategies is initialized even if not in old save
-              if (!parsed.customStrategies) parsed.customStrategies = [];
-              if (!parsed.theme) parsed.theme = 'dark'; // Ensure theme exists
-              if (!parsed.language) parsed.language = 'British English'; // Ensure language exists
-              setGlobalSettings(prev => ({ ...prev, ...parsed }));
-              tools.setIsToolsPanelOpen(parsed.toolsBarOpenByDefault ?? true);
-              setIsDarkMode(parsed.theme === 'dark');
-          }
-      } catch (e) {
-          console.error("Failed to load global settings", e);
-      }
-  }, []);
-
-  const handleGlobalSettingsChange = (settings: GlobalSettings) => {
-      setGlobalSettings(settings);
-      setIsDarkMode(settings.theme === 'dark');
-      localStorage.setItem(GLOBAL_SETTINGS_KEY, JSON.stringify(settings));
-  };
-
-  const handleThemeToggle = () => {
-      const newTheme = isDarkMode ? 'light' : 'dark';
-      const newSettings: GlobalSettings = { ...globalSettings, theme: newTheme };
-      handleGlobalSettingsChange(newSettings);
-  };
-
-  const handleCustomStrategiesChange = (strategies: CustomStrategyTool[]) => {
-      handleGlobalSettingsChange({ ...globalSettings, customStrategies: strategies });
-  };
-
-  const aiConfig = useMemo<AIConfig>(() => {
-      const provider = globalSettings.activeProvider;
-      const conn = globalSettings.aiConnections[provider];
-      return {
-          provider,
-          apiKey: conn?.apiKey || '',
-          modelId: conn?.modelId || 'gemini-2.5-flash',
-          baseUrl: conn?.baseUrl,
-          language: globalSettings.language || 'British English'
-      };
-  }, [globalSettings]);
-
-  // --- Helpers ---
-  const getToolPrompt = useCallback((tool: string, subTool?: string | null) => {
-      const prompts = systemPromptConfig.toolPrompts || DEFAULT_TOOL_PROMPTS;
-      if (subTool && prompts[`${tool}:${subTool}`]) {
-          return prompts[`${tool}:${subTool}`];
-      }
-      if (prompts[tool]) {
-          return prompts[tool];
-      }
-      return DEFAULT_TOOL_PROMPTS[tool];
-  }, [systemPromptConfig]);
-
-  const handleLogHistory = useCallback((tool: string, content: string, summary?: string, subTool?: string, toolParams?: any) => {
-      const now = new Date().toISOString();
-      const newEntry: HistoryEntry = {
-          id: generateUUID(),
-          tool,
-          subTool,
-          toolParams,
-          timestamp: now,
-          content,
-          summary
-      };
-      setHistory(prev => [newEntry, ...prev]);
-  }, []);
-
-  const handleDeleteHistory = useCallback((id: string) => {
-      setHistory(prev => prev.filter(h => h.id !== id));
-      setDetachedHistoryIds(prev => prev.filter(did => did !== id));
-  }, []);
+      return counts;
+  }, [filteredElements]);
 
   const handleAnalyzeWithChat = useCallback((context: string) => {
       setChatDraftMessage(`Context:\n${context}\n\nQuestion: `);
       panelState.setIsChatPanelOpen(true);
   }, [panelState]);
 
-  const handleDetachHistory = useCallback((id: string) => {
-      if (!detachedHistoryIds.includes(id)) {
-          setDetachedHistoryIds(prev => [...prev, id]);
-          const nextZ = panelZIndex + 1;
-          setPanelZIndex(nextZ);
-          setPanelLayouts(prev => ({
-              ...prev,
-              [`history-${id}`]: {
-                  x: window.innerWidth / 2 - 250,
-                  y: window.innerHeight / 2 - 200,
-                  w: 500,
-                  h: 400,
-                  zIndex: nextZ,
-                  isFloating: true
-              }
-          }));
-      }
-  }, [detachedHistoryIds, panelZIndex]);
-
-  // --- Tool Handlers ---
-  const handleTrizToolSelect = (tool: TrizToolType) => { tools.setActiveTrizTool(tool); tools.setIsTrizModalOpen(true); tools.setTrizInitialParams(null); tools.setActiveTool(null); };
-  const handleLssToolSelect = (tool: LssToolType) => { tools.setActiveLssTool(tool); tools.setIsLssModalOpen(true); tools.setLssInitialParams(null); tools.setActiveTool(null); };
-  const handleTocToolSelect = (tool: TocToolType) => { tools.setActiveTocTool(tool); tools.setIsTocModalOpen(true); tools.setTocInitialParams(null); tools.setActiveTool(null); };
-  const handleSsmToolSelect = (tool: SsmToolType) => { tools.setActiveSsmTool(tool); tools.setIsSsmModalOpen(true); tools.setSsmInitialParams(null); tools.setActiveTool(null); };
-  
-  const handleAnalysisToolSelect = useCallback((toolId: string) => {
-      // Close main tool menu
-      tools.setActiveTool(null);
-
-      const width = 400;
-      const height = 500;
-      const x = 100; // Floating on the left
-      const y = 160;
-
-      const nextZ = panelZIndex + 1;
-      
-      const defaultLayout: PanelLayout = { 
-          x, 
-          y, 
-          w: width, 
-          h: height, 
-          zIndex: nextZ, 
-          isFloating: true 
-      };
-
-      if (toolId === 'network') {
-          panelState.setIsNetworkAnalysisOpen(true);
-      } else if (toolId === 'tags') {
-          setPanelZIndex(nextZ);
-          if (!panelLayouts['tag-dist']) {
-               setPanelLayouts(prev => ({ ...prev, 'tag-dist': defaultLayout }));
-          }
-          panelState.setIsTagDistPanelOpen(true);
-      } else if (toolId === 'relationships') {
-          setPanelZIndex(nextZ);
-          if (!panelLayouts['rel-dist']) {
-               setPanelLayouts(prev => ({ ...prev, 'rel-dist': defaultLayout }));
-          }
-          panelState.setIsRelDistPanelOpen(true);
-      }
-  }, [panelState, panelLayouts, panelZIndex, tools, setPanelLayouts, setPanelZIndex]);
-
-  const handleExplorerToolSelect = (tool: ExplorerToolType) => {
-      // Legacy Explorer tool handling (mostly moved to Visualise / Analysis)
-      if (tool === 'sunburst') {
-          panelState.setIsSunburstPanelOpen(prev => !prev);
-          panelState.setSunburstState(prev => ({ ...prev, active: true }));
-      }
-      if (tool === 'matrix') panelState.setIsMatrixPanelOpen(prev => !prev);
-      if (tool === 'table') panelState.setIsTablePanelOpen(prev => !prev);
-      
-      // Random Walk logic moved here
-      if (tool === 'random_walk') {
-          if (!isRandomWalkOpen) {
-               // Opening: Capture focus, reset state
-               setPreWalkFocusMode(focusMode);
-               setIsRandomWalkOpen(true);
-               setWalkState(prev => ({ 
-                   ...prev, 
-                   visitedIds: new Set(), 
-                   pathHistory: [], 
-                   historyIndex: -1, 
-                   currentNodeId: null, 
-                   isPaused: true, 
-                   direction: 'forward',
-                   speedMultiplier: 1,
-                   hideDetails: false // Reset to showing details by default
-               }));
-          } else {
-               // Closing
-               setIsRandomWalkOpen(false);
-               setFocusMode(preWalkFocusMode);
-          }
-      }
-
-      tools.setActiveTool(null); 
-  };
-  const handleVisualiseToolSelect = (tool: VisualiseToolType) => {
-      if (tool === 'grid') {
-          panelState.setIsGridPanelOpen(prev => !prev);
-      } else if (tool === 'treemap') {
-          panelState.setIsTreemapPanelOpen(prev => !prev);
-      } else if (tool === 'circle_packing') {
-          if (!panelState.isCirclePackingPanelOpen) {
-               // Opening
-               const size = Math.min(window.innerWidth, window.innerHeight) * 0.8;
-               const x = (window.innerWidth - size) / 2;
-               const y = (window.innerHeight - size) / 2;
-               const nextZ = panelZIndex + 1;
-               setPanelZIndex(nextZ);
-               
-               setPanelLayouts(prev => ({
-                   ...prev,
-                   'circle_packing': {
-                       x, y, w: size, h: size, zIndex: nextZ, isFloating: true
-                   }
-               }));
-               panelState.setIsCirclePackingPanelOpen(true);
-          } else {
-               panelState.setIsCirclePackingPanelOpen(false);
-          }
-      } else if (tool === 'mermaid') {
-          panelState.setIsMermaidPanelOpen(true);
-      }
-      tools.setActiveTool(null);
-  };
-  const handleTagCloudToolSelect = (tool: TagCloudToolType) => {
-      // Create a large default centered layout for Cloud tools if not present
-      const width = Math.min(window.innerWidth * 0.8, 1000);
-      const height = Math.min(window.innerHeight * 0.8, 800);
-      const x = (window.innerWidth - width) / 2;
-      const y = (window.innerHeight - height) / 2;
-      
-      const defaultLayout = { 
-          x, 
-          y, 
-          w: width, 
-          h: height, 
-          zIndex: panelZIndex + 1, 
-          isFloating: true 
-      };
-
-      setPanelZIndex(prev => prev + 1);
-
-      if (tool === 'tags') {
-          panelState.setIsConceptCloudOpen(prev => !prev);
-          if (!panelLayouts['concept-cloud']) setPanelLayouts(prev => ({ ...prev, 'concept-cloud': defaultLayout }));
-      } else if (tool === 'nodes') {
-          panelState.setIsInfluenceCloudOpen(prev => !prev);
-          if (!panelLayouts['influence-cloud']) setPanelLayouts(prev => ({ ...prev, 'influence-cloud': defaultLayout }));
-      } else if (tool === 'words') {
-          panelState.setIsTextAnalysisOpen(prev => !prev);
-          if (!panelLayouts['text-cloud']) setPanelLayouts(prev => ({ ...prev, 'text-cloud': defaultLayout }));
-      } else if (tool === 'full_text') {
-          panelState.setIsFullTextAnalysisOpen(prev => !prev);
-          if (!panelLayouts['full-text-cloud']) setPanelLayouts(prev => ({ ...prev, 'full-text-cloud': defaultLayout }));
-      }
-      tools.setActiveTool(null);
-  };
-  const handleSwotToolSelect = (tool: SwotToolType) => { tools.setActiveSwotTool(tool); tools.setSwotInitialDoc(null); tools.setIsSwotModalOpen(true); tools.setActiveTool(null); };
-  const handleMermaidToolSelect = (tool: MermaidToolType) => { if (tool === 'editor') panelState.setIsMermaidPanelOpen(true); tools.setActiveTool(null); };
-
-  const handleAiToolSelect = useCallback((toolId: string) => {
-    tools.setActiveTool(null); // Close dropdown
-    
-    if (toolId === 'chat') {
-        panelState.setIsChatPanelOpen(true);
-    } else if (toolId === 'expand') {
-        if (selectedElementId) {
-             const el = elements.find(e => e.id === selectedElementId);
-             if (el) {
-                const prompt = promptStore.get('ai:expand:node', { name: el.name });
-                setChatDraftMessage(prompt);
-             }
-        } else {
-             const prompt = promptStore.get('ai:expand:general');
-             setChatDraftMessage(prompt);
-        }
-        panelState.setIsChatPanelOpen(true);
-    } else if (toolId === 'connect') {
-        const prompt = promptStore.get('ai:connect');
-        setChatDraftMessage(prompt);
-        panelState.setIsChatPanelOpen(true);
-    } else if (toolId === 'critique') {
-        const prompt = promptStore.get('ai:critique');
-        setChatDraftMessage(prompt);
-        panelState.setIsChatPanelOpen(true);
-    }
-}, [elements, selectedElementId, panelState, tools]);
-
-
   useEffect(() => { if (tools.activeTool !== 'bulk') { setIsBulkEditActive(false); } }, [tools.activeTool]);
 
-  // --- Use Hooks ---
-  const { runSelfTest, isSelfTestModalOpen, setIsSelfTestModalOpen, testLogs, testStatus } = useSelfTest({ panelState, tools, setPanelLayouts });
-  
+  const handleDeleteElement = useCallback((elementId: string) => { setElements(prev => prev.filter(f => f.id !== elementId)); setRelationships(prev => prev.filter(r => r.source !== elementId && r.target !== elementId)); if (selectedElementId === elementId) { setSelectedElementId(null); } if (multiSelection.has(elementId)) { const next = new Set(multiSelection); next.delete(elementId); setMultiSelection(next); } }, [selectedElementId, multiSelection]);
+
+  const aiActions: ModelActions = useModelActions({ elementsRef, setElements, relationshipsRef, setRelationships, documentsRef, setDocuments, foldersRef, setFolders, openDocIds, setOpenDocIds, onDeleteElement: handleDeleteElement });
+
   const persistence = usePersistence({
       setElements, setRelationships, setDocuments, setFolders, setHistory, setSlides, setMermaidDiagrams, setScripts,
       setColorSchemes, setActiveSchemeId, setSystemPromptConfig, setOpenDocIds, setDetachedHistoryIds,
       setPanelLayouts, setAnalysisHighlights, setAnalysisFilterState, setMultiSelection, setSelectedElementId,
       setTagFilter, setDateFilter, currentFileHandleRef,
+      setViews, setActiveViewId,
       elementsRef, relationshipsRef, documentsRef, foldersRef,
-      colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts
+      colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, views, activeViewId,
+      githubToken: globalSettings.githubToken
   });
 
-  // --- Reset Chat on new model ---
+  // Global Keyboard Shortcuts (CTRL+S for Save)
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+              e.preventDefault();
+              if (persistence.currentModelId) {
+                  persistence.handleDiskSave();
+              }
+          }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [persistence.handleDiskSave, persistence.currentModelId]);
+
+  const { runSelfTest, isSelfTestModalOpen, setIsSelfTestModalOpen, testLogs, testStatus, handlePlay, handleStop, handleRunSingle, handleSelectStep, executionIndex } = useSelfTest({ 
+      panelState, 
+      tools, 
+      setPanelLayouts,
+      persistence,
+      modelActions: aiActions,
+      setAnalysisHighlights,
+      setFocusMode,
+      setIsPhysicsModeActive,
+      setActiveSchemeId,
+      setSelectedElementId,
+      setMultiSelection,
+      onAutoLayout: handleStaticLayout,
+      elements, 
+      graphCanvasRef,
+      // New props for expanded test coverage
+      setIsCsvModalOpen: tools.setIsCsvModalOpen,
+      setIsAboutModalOpen,
+      setIsPatternGalleryModalOpen,
+      setIsUserGuideModalOpen,
+      setIsRandomWalkOpen
+  });
+
   useEffect(() => {
       if (persistence.currentModelId) {
           setChatConversation([{ role: 'model', text: "Hello! I'm your AI assistant. Ask me anything about your current model, or ask me to make changes to it." }]);
-          
-          // Auto-zoom to fit content when a model opens
           setTimeout(() => {
               if (graphCanvasRef.current) {
                   graphCanvasRef.current.zoomToFit();
@@ -606,14 +451,15 @@ export default function App() {
       }
   }, [persistence.currentModelId]);
 
-  // --- CSV Import Handler ---
   const handleImportCsv = useCallback((newElements: Element[], newRelationships: Relationship[], mode: 'merge' | 'replace', selectAfterImport?: boolean) => {
-      // Create random positions for new nodes if they don't have them (circular)
       const centerX = window.innerWidth / 2;
       const centerY = window.innerHeight / 2;
       let count = 0;
       
       newElements.forEach(e => {
+          // Ensure imported tags are normalized
+          e.tags = e.tags.map(normalizeTag);
+          
           if (e.x === undefined) {
              const angle = (count * 0.5) + Math.random();
              const radius = 100 + (5 * count);
@@ -630,10 +476,9 @@ export default function App() {
           setRelationships(newRelationships);
           alert(`Imported ${newElements.length} nodes and ${newRelationships.length} relationships (Replaced existing model).`);
       } else {
-          // Merge
           setElements(prev => {
               const prevMap = new Map(prev.map(e => [e.id, e]));
-              newElements.forEach(e => prevMap.set(e.id, e)); // Overwrite if ID matches
+              newElements.forEach(e => prevMap.set(e.id, e)); 
               return Array.from(prevMap.values());
           });
           setRelationships(prev => [...prev, ...newRelationships]);
@@ -643,108 +488,39 @@ export default function App() {
       if (selectAfterImport && newElements.length > 0) {
           const newIds = new Set(newElements.map(e => e.id));
           setMultiSelection(newIds);
-          // Clear singular selection to ensure bulk selection is active
           setSelectedElementId(null);
       }
   }, []);
-
-  const allTags = useMemo(() => { const tags = new Set<string>(); elements.forEach(element => { element.tags.forEach(tag => tags.add(tag)); }); return Array.from(tags).sort(); }, [elements]);
-  const tagCounts = useMemo(() => { const counts = new Map<string, number>(); elements.forEach(element => { element.tags.forEach(tag => { counts.set(tag, (counts.get(tag) || 0) + 1); }); }); return counts; }, [elements]);
-  useEffect(() => { setTagFilter(prevFilter => { const allTagsSet = new Set(allTags); const newIncluded = new Set<string>(); for (const tag of allTags) { const wasPreviouslyIncluded = prevFilter.included.has(tag); const wasPreviouslyExcluded = prevFilter.excluded.has(tag); if (wasPreviouslyIncluded) { newIncluded.add(tag); } else if (!wasPreviouslyExcluded) { newIncluded.add(tag); } } const newExcluded = new Set<string>(); for (const tag of prevFilter.excluded) { if (allTagsSet.has(tag)) { newExcluded.add(tag); } } return { included: newIncluded, excluded: newExcluded }; }); }, [allTags]);
-  
-  // --- Sunburst & Filter Logic ---
-  const getSunburstNodes = useCallback((centerId: string, depth: number) => {
-      const visibleIds = new Set<string>([centerId]);
-      let currentLayer = [centerId];
-      for (let i = 0; i < depth; i++) {
-          const nextLayer: string[] = [];
-          currentLayer.forEach(nodeId => {
-              relationships.forEach(rel => {
-                  if (rel.source === nodeId && !visibleIds.has(rel.target as string)) { visibleIds.add(rel.target as string); nextLayer.push(rel.target as string); }
-                  if (rel.target === nodeId && !visibleIds.has(rel.source as string)) { visibleIds.add(rel.source as string); nextLayer.push(rel.source as string); }
-              });
-          });
-          currentLayer = nextLayer;
-      }
-      return visibleIds;
-  }, [relationships]);
-
-  const filteredElements = useMemo(() => { 
-      // Handle Sunburst Panel View
-      if (panelState.isSunburstPanelOpen && panelState.sunburstState.active && panelState.sunburstState.centerId) {
-          const visibleIds = getSunburstNodes(panelState.sunburstState.centerId, panelState.sunburstState.hops);
-          return elements.filter(e => visibleIds.has(e.id));
-      }
-
-      // Handle Standard Filtering
-      let currentElements = elements;
-
-      // 1. Date Filter
-      const matchesDate = (element: Element) => { 
-          const createdDate = element.createdAt.substring(0, 10); 
-          const updatedDate = element.updatedAt.substring(0, 10); 
-          if (dateFilter.createdAfter && createdDate < dateFilter.createdAfter) return false; 
-          if (dateFilter.createdBefore && createdDate > dateFilter.createdBefore) return false; 
-          if (dateFilter.updatedAfter && updatedDate < dateFilter.updatedAfter) return false; 
-          if (dateFilter.updatedBefore && updatedDate > dateFilter.updatedBefore) return false; 
-          return true; 
-      };
-      
-      currentElements = currentElements.filter(matchesDate);
-
-      // 2. Node Hops Filter (New)
-      if (nodeFilter.active && nodeFilter.centerId) {
-          const visibleIds = getSunburstNodes(nodeFilter.centerId, nodeFilter.hops);
-          currentElements = currentElements.filter(e => visibleIds.has(e.id));
-      }
-
-      // 3. Analysis Filter (Hide/Hide Others)
-      if (analysisFilterState.mode === 'hide') {
-          currentElements = currentElements.filter(e => !analysisFilterState.ids.has(e.id));
-      } else if (analysisFilterState.mode === 'hide_others') {
-          currentElements = currentElements.filter(e => analysisFilterState.ids.has(e.id));
-      }
-
-      // 4. Tag Filter
-      const { included, excluded } = tagFilter;
-      currentElements = currentElements.filter(element => { 
-          if (excluded.has(element.tags.find(t => excluded.has(t)) || '')) return false; // Optimization? No, simple logic:
-          if (element.tags.some(tag => excluded.has(tag))) return false; 
-          
-          // If no tags are explicitly excluded and all tags are included (default state), show everything
-          if (excluded.size === 0 && included.size === allTags.length) return true; 
-          
-          // If node has no tags, show it (unless hidden by other means) - mimicking default behavior where untagged are usually visible unless strictly filtering for specific tags
-          if (element.tags.length === 0) return true; 
-          
-          return element.tags.some(tag => included.has(tag)); 
-      }); 
-
-      return currentElements;
-  }, [elements, tagFilter, allTags, dateFilter, analysisFilterState, panelState.isSunburstPanelOpen, panelState.sunburstState, getSunburstNodes, nodeFilter]);
-
-  const filteredRelationships = useMemo(() => { 
-      const visibleElementIds = new Set(filteredElements.map(f => f.id)); 
-      return relationships.filter(rel => visibleElementIds.has(rel.source as string) && visibleElementIds.has(rel.target as string)); 
-  }, [relationships, filteredElements]);
-
-  const handleDeleteElement = useCallback((elementId: string) => { setElements(prev => prev.filter(f => f.id !== elementId)); setRelationships(prev => prev.filter(r => r.source !== elementId && r.target !== elementId)); if (selectedElementId === elementId) { setSelectedElementId(null); } if (multiSelection.has(elementId)) { const next = new Set(multiSelection); next.delete(elementId); setMultiSelection(next); } }, [selectedElementId, multiSelection]);
   
   // --- Actions ---
   const handleAddElement = useCallback((coords: { x: number; y: number }) => { 
       const now = new Date().toISOString(); 
+
+      // Determine initial tags based on Active View
+      let initialTags = [...defaultTags];
+      if (activeView) {
+          const { included, excluded } = activeView.filters.tags;
+          const tagsToAdd = included.filter(t => !initialTags.includes(t));
+          initialTags = [...initialTags, ...tagsToAdd];
+          if (excluded.length > 0) {
+              const excludedSet = new Set(excluded);
+              initialTags = initialTags.filter(t => !excludedSet.has(t));
+          }
+      }
+      
+      // Normalize all tags
+      initialTags = initialTags.map(normalizeTag);
+
       const newElement: Element = { 
           id: generateUUID(), 
           name: 'New Element', 
           notes: '', 
-          tags: [...defaultTags], 
+          tags: initialTags, 
           createdAt: now, 
           updatedAt: now, 
           x: coords.x, 
           y: coords.y, 
           fx: coords.x, 
-          // CRITICAL FIX: Ensure fy uses coords.y, not coords.x. 
-          // This caused nodes to jump diagonally on creation.
           fy: coords.y, 
       }; 
       setElements(prev => [...prev, newElement]); 
@@ -752,14 +528,12 @@ export default function App() {
       setMultiSelection(new Set([newElement.id])); 
       setSelectedRelationshipId(null); 
       setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); 
-  }, [defaultTags]);
+  }, [defaultTags, activeView]);
   
-  const handleAddElementFromName = useCallback((name: string) => { const centerX = window.innerWidth / 2; const centerY = window.innerHeight / 2; const randomOffset = () => (Math.random() - 0.5) * 100; const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: name, notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: centerX + randomOffset(), y: centerY + randomOffset(), fx: null, fy: null, }; setElements(prev => [...prev, newElement]); }, [defaultTags]);
+  const handleAddElementFromName = useCallback((name: string) => { const centerX = window.innerWidth / 2; const centerY = window.innerHeight / 2; const randomOffset = () => (Math.random() - 0.5) * 100; const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: name, notes: '', tags: defaultTags.map(normalizeTag), createdAt: now, updatedAt: now, x: centerX + randomOffset(), y: centerY + randomOffset(), fx: null, fy: null, }; setElements(prev => [...prev, newElement]); }, [defaultTags]);
   const handleUpdateElement = useCallback((updatedElement: Element) => { setElements(prev => prev.map(f => f.id === updatedElement.id ? { ...updatedElement, updatedAt: new Date().toISOString() } : f)); }, []);
-  const handleBulkTagAction = useCallback((elementIds: string[], tag: string, mode: 'add' | 'remove') => { setElements(prev => prev.map(e => { if (elementIds.includes(e.id)) { let newTags = [...e.tags]; if (mode === 'add') { if (!newTags.includes(tag)) { newTags.push(tag); } else { return e; } } else { if (newTags.includes(tag)) { newTags = newTags.filter(t => t !== tag); } else { return e; } } return { ...e, tags: newTags, updatedAt: new Date().toISOString() }; } return e; })); }, []);
-  const handleAddRelationship = useCallback((relationship: Omit<Relationship, 'id' | 'tags'>, newElementData?: Omit<Element, 'id' | 'createdAt' | 'updatedAt'>) => { let finalRelationship: Relationship = { ...relationship, id: generateUUID(), tags: [] }; if (newElementData) { const now = new Date().toISOString(); const newElement: Element = { ...newElementData, id: generateUUID(), createdAt: now, updatedAt: now, }; setElements(prev => [...prev, newElement]); finalRelationship.target = newElement.id; } setRelationships(prev => [...prev, finalRelationship]); if (newElementData) { setSelectedElementId(panelStateUI.sourceElementId || null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); } else { setSelectedRelationshipId(finalRelationship.id); setSelectedElementId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); } }, [panelStateUI.sourceElementId]);
+  const handleBulkTagAction = useCallback((elementIds: string[], tag: string, mode: 'add' | 'remove') => { const normTag = normalizeTag(tag); setElements(prev => prev.map(e => { if (elementIds.includes(e.id)) { let newTags = [...e.tags]; if (mode === 'add') { if (!newTags.includes(normTag)) { newTags.push(normTag); } else { return e; } } else { if (newTags.includes(normTag)) { newTags = newTags.filter(t => t !== normTag); } else { return e; } } return { ...e, tags: newTags, updatedAt: new Date().toISOString() }; } return e; })); }, []);
   const handleAddRelationshipDirect = useCallback((relationship: Omit<Relationship, 'id' | 'tags'>) => { const newRel: Relationship = { ...relationship, id: generateUUID(), tags: [] }; setRelationships(prev => [...prev, newRel]); }, []);
-  const handleCancelAddRelationship = useCallback(() => { if (panelStateUI.isNewTarget && panelStateUI.targetElementId) { handleDeleteElement(panelStateUI.targetElementId); } setSelectedElementId(panelStateUI.sourceElementId || null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); }, [panelStateUI, handleDeleteElement]);
   const handleUpdateRelationship = useCallback((updatedRelationship: Relationship) => { setRelationships(prev => prev.map(r => r.id === updatedRelationship.id ? updatedRelationship : r)); }, []);
   const handleDeleteRelationship = useCallback((relationshipId: string) => { setRelationships(prev => prev.filter(r => r.id !== relationshipId)); setSelectedRelationshipId(null); }, []);
   const handleCreateFolder = useCallback((name: string) => { const newFolder: TapestryFolder = { id: generateUUID(), name, parentId: null, createdAt: new Date().toISOString() }; setFolders(prev => [...prev, newFolder]); }, []);
@@ -768,118 +542,20 @@ export default function App() {
   const handleDeleteFolder = useCallback((folderId: string) => { if (confirm("Delete this folder and all its contents?")) { setFolders(prev => prev.filter(f => f.id !== folderId)); setDocuments(prev => prev.filter(d => d.folderId !== folderId)); } }, []);
   const handleUpdateDocument = useCallback((docId: string, updates: Partial<TapestryDocument>) => { setDocuments(prev => prev.map(d => d.id === docId ? { ...d, ...updates, updatedAt: new Date().toISOString() } : d)); }, []);
   
-  const handleSaveMermaidDiagram = useCallback((diagram: MermaidDiagram) => { setMermaidDiagrams(prev => { const existingIndex = prev.findIndex(d => d.id === diagram.id); if (existingIndex >= 0) { const newDiagrams = [...prev]; newDiagrams[existingIndex] = diagram; return newDiagrams; } else { return [...prev, diagram]; } }); }, []);
-  const handleDeleteMermaidDiagram = useCallback((id: string) => { if (confirm("Delete this diagram?")) { setMermaidDiagrams(prev => prev.filter(d => d.id !== id)); } }, []);
-  const handleGenerateMermaid = useCallback(async (prompt: string, contextMarkdown?: string) => { 
-      setIsMermaidGenerating(true); 
-      try { 
-          const graphMarkdown = contextMarkdown || generateMarkdownFromGraph(elements, relationships); 
-          const fullPrompt = promptStore.get('mermaid:generate', { prompt, context: graphMarkdown });
-          const response = await callAI(aiConfig, fullPrompt); 
-          return response.text || ""; 
-      } catch (e) { 
-          console.error("Mermaid Gen Error", e); 
-          alert("Failed to generate diagram."); 
-          return ""; 
-      } finally { 
-          setIsMermaidGenerating(false); 
-      } 
-    }, [elements, relationships, aiConfig]);
-
-  const aiActions: ModelActions = useModelActions({ elementsRef, setElements, relationshipsRef, setRelationships, documentsRef, setDocuments, foldersRef, setFolders, openDocIds, setOpenDocIds, onDeleteElement: handleDeleteElement });
+  const handleOpenDocument = useCallback((docId: string, origin?: string) => {
+    setOpenDocIds(prev => {
+        if (prev.includes(docId)) return prev;
+        return [...prev, docId];
+    });
+  }, []);
 
   const handleCloseContextMenu = useCallback(() => setContextMenu(null), []);
   const handleCloseCanvasContextMenu = useCallback(() => setCanvasContextMenu(null), []);
   const handleCloseRelationshipContextMenu = useCallback(() => setRelationshipContextMenu(null), []);
   
-  const runImpactSimulation = (startNodeId: string) => {
-      const newSimState: Record<string, SimulationNodeState> = {};
-      const queue: { id: string, state: SimulationNodeState }[] = [];
-      newSimState[startNodeId] = simulationState[startNodeId] === 'increased' ? 'decreased' : 'increased';
-      queue.push({ id: startNodeId, state: newSimState[startNodeId] });
-      const visited = new Set<string>();
-      visited.add(startNodeId);
-      const isPositive = (label: string) => ['causes', 'increases', 'promotes', 'leads to', 'produces', 'enables', 'enhances', 'amplifies', 'reinforces'].some(k => label.toLowerCase().includes(k));
-      const isNegative = (label: string) => ['inhibits', 'decreases', 'prevents', 'reduces', 'stops', 'block', 'counteracts'].some(k => label.toLowerCase().includes(k));
-      while (queue.length > 0) {
-          const { id, state } = queue.shift()!;
-          const outgoing = relationships.filter(r => r.source === id);
-          outgoing.forEach(rel => {
-              const targetId = rel.target as string;
-              if (visited.has(targetId)) return;
-              let nextState: SimulationNodeState = 'neutral';
-              if (isPositive(rel.label)) { nextState = state; } else if (isNegative(rel.label)) { nextState = state === 'increased' ? 'decreased' : 'increased'; }
-              if (nextState !== 'neutral') { newSimState[targetId] = nextState; visited.add(targetId); queue.push({ id: targetId, state: nextState }); }
-          });
-      }
-      setSimulationState(newSimState);
-  };
-
   const handleAnalysisHighlight = useCallback((highlightMap: Map<string, string>) => { setAnalysisHighlights(highlightMap); }, []);
   const handleAnalysisFilter = useCallback((mode: 'hide' | 'hide_others' | 'none', ids: Set<string>) => { setAnalysisFilterState({ mode, ids }); }, []);
 
-  const handleToggleNodeHighlight = useCallback((elementId: string) => {
-      setElements(prev => prev.map(e => {
-          if (e.id === elementId) {
-              const newMeta = { ...(e.meta || {}) };
-              // Toggle highlight: if set, remove it. If not set, add default yellow.
-              if (newMeta.highlightColor) {
-                  delete newMeta.highlightColor;
-              } else {
-                  newMeta.highlightColor = '#facc15'; // Default yellow
-              }
-              return { ...e, meta: newMeta, updatedAt: new Date().toISOString() };
-          }
-          return e;
-      }));
-  }, []);
-
-  const handleNodeClick = useCallback((elementId: string, event: MouseEvent) => { 
-      // Manual Highlight Tool Priority
-      if (isHighlightToolActive) {
-          handleToggleNodeHighlight(elementId);
-          return;
-      }
-
-      // Random Walk Logic
-      if (isRandomWalkOpen) {
-          // If manually clicking, treat as starting a new walk or jumping
-          setWalkState(prev => ({
-              ...prev,
-              currentNodeId: elementId,
-              pathHistory: [...prev.pathHistory, elementId],
-              historyIndex: prev.historyIndex + 1,
-              visitedIds: new Set([...prev.visitedIds, elementId]),
-              isPaused: false, // Auto-start
-              direction: 'forward',
-              speedMultiplier: 1
-          }));
-          
-          const el = elements.find(e => e.id === elementId);
-          if (el && graphCanvasRef.current) {
-              graphCanvasRef.current.setCamera(-(el.x || 0) + window.innerWidth/2, -(el.y || 0) + window.innerHeight/2, 1.5);
-          }
-      }
-
-      if (isSimulationMode) { runImpactSimulation(elementId); return; }
-      if (panelState.isSunburstPanelOpen && panelState.sunburstState.active) {
-          if (!originalElements && !panelState.sunburstState.centerId) { setOriginalElements(elements); }
-          const cx = window.innerWidth / 2; const cy = window.innerHeight / 2;
-          setElements(prev => prev.map(e => { if (e.id === elementId) { return { ...e, x: cx, y: cy, fx: cx, fy: cy, vx: 0, vy: 0 }; } return { ...e, fx: null, fy: null }; }));
-          panelState.setSunburstState(prev => ({ ...prev, centerId: elementId }));
-          setIsPhysicsModeActive(true);
-          setSelectedElementId(elementId);
-          setMultiSelection(new Set([elementId]));
-          setTimeout(() => { if (graphCanvasRef.current) { graphCanvasRef.current.setCamera(0, 0, 1); } }, 50);
-          return;
-      }
-      if (isBulkEditActive) { if (bulkTagsToAdd.length === 0 && bulkTagsToRemove.length === 0) return; setElements(prev => prev.map(el => { if (el.id === elementId) { const currentTags = el.tags; let newTags = [...currentTags]; let changed = false; const lowerToRemove = bulkTagsToRemove.map(t => t.toLowerCase()); const filteredTags = newTags.filter(t => !lowerToRemove.includes(t.toLowerCase())); if (filteredTags.length !== newTags.length) { newTags = filteredTags; changed = true; } const lowerCurrent = newTags.map(t => t.toLowerCase()); const toAdd = bulkTagsToAdd.filter(t => !lowerCurrent.includes(t.toLowerCase())); if (toAdd.length > 0) { newTags = [...newTags, ...toAdd]; changed = true; } if (changed) { return { ...el, tags: newTags, updatedAt: new Date().toISOString() }; } } return el; })); return; } 
-      if (event.ctrlKey || event.metaKey) { const newMulti = new Set(multiSelection); if (newMulti.has(elementId)) { newMulti.delete(elementId); } else { newMulti.add(elementId); } setMultiSelection(newMulti); if (newMulti.has(elementId)) { setSelectedElementId(elementId); } else if (selectedElementId === elementId) { setSelectedElementId(newMulti.size > 0 ? Array.from(newMulti).pop() || null : null); } } else { setMultiSelection(new Set([elementId])); setSelectedElementId(elementId); }
-      setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseRelationshipContextMenu();
-  }, [handleCloseContextMenu, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, isSimulationMode, relationships, simulationState, multiSelection, selectedElementId, panelState.isSunburstPanelOpen, panelState.sunburstState, elements, originalElements, panelState, handleCloseRelationshipContextMenu, isRandomWalkOpen, isHighlightToolActive, handleToggleNodeHighlight]);
-  
-  const handleLinkClick = useCallback((relationshipId: string) => { setSelectedRelationshipId(relationshipId); setSelectedElementId(null); setMultiSelection(new Set()); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseRelationshipContextMenu(); }, [handleCloseContextMenu, handleCloseRelationshipContextMenu]);
-  const handleCanvasClick = useCallback(() => { setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); handleCloseCanvasContextMenu(); handleCloseRelationshipContextMenu(); setAnalysisHighlights(new Map()); }, [handleCloseContextMenu, handleCloseCanvasContextMenu, handleCloseRelationshipContextMenu]);
   const handleNodeContextMenu = useCallback((event: React.MouseEvent, elementId: string) => { event.preventDefault(); setContextMenu({ x: event.clientX, y: event.clientY, elementId }); handleCloseCanvasContextMenu(); handleCloseRelationshipContextMenu(); }, [handleCloseCanvasContextMenu, handleCloseRelationshipContextMenu]);
   
   const handleLinkContextMenu = useCallback((event: React.MouseEvent, relationshipId: string) => {
@@ -894,34 +570,8 @@ export default function App() {
   }, []);
 
   const handleCanvasContextMenu = useCallback((event: React.MouseEvent) => { event.preventDefault(); setCanvasContextMenu({ x: event.clientX, y: event.clientY }); handleCloseContextMenu(); handleCloseRelationshipContextMenu(); }, [handleCloseContextMenu, handleCloseRelationshipContextMenu]);
-  const handleNodeConnect = useCallback((sourceId: string, targetId: string) => { const currentScheme = colorSchemes.find(s => s.id === activeSchemeId); let defaultLabel = ''; if (currentScheme && currentScheme.defaultRelationshipLabel) { defaultLabel = currentScheme.defaultRelationshipLabel; } const newRelId = generateUUID(); const newRel: Relationship = { id: newRelId, source: sourceId, target: targetId, label: defaultLabel, direction: RelationshipDirection.To, tags: [] }; setRelationships(prev => [...prev, newRel]); setSelectedRelationshipId(newRelId); setSelectedElementId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); handleCloseContextMenu(); }, [activeSchemeId, colorSchemes, handleCloseContextMenu]);
-  const handleNodeConnectToNew = useCallback((sourceId: string, coords: { x: number; y: number }) => { 
-      const now = new Date().toISOString(); 
-      const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: [...defaultTags], createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.y, }; 
-      setElements(prev => [...prev, newElement]); 
-      
-      // Auto-create relationship immediately
-      const currentScheme = colorSchemes.find(s => s.id === activeSchemeId);
-      const defaultLabel = currentScheme?.defaultRelationshipLabel || '';
-      
-      const newRel: Relationship = {
-          id: generateUUID(),
-          source: sourceId,
-          target: newElement.id,
-          label: defaultLabel,
-          direction: RelationshipDirection.To,
-          tags: []
-      };
-      setRelationships(prev => [...prev, newRel]);
-      
-      setPanelStateUI({ view: 'addRelationship', sourceElementId: sourceId, targetElementId: newElement.id, isNewTarget: true }); 
-      setSelectedElementId(null); 
-      setSelectedRelationshipId(null); 
-      handleCloseContextMenu(); 
-  }, [defaultTags, handleCloseContextMenu, colorSchemes, activeSchemeId]);
-
+  
   const handleUpdateDefaultRelationship = (newLabel: string) => { if (!activeSchemeId) return; setColorSchemes(prev => prev.map(s => s.id === activeSchemeId ? { ...s, defaultRelationshipLabel: newLabel } : s)); };
-  const handleToggleFocusMode = () => { setFocusMode(prev => { if (prev === 'narrow') return 'wide'; if (prev === 'wide') return 'zoom'; return 'narrow'; }); };
   
   const handleCopy = async () => {
       const idsToCopy = multiSelection.size > 0 ? Array.from(multiSelection) : (selectedElementId ? [selectedElementId] : []);
@@ -950,104 +600,63 @@ export default function App() {
   };
 
   const handleApplyMarkdown = (markdown: string, shouldMerge: boolean = false) => { 
-    // Logic for markdown parsing (abbreviated for brevity as requested to minimize changes if possible, but this needs to be here)
-    // Reusing the existing parser logic
-    let processedMarkdown = markdown.replace(/\s*\/>\s*/g, ' -[Counteracts]-> ').replace(/(?<!\-|\[)>(?!\-|\])/g, ' -[Produces]-> '); 
-    const lines = processedMarkdown.split('\n').filter(line => { const trimmed = line.trim(); return trimmed !== '' && !trimmed.startsWith('#'); }); 
-    const parsedElements = new Map<string, { tags: string[] }>(); 
-    const parsedRels: { sourceName: string, targetName: string, label: string, direction: RelationshipDirection }[] = []; 
-    function parseElementStr(str: string) { let workStr = str.trim(); if (!workStr) return null; let name: string; let tags: string[] = []; const lastColonIndex = workStr.lastIndexOf(':'); const lastParenOpenIndex = workStr.lastIndexOf('('); if (lastColonIndex > -1 && lastColonIndex > lastParenOpenIndex) { const tagsStr = workStr.substring(lastColonIndex + 1); tags = tagsStr.split(',').map(t => t.trim()).filter(t => !!t); workStr = workStr.substring(0, lastColonIndex).trim(); } if (workStr.endsWith('+')) { workStr = workStr.slice(0, -1).trim(); tags.push('Useful'); } else if (workStr.endsWith('-')) { workStr = workStr.slice(0, -1).trim(); tags.push('Harmful'); } name = workStr; if (name.startsWith('"') && name.endsWith('"')) { name = name.substring(1, name.length - 1); } if (!name) return null; return { name, tags }; }
-    function updateParsedElement(elementData: { name: string, tags: string[] }) { const existing = parsedElements.get(elementData.name); if (existing) { const newTags = [...new Set([...existing.tags, ...elementData.tags])]; parsedElements.set(elementData.name, { tags: newTags }); } else { parsedElements.set(elementData.name, { tags: elementData.tags }); } }
-    for (const line of lines) { 
-        const relSeparatorRegex = /(<?-\[.*?]->?)/g; 
-        const parts = line.split(relSeparatorRegex); 
-        const tokens = parts.map(p => p.trim()).filter(t => !!t); 
-        if (tokens.length === 0) continue; 
-        if (tokens.length === 1) { 
-            const element = parseElementStr(tokens[0]); 
-            if (element) { updateParsedElement(element); } 
-            continue; 
-        } 
-        let currentSourceElementStr = tokens.shift(); 
-        while (tokens.length > 0) { 
-            const relStr = tokens.shift(); 
-            const targetsStr = tokens.shift(); 
-            if (!currentSourceElementStr || !relStr || !targetsStr) break; 
-            const sourceElementData = parseElementStr(currentSourceElementStr); 
-            if (!sourceElementData) break; 
-            updateParsedElement(sourceElementData); 
-            const singleRelRegex = /<?-\[(.*?)]->?/; 
-            const relMatch = relStr.match(singleRelRegex); 
-            if (!relMatch) break; 
-            const label = relMatch[1]; 
-            let direction = RelationshipDirection.None; 
-            if (relStr.startsWith('<-') && relStr.endsWith('->')) direction = RelationshipDirection.Both; // Handle Bi-directional
-            else if (relStr.startsWith('<-')) direction = RelationshipDirection.From; 
-            else if (relStr.endsWith('->')) direction = RelationshipDirection.To; 
-            const targetElementStrs = targetsStr.split(';').map(t => t.trim()).filter(t => !!t); 
-            for (const targetElementStr of targetElementStrs) { 
-                const targetElementData = parseElementStr(targetElementStr); 
-                if (targetElementData) { 
-                    updateParsedElement(targetElementData); 
-                    parsedRels.push({ sourceName: sourceElementData.name, targetName: targetElementData.name, label, direction }); 
-                } 
-            } 
-            if (targetElementStrs.length === 1) { currentSourceElementStr = targetElementStrs[0]; } else { break; } 
-        } 
-    } 
-    let nextElements: Element[] = []; let nextRelationships: Relationship[] = []; const newElementNames = new Set<string>(); 
-    if (shouldMerge) { nextElements = [...elements]; nextRelationships = [...relationships]; const existingMap = new Map<string, Element>(); const nameToIdMap = new Map<string, string>(); nextElements.forEach(e => { existingMap.set(e.name.toLowerCase(), e); nameToIdMap.set(e.name.toLowerCase(), e.id); }); parsedElements.forEach(({ tags }, name) => { const lowerName = name.toLowerCase(); const existing = existingMap.get(lowerName); if (existing) { const mergedTags = Array.from(new Set([...existing.tags, ...tags])); if (mergedTags.length !== existing.tags.length || !mergedTags.every(t => existing.tags.includes(t))) { const updated = { ...existing, tags: mergedTags, updatedAt: new Date().toISOString() }; const idx = nextElements.findIndex(e => e.id === existing.id); if (idx !== -1) nextElements[idx] = updated; existingMap.set(lowerName, updated); } } else { const now = new Date().toISOString(); const newId = generateUUID(); const newEl: Element = { id: newId, name, tags, notes: '', createdAt: now, updatedAt: now }; nextElements.push(newEl); existingMap.set(lowerName, newEl); nameToIdMap.set(lowerName, newId); newElementNames.add(name); } }); parsedRels.forEach(rel => { const sId = nameToIdMap.get(rel.sourceName.toLowerCase()); const tId = nameToIdMap.get(rel.targetName.toLowerCase()); if (sId && tId) { const exists = nextRelationships.some(r => r.source === sId && r.target === tId && r.label === rel.label && r.direction === rel.direction); if (!exists) { nextRelationships.push({ id: generateUUID(), source: sId, target: tId, label: rel.label, direction: rel.direction, tags: [] }); } } }); } else { const nameToIdMap = new Map<string, string>(); parsedElements.forEach(({ tags }, name) => { const existing = elements.find(e => e.name.toLowerCase() === name.toLowerCase()); if (existing) { const updated = { ...existing, tags, updatedAt: new Date().toISOString() }; nextElements.push(updated); nameToIdMap.set(name.toLowerCase(), existing.id); } else { const now = new Date().toISOString(); const newId = generateUUID(); const newEl: Element = { id: newId, name, tags, notes: '', createdAt: now, updatedAt: now }; nextElements.push(newEl); nameToIdMap.set(name.toLowerCase(), newId); newElementNames.add(name); } }); parsedRels.forEach(rel => { const sId = nameToIdMap.get(rel.sourceName.toLowerCase()); const tId = nameToIdMap.get(rel.targetName.toLowerCase()); if (sId && tId) { nextRelationships.push({ id: generateUUID(), source: sId, target: tId, label: rel.label, direction: rel.direction, tags: [] }); } }); } 
-    let placedNewElementsCount = 0; const positionNewElements = () => { nextElements.forEach(element => { if (newElementNames.has(element.name) && element.x === undefined) { let connectedAnchor: Element | undefined; for (const rel of nextRelationships) { let anchorId: string | undefined; if (rel.source === element.id) anchorId = rel.target as string; else if (rel.target === element.id) anchorId = rel.source as string; if (anchorId) { const potentialAnchor = nextElements.find(f => f.id === anchorId && f.x !== undefined); if (potentialAnchor) { connectedAnchor = potentialAnchor; break; } } } if (connectedAnchor && connectedAnchor.x && connectedAnchor.y) { element.x = connectedAnchor.x + (Math.random() - 0.5) * 300; element.y = connectedAnchor.y + (Math.random() - 0.5) * 300; } else { element.x = 200 + (placedNewElementsCount * 50); element.y = 200 + (placedNewElementsCount * 50); placedNewElementsCount++; } element.fx = element.x; element.fy = element.y; } }); }; 
-    positionNewElements(); positionNewElements(); setElements(nextElements); setRelationships(nextRelationships); if (!shouldMerge) panelState.setIsMarkdownPanelOpen(false); 
+    // Use the extracted utility
+    const { newElements, newRelationships } = parseMarkdownToGraph(markdown, elements, relationships, shouldMerge);
+    setElements(newElements);
+    setRelationships(newRelationships);
+    if (!shouldMerge) panelState.setIsMarkdownPanelOpen(false); 
   };
 
-  const handleStartPhysicsLayout = () => { setOriginalElements(elements); setElements(prev => prev.map(f => ({ ...f, fx: null, fy: null }))); setIsPhysicsModeActive(true); };
-  
-  const handleStaticLayout = useCallback(() => {
-      if (elements.length === 0) return;
-      
-      // Create deep clones for simulation to avoid modifying state directly during calculation
-      const nodes = elements.map(e => ({ ...e }));
-      const links = relationships.map(r => ({ ...r }));
+  const handleAddToKanban = useCallback((ids: string[], coords: {x: number, y: number}) => {
+      const attributeKey = 'Status';
+      const defaultColumn = 'To Do';
+      const targetIds = new Set(ids);
 
-      // Estimate dimensions based on text? 
-      const simulation = d3.forceSimulation(nodes)
-          .force("charge", d3.forceManyBody().strength(layoutParams.repulsion))
-          .force("link", d3.forceLink(links).id((d: any) => d.id).distance(layoutParams.linkDistance))
-          .force("center", d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2))
-          .force("collide", d3.forceCollide().radius((d: any) => {
-              // Estimate width based on name length roughly
-              const w = d.width || Math.max(160, d.name.length * 8);
-              return (w / 2) + 30; // Radius + padding
-          }).iterations(3))
-          .stop();
+      let added = 0;
+      let existing = 0;
 
-      simulation.tick(300);
+      const updates: {id: string, val: string}[] = [];
 
-      setElements(prev => {
-          const newEls = prev.map(el => {
-              const node = nodes.find(n => n.id === el.id);
-              if (node) {
-                  return { 
-                      ...el, 
-                      x: node.x, 
-                      y: node.y,
-                      fx: node.x,
-                      fy: node.y,
-                      updatedAt: new Date().toISOString()
-                  };
+      elements.forEach(el => {
+          if (targetIds.has(el.id)) {
+              if (el.attributes && el.attributes[attributeKey]) {
+                  existing++;
+              } else {
+                  added++;
+                  updates.push({id: el.id, val: defaultColumn});
               }
-              return el;
-          });
-          return newEls;
+          }
       });
-      
-  }, [elements, relationships, layoutParams]);
 
-  const handleAcceptLayout = () => { const finalPositions = graphCanvasRef.current?.getFinalNodePositions(); if (finalPositions) { const positionsMap = new Map(finalPositions.map((p: { id: string; x: number; y: number; }) => [p.id, p])); setElements(prev => prev.map(element => { const pos = positionsMap.get(element.id); const posEntry = pos as { x: number; y: number } | undefined; return posEntry ? { ...element, x: posEntry.x, y: posEntry.y, fx: posEntry.x, fy: posEntry.y } : element; })); } setIsPhysicsModeActive(false); setOriginalElements(null); };
-  const handleRejectLayout = () => { if (originalElements) { setElements(originalElements); } setIsPhysicsModeActive(false); setOriginalElements(null); };
-  const handleScaleLayout = useCallback((factor: number) => { if (isPhysicsModeActive) return; setElements(prev => { if (prev.length === 0) return prev; const xs = prev.map(e => e.x || 0); const ys = prev.map(e => e.y || 0); const avgX = xs.reduce((a,b) => a+b, 0) / prev.length; const avgY = ys.reduce((a,b) => a+b, 0) / prev.length; return prev.map(e => { const x = e.x || 0; const y = e.y || 0; const dx = x - avgX; const dy = y - avgY; const newX = avgX + dx * factor; const newY = avgY + dy * factor; return { ...e, x: newX, y: newY, fx: newX, fy: newY, updatedAt: new Date().toISOString() }; }); }); }, [isPhysicsModeActive]);
-  
+      if (added > 0) {
+           setElements(prev => prev.map(el => {
+               const update = updates.find(u => u.id === el.id);
+               if (update) {
+                   return {
+                       ...el,
+                       attributes: { ...el.attributes, [attributeKey]: update.val },
+                       updatedAt: new Date().toISOString()
+                   };
+               }
+               return el;
+           }));
+      }
+
+      let msg = '';
+      if (added > 0) {
+          msg = `Added ${added} task${added > 1 ? 's' : ''}`;
+          if (existing > 0) msg += `. ${existing} already on board`;
+      } else if (existing > 0) {
+          msg = `${existing} task${existing > 1 ? 's' : ''} already on board`;
+      } else {
+          msg = "No tasks added";
+      }
+
+      setNotification({ x: coords.x, y: coords.y, message: msg });
+      setTimeout(() => setNotification(null), 3000);
+
+  }, [elements]);
+
   const handleZoomIn = useCallback(() => {
       if (graphCanvasRef.current) {
           const { x, y, k } = graphCanvasRef.current.getCamera();
@@ -1079,7 +688,6 @@ export default function App() {
   // --- Search Handlers ---
   const handleSearch = useCallback((matchIds: Set<string>) => {
       const map = new Map<string, string>();
-      // Use Neon Green for match highlights
       matchIds.forEach(id => map.set(id, '#00ff00')); 
       setAnalysisHighlights(map);
   }, []);
@@ -1099,33 +707,16 @@ export default function App() {
       setAnalysisHighlights(new Map());
   }, [searchInitialCamera]);
 
-  const handleFocusSingle = useCallback((elementId: string) => {
-      // Simulate click to open panel
-      handleNodeClick(elementId, new MouseEvent('click'));
-      
-      // Center camera
-      const element = elements.find(e => e.id === elementId);
-      if (element && element.x !== undefined && element.y !== undefined && graphCanvasRef.current) {
-          graphCanvasRef.current.setCamera(-element.x + window.innerWidth/2, -element.y + window.innerHeight/2, 1.5);
-      }
-  }, [elements, handleNodeClick]);
-
-  // --- Random Walk Effect ---
   useEffect(() => {
       if (!isRandomWalkOpen || walkState.isPaused) return;
 
-      // Apply speed multiplier (lower interval for higher speed)
-      // Default multiplier is 1. Fast forward is 4.
-      // Base interval is waitTime * 1000
       const interval = (walkState.waitTime * 1000) / walkState.speedMultiplier;
 
       const timer = setTimeout(() => {
           const { historyIndex, pathHistory, visitedIds, direction } = walkState;
 
           if (direction === 'backward') {
-              // Rewind Logic
               const prevIndex = historyIndex - 1;
-              
               if (prevIndex >= 0) {
                   const prevNodeId = pathHistory[prevIndex];
                   setWalkState(prev => ({
@@ -1134,16 +725,11 @@ export default function App() {
                       historyIndex: prevIndex
                   }));
               } else {
-                  // Reached start of history
                   setWalkState(prev => ({ ...prev, isPaused: true }));
               }
           } else {
-              // Forward Logic
-              // 1. Check if we can move forward in history
               const nextIndex = historyIndex + 1;
-              
               if (nextIndex < pathHistory.length) {
-                  // Replaying history
                   const nextNodeId = pathHistory[nextIndex];
                   setWalkState(prev => ({
                       ...prev,
@@ -1151,42 +737,29 @@ export default function App() {
                       historyIndex: nextIndex
                   }));
               } else {
-                  // Generating new step
                   const currentNodeId = walkState.currentNodeId;
                   if (!currentNodeId) return;
 
-                  // Find potential next steps (neighbors)
                   const outgoing = relationships.filter(r => r.source === currentNodeId);
                   const candidates = outgoing.map(r => r.target as string);
-                  
-                  // Prioritize unvisited neighbors
                   const unvisitedCandidates = candidates.filter(id => !visitedIds.has(id));
                   
                   let nextNodeId;
                   
                   if (unvisitedCandidates.length > 0) {
-                      // Pick random unvisited neighbor
                       const randomIndex = Math.floor(Math.random() * unvisitedCandidates.length);
                       nextNodeId = unvisitedCandidates[randomIndex];
                   } else {
-                      // All neighbors visited (or dead end), pick random unvisited node from ANYWHERE in graph
                       const allUnvisited = elements.filter(e => !visitedIds.has(e.id));
-                      
                       if (allUnvisited.length > 0) {
                           const randomIndex = Math.floor(Math.random() * allUnvisited.length);
                           nextNodeId = allUnvisited[randomIndex].id;
                       } else {
-                          // All nodes visited! Reset and restart from random
-                          // (Or just stop?) Let's restart
                           const randomIndex = Math.floor(Math.random() * elements.length);
                           if (elements[randomIndex]) {
                               nextNodeId = elements[randomIndex].id;
-                              // Reset visited but keep path history?
-                              // Prompt said "Once all nodes visited, it starts again."
-                              // We'll clear visitedIds but keep walking.
                               setWalkState(prev => ({ ...prev, visitedIds: new Set() }));
                           } else {
-                              // Empty graph? Stop.
                               setWalkState(prev => ({ ...prev, isPaused: true }));
                               return;
                           }
@@ -1204,27 +777,22 @@ export default function App() {
                   }
               }
           }
-
       }, interval);
 
       return () => clearTimeout(timer);
   }, [walkState, isRandomWalkOpen, elements, relationships]);
 
-  // --- Effect to sync UI with Walk Step ---
   useEffect(() => {
       if (isRandomWalkOpen && walkState.currentNodeId) {
            const el = elements.find(e => e.id === walkState.currentNodeId);
            if (el) {
-               // 1. Select Node
                setSelectedElementId(walkState.currentNodeId);
                setMultiSelection(new Set([walkState.currentNodeId]));
                
-               // 2. Focus Camera
                if (graphCanvasRef.current) {
                    graphCanvasRef.current.setCamera(-(el.x || 0) + window.innerWidth/2, -(el.y || 0) + window.innerHeight/2, 1.5);
                }
                
-               // 3. Open Details if not hidden
                if (!walkState.hideDetails) {
                    setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
                }
@@ -1232,8 +800,6 @@ export default function App() {
       }
   }, [walkState.currentNodeId, isRandomWalkOpen, walkState.hideDetails]);
 
-  // --- Random Walk Focus Mode Effect ---
-  // Force 'zoom' when walking, restore previous mode when stopped/closed
   useEffect(() => {
     if (isRandomWalkOpen) {
         if (!walkState.isPaused) {
@@ -1245,28 +811,20 @@ export default function App() {
   }, [walkState.isPaused, isRandomWalkOpen, preWalkFocusMode]);
 
 
-  // --- Presentation Handlers ---
   const handleCaptureSlide = () => { const camera = graphCanvasRef.current?.getCamera() || { x: 0, y: 0, k: 1 }; const newSlide: StorySlide = { id: generateUUID(), title: `Slide ${slides.length + 1}`, description: '', camera, selectedElementId: selectedElementId }; setSlides(prev => [...prev, newSlide]); };
   const handlePlayPresentation = () => { if (slides.length > 0) { setIsPresenting(true); setCurrentSlideIndex(0); } };
   useEffect(() => { if (isPresenting && currentSlideIndex !== null && slides[currentSlideIndex]) { const slide = slides[currentSlideIndex]; graphCanvasRef.current?.setCamera(slide.camera.x, slide.camera.y, slide.camera.k); setSelectedElementId(slide.selectedElementId); } }, [currentSlideIndex, isPresenting, slides]);
 
-  // --- Panel Dragging Logic ---
   const handlePanelDragStart = (e: React.MouseEvent) => { if (!panelRef.current) return; const rect = panelRef.current.getBoundingClientRect(); dragStartRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }; if (!detailsPanelPosition) { setDetailsPanelPosition({ x: rect.left, y: rect.top }); } const handleMouseMove = (moveEvent: MouseEvent) => { if (dragStartRef.current) { setDetailsPanelPosition({ x: moveEvent.clientX - dragStartRef.current.x, y: moveEvent.clientY - dragStartRef.current.y }); } }; const handleMouseUp = () => { document.removeEventListener('mousemove', handleMouseMove); document.removeEventListener('mouseup', handleMouseUp); dragStartRef.current = null; }; document.addEventListener('mousemove', handleMouseMove); document.addEventListener('mouseup', handleMouseUp); };
-  const handleResetPanelPosition = () => { setDetailsPanelPosition(null); };
-
-  const selectedElement = useMemo(() => elements.find(f => f.id === selectedElementId), [elements, selectedElementId]);
-  const selectedRelationship = useMemo(() => relationships.find(r => r.id === selectedRelationshipId), [relationships, selectedRelationshipId]);
-  const addRelationshipSourceElement = useMemo(() => elements.find(f => f.id === panelStateUI.sourceElementId), [elements, panelStateUI.sourceElementId]);
+  
   const activeColorScheme = useMemo(() => { const current = colorSchemes.find(s => s.id === activeSchemeId); if (!current) return undefined; const defaultScheme = DEFAULT_COLOR_SCHEMES.find(d => d.id === current.id); if (defaultScheme) { const mergedTags = { ...defaultScheme.tagColors, ...current.tagColors }; const currentDefs = current.relationshipDefinitions || []; const defaultDefs = defaultScheme.relationshipDefinitions || []; const combinedDefsMap = new Map<string, RelationshipDefinition>(); defaultDefs.forEach(d => combinedDefsMap.set(d.label, d)); currentDefs.forEach(d => combinedDefsMap.set(d.label, d)); const mergedDefinitions = Array.from(combinedDefsMap.values()); const mergedDefaultLabel = current.defaultRelationshipLabel || defaultScheme.defaultRelationshipLabel; return { ...current, tagColors: mergedTags, relationshipDefinitions: mergedDefinitions, defaultRelationshipLabel: mergedDefaultLabel }; } return current; }, [colorSchemes, activeSchemeId]);
   const activeRelationshipLabels = useMemo(() => { return activeColorScheme?.relationshipDefinitions?.map(d => d.label) || []; }, [activeColorScheme]);
-  const isRightPanelOpen = panelState.isReportPanelOpen || panelState.isMarkdownPanelOpen || panelState.isJSONPanelOpen || panelState.isMatrixPanelOpen || panelState.isTablePanelOpen || panelState.isGridPanelOpen || panelState.isDocumentPanelOpen || panelState.isHistoryPanelOpen || panelState.isKanbanPanelOpen || panelState.isPresentationPanelOpen || panelState.isMermaidPanelOpen || panelState.isTreemapPanelOpen || panelState.isTagDistPanelOpen || panelState.isRelDistPanelOpen || panelState.isSunburstPanelOpen || panelState.isCirclePackingPanelOpen || panelState.isConceptCloudOpen || panelState.isInfluenceCloudOpen || panelState.isTextAnalysisOpen || panelState.isFullTextAnalysisOpen || openDocIds.length > 0 || detachedHistoryIds.length > 0 || isDebugPanelOpen;
-
+  
   // --- New Command Handlers ---
   const handleOpenCommandHistory = useCallback(() => {
     const cmdFolder = foldersRef.current.find(f => f.name === "CMD" && !f.parentId);
     let folderId = cmdFolder?.id;
     if (!folderId) {
-         // Create CMD folder manually since handleCreateModel switches context
          const id = generateUUID();
          const newFolder: TapestryFolder = { id, name: "CMD", parentId: null, createdAt: new Date().toISOString() };
          setFolders(prev => [...prev, newFolder]);
@@ -1312,11 +870,8 @@ export default function App() {
 
   const handleApplyJSONWrapper = useCallback((data: any) => {
       try {
-          // Manually apply because persistence.loadModelData is complex and resets IDs usually
-          // For Apply JSON panel, we want to just set state
           if (data.elements && Array.isArray(data.elements)) setElements(data.elements);
           if (data.relationships && Array.isArray(data.relationships)) setRelationships(data.relationships);
-          // ... (rest of simple setters)
           if (data.colorSchemes && Array.isArray(data.colorSchemes)) setColorSchemes(persistence.migrateLegacySchemes(data.colorSchemes).schemes);
           panelState.setIsJSONPanelOpen(false);
       } catch (e) {
@@ -1327,50 +882,23 @@ export default function App() {
   const handleSaveAsImage = useCallback(() => {
     if (graphCanvasRef.current) {
         const filename = `${persistence.currentModelName.replace(/ /g, '_')}_view.png`;
-        const bgColor = isDarkMode ? '#111827' : '#f9fafb'; // gray-900 or gray-50
+        const bgColor = isDarkMode ? '#111827' : '#f9fafb'; 
         graphCanvasRef.current.exportAsImage(filename, bgColor);
         setCanvasContextMenu(null);
     }
   }, [persistence.currentModelName, isDarkMode]);
 
-  const handleCompleteAddRelationship = useCallback(() => {
-      if (panelStateUI.targetElementId) {
-          setSelectedElementId(panelStateUI.targetElementId);
-      } else {
-          setSelectedElementId(panelStateUI.sourceElementId || null);
-      }
-      setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
-  }, [panelStateUI]);
-
-  // Handler to open Kanban board in a floating window (80% of screen)
   const handleOpenKanban = useCallback(() => {
       if (!panelState.isKanbanPanelOpen) {
           const width = window.innerWidth * 0.8;
           const height = window.innerHeight * 0.8;
-          const x = (window.innerWidth - width) / 2;
-          const y = (window.innerHeight - height) / 2;
-          
-          const nextZ = panelZIndex + 1;
-          setPanelZIndex(nextZ);
-          
-          setPanelLayouts(prev => ({
-              ...prev,
-              'kanban': {
-                  x,
-                  y,
-                  w: width,
-                  h: height,
-                  zIndex: nextZ,
-                  isFloating: true
-              }
-          }));
+          openPanelAt('kanban', { w: width, h: height, x: (window.innerWidth - width) / 2, y: (window.innerHeight - height) / 2 });
           panelState.setIsKanbanPanelOpen(true);
       } else {
           panelState.setIsKanbanPanelOpen(false);
       }
-  }, [panelState, panelZIndex]);
+  }, [panelState, openPanelAt]);
 
-  // Construct dynamic panel definitions using props from usePanelState and local state
   const panelDefinitions = usePanelDefinitions({
     ...panelState,
     filteredElements, filteredRelationships,
@@ -1415,16 +943,32 @@ export default function App() {
     setPanelLayouts,
     setIsPhysicsModeActive,
     setOriginalElements,
-    originalElements, // Added
-    setElements,      // Added
+    originalElements, 
+    setElements,      
     graphCanvasRef,
     aiActions,
-    isDarkMode, // Passed for styling child panels
-    isDebugPanelOpen,
-    setIsDebugPanelOpen,
-    chatMessages: chatConversation, // Pass local chat history
-    aiConfig // Pass AI Config for AI features inside panels
+    aiConfig,
+    activeView,
+    onUpdateView: handleUpdateActiveView,
+    onGenerateTapestry: handleGenerateTapestry,
+    isGeneratingTapestry,
+    
+    // View Filters
+    onTagFilterChange: setTagFilter,
+    onDateFilterChange: setDateFilter,
+    onNodeFilterChange: setNodeFilter,
+    
+    // Tag Stats
+    allTags,
+    tagCounts,
+
+    chatMessages: chatConversation,
+    isDarkMode
 });
+
+const isRightPanelOpen = useMemo(() => {
+    return panelDefinitions.some(p => p.isOpen && !panelLayouts[p.id]?.isFloating);
+}, [panelDefinitions, panelLayouts]);
 
   return (
     <div className="w-screen h-screen overflow-hidden flex flex-col relative">
@@ -1474,7 +1018,7 @@ export default function App() {
       />
 
       {/* Main Viewport Area */}
-      <div className="flex-grow relative w-full overflow-hidden">
+      <div className="flex-grow relative w-full overflow-hidden flex flex-col">
 
         {persistence.currentModelId && !isPresenting && (
             <AppHeader 
@@ -1485,7 +1029,10 @@ export default function App() {
                 onSaveDisk={persistence.handleDiskSave}
                 onCopy={handleCopy}
                 onPaste={handlePaste}
-                onOpenCsvTool={() => setIsCsvModalOpen(true)}
+                onOpenCsvTool={() => tools.setIsCsvModalOpen(true)}
+                onSaveGist={persistence.handleSaveToGist}
+                onSelfTest={runSelfTest}
+                
                 tools={tools}
                 panelState={panelState}
                 focusMode={focusMode}
@@ -1495,13 +1042,22 @@ export default function App() {
                 onOpenSettings={(tab) => { setSettingsInitialTab(tab || 'general'); setIsSettingsModalOpen(true); }}
                 onAbout={() => setIsAboutModalOpen(true)}
                 onPatternGallery={() => setIsPatternGalleryModalOpen(true)}
-                onSelfTest={runSelfTest}
                 onUserGuide={() => setIsUserGuideModalOpen(true)}
                 isDarkMode={isDarkMode}
                 onToggleTheme={handleThemeToggle}
-                onToggleDebug={() => setIsDebugPanelOpen(prev => !prev)}
+                onToggleDebug={() => panelState.setIsDebugPanelOpen(prev => !prev)}
                 onOpenKanban={handleOpenKanban}
                 hasUnsavedChanges={persistence.hasUnsavedChanges}
+                
+                // View Management
+                views={views}
+                activeViewId={activeViewId}
+                onSelectView={setActiveViewId}
+                onCreateView={handleCreateView}
+                onDuplicateView={handleDuplicateView}
+                onRenameView={handleRenameView}
+                onDeleteView={handleDeleteView}
+                onEditView={openViewDetails}
             />
         )}
         
@@ -1553,6 +1109,7 @@ export default function App() {
                 handleExplorerToolSelect={handleExplorerToolSelect}
                 handleTagCloudToolSelect={handleTagCloudToolSelect}
                 handleMermaidToolSelect={handleMermaidToolSelect}
+                handleDataToolSelect={handleDataToolSelect}
                 setSettingsInitialTab={setSettingsInitialTab}
                 setIsSettingsModalOpen={setIsSettingsModalOpen}
                 bulkTagsToAdd={bulkTagsToAdd}
@@ -1562,30 +1119,34 @@ export default function App() {
                 setIsBulkEditActive={setIsBulkEditActive}
                 handleCommandExecution={handleCommandExecution}
                 handleOpenCommandHistory={handleOpenCommandHistory}
+                handleCreateScript={createScript}
                 globalSettings={globalSettings}
                 isDarkMode={isDarkMode}
                 selectedElementId={selectedElementId}
                 handleAnalysisToolSelect={handleAnalysisToolSelect}
-                handleCreateScript={createScript}
-            />
-        )}
-
-        {panelState.isFilterPanelOpen && persistence.currentModelId && !isPresenting && (
-            <FilterPanel 
-                allTags={allTags} 
-                tagCounts={tagCounts} 
-                tagFilter={tagFilter} 
-                dateFilter={dateFilter} 
-                nodeFilter={nodeFilter}
-                elements={elements}
-                onTagFilterChange={setTagFilter} 
-                onDateFilterChange={setDateFilter} 
-                onNodeFilterChange={setNodeFilter}
-                onClose={() => panelState.setIsFilterPanelOpen(false)} 
-                isDarkMode={isDarkMode} 
+                isHighlightToolActive={isHighlightToolActive}
+                setIsHighlightToolActive={setIsHighlightToolActive}
             />
         )}
         
+        {/* Floating Filter Panel */}
+        {panelState.isFilterPanelOpen && persistence.currentModelId && !isPresenting && (
+             <FilterPanel 
+                 allTags={allTags}
+                 tagCounts={tagCounts}
+                 filteredTagCounts={filteredTagCounts}
+                 tagFilter={tagFilter}
+                 dateFilter={dateFilter}
+                 nodeFilter={nodeFilter}
+                 elements={elements}
+                 onTagFilterChange={setTagFilter}
+                 onDateFilterChange={setDateFilter}
+                 onNodeFilterChange={setNodeFilter}
+                 onClose={() => panelState.setIsFilterPanelOpen(false)}
+                 isDarkMode={isDarkMode}
+             />
+        )}
+
         {/* Network Analysis Panel */}
         {panelState.isNetworkAnalysisOpen && persistence.currentModelId && !isPresenting && (
              <NetworkAnalysisPanel 
@@ -1658,8 +1219,6 @@ export default function App() {
                     }
                 }}
                 onSprint={() => {
-                    // Sprint logic removed for brevity in refactor (same as original)
-                    // Triggering play to keep it simple for now or implement full sprint logic again
                     setWalkState(prev => ({ ...prev, isPaused: false, speedMultiplier: 5 }));
                 }}
                 hideDetails={walkState.hideDetails}
@@ -1673,6 +1232,22 @@ export default function App() {
                 speedMultiplier={walkState.speedMultiplier}
                 onOpenGuidance={() => tools.handleOpenGuidance('random_walk')}
             />
+        )}
+        
+        {/* Kanban Notification Bubble */}
+        {notification && (
+            <div 
+                className="fixed z-[2000] px-4 py-2 rounded-lg shadow-lg text-sm font-bold pointer-events-none transition-opacity duration-300"
+                style={{ 
+                    left: notification.x + 10, 
+                    top: notification.y - 10,
+                    backgroundColor: isDarkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)',
+                    color: isDarkMode ? '#4ade80' : '#15803d', // Green text
+                    border: '1px solid ' + (isDarkMode ? '#22c55e' : '#86efac')
+                }}
+            >
+                {notification.message}
+            </div>
         )}
 
         {persistence.currentModelId && !isPresenting && (
@@ -1722,7 +1297,7 @@ export default function App() {
         )}
 
         <ChatPanel className={(!panelState.isChatPanelOpen || !persistence.currentModelId || isPresenting) ? 'hidden' : ''} isOpen={panelState.isChatPanelOpen} elements={elements} relationships={relationships} colorSchemes={colorSchemes} activeSchemeId={activeSchemeId} onClose={() => panelState.setIsChatPanelOpen(false)} currentModelId={persistence.currentModelId} modelActions={aiActions} onOpenPromptSettings={() => { setSettingsInitialTab('ai_prompts'); setIsSettingsModalOpen(true); }} systemPromptConfig={systemPromptConfig} documents={documents} folders={folders} openDocIds={openDocIds} onLogHistory={handleLogHistory} onOpenHistory={() => panelState.setIsHistoryPanelOpen(true)} onOpenTool={tools.handleOpenTool} initialInput={chatDraftMessage} aiConfig={aiConfig} isDarkMode={isDarkMode} messages={chatConversation} setMessages={setChatConversation} />
-        {isDebugPanelOpen && <DebugPanel messages={debugLog} onClose={() => setIsDebugPanelOpen(false)} isDarkMode={isDarkMode} />}
+        {panelState.isDebugPanelOpen && <DebugPanel messages={chatConversation} onClose={() => panelState.setIsDebugPanelOpen(false)} isDarkMode={isDarkMode} />}
         
         <AppModals 
             tools={tools}
@@ -1753,84 +1328,101 @@ export default function App() {
             setIsPatternGalleryModalOpen={setIsPatternGalleryModalOpen}
             isUserGuideModalOpen={isUserGuideModalOpen}
             setIsUserGuideModalOpen={setIsUserGuideModalOpen}
-            isCsvModalOpen={isCsvModalOpen}
-            setIsCsvModalOpen={setIsCsvModalOpen}
+            isChangelogModalOpen={isChangelogModalOpen}
+            setIsChangelogModalOpen={setIsChangelogModalOpen}
+            isCsvModalOpen={tools.isCsvModalOpen}
+            setIsCsvModalOpen={tools.setIsCsvModalOpen}
             handleImportCsv={handleImportCsv}
+            
+            // Self Test Props
             isSelfTestModalOpen={isSelfTestModalOpen}
             setIsSelfTestModalOpen={setIsSelfTestModalOpen}
             testLogs={testLogs}
             testStatus={testStatus}
+            onSelfTestPlay={handlePlay}
+            onSelfTestStop={handleStop}
+            onSelfTestRunSingle={handleRunSingle}
+            onSelfTestSelectStep={handleSelectStep}
+            selfTestSelectedIndex={executionIndex}
+
             importFileRef={importFileRef}
             handleCustomStrategiesChange={handleCustomStrategiesChange}
             getToolPrompt={getToolPrompt}
         />
 
-        {persistence.currentModelId ? (
-            <>
-                <GraphCanvas 
-                    ref={graphCanvasRef} 
-                    elements={filteredElements} 
-                    relationships={filteredRelationships} 
-                    onNodeClick={handleNodeClick} 
-                    onLinkClick={handleLinkClick} 
-                    onCanvasClick={handleCanvasClick} 
-                    onCanvasDoubleClick={handleAddElement} 
-                    onNodeContextMenu={handleNodeContextMenu} 
-                    onLinkContextMenu={handleLinkContextMenu}
-                    onCanvasContextMenu={handleCanvasContextMenu} 
-                    onNodeConnect={handleNodeConnect} 
-                    onNodeConnectToNew={handleNodeConnectToNew} 
-                    activeColorScheme={activeColorScheme} 
-                    selectedElementId={selectedElementId}
-                    setSelectedElementId={setSelectedElementId}
-                    multiSelection={multiSelection}
-                    setMultiSelection={setMultiSelection}
-                    selectedRelationshipId={selectedRelationshipId} 
-                    focusMode={focusMode} 
-                    setElements={setElements} 
-                    isPhysicsModeActive={isPhysicsModeActive} 
-                    layoutParams={layoutParams} 
-                    onJiggleTrigger={jiggleTrigger} 
-                    isBulkEditActive={isBulkEditActive} 
-                    isSimulationMode={isSimulationMode}
-                    simulationState={simulationState} 
-                    analysisHighlights={analysisHighlights} 
-                    isDarkMode={isDarkMode}
-                    nodeShape={nodeShape}
-                    isHighlightToolActive={isHighlightToolActive}
+        <div className="flex-grow relative overflow-hidden">
+            {persistence.currentModelId ? (
+                <>
+                    <GraphCanvas 
+                        ref={graphCanvasRef} 
+                        elements={filteredElements} 
+                        relationships={filteredRelationships} 
+                        onNodeClick={handleNodeClick} 
+                        onLinkClick={handleLinkClick} 
+                        onCanvasClick={handleCanvasClick} 
+                        onCanvasDoubleClick={handleAddElement} 
+                        onNodeContextMenu={handleNodeContextMenu} 
+                        onLinkContextMenu={handleLinkContextMenu}
+                        onCanvasContextMenu={handleCanvasContextMenu} 
+                        onNodeConnect={handleNodeConnect} 
+                        onNodeConnectToNew={handleNodeConnectToNew} 
+                        activeColorScheme={activeColorScheme} 
+                        selectedElementId={selectedElementId}
+                        setSelectedElementId={setSelectedElementId}
+                        multiSelection={multiSelection}
+                        setMultiSelection={setMultiSelection}
+                        selectedRelationshipId={selectedRelationshipId} 
+                        focusMode={focusMode} 
+                        setElements={setElements} 
+                        isPhysicsModeActive={isPhysicsModeActive} 
+                        layoutParams={layoutParams} 
+                        onJiggleTrigger={jiggleTrigger} 
+                        isBulkEditActive={isBulkEditActive} 
+                        isSimulationMode={isSimulationMode}
+                        simulationState={simulationState} 
+                        analysisHighlights={analysisHighlights} 
+                        isDarkMode={isDarkMode}
+                        nodeShape={nodeShape}
+                        isHighlightToolActive={isHighlightToolActive}
+                    />
+                    <ContextMenus 
+                        contextMenu={contextMenu}
+                        relationshipContextMenu={relationshipContextMenu}
+                        canvasContextMenu={canvasContextMenu}
+                        relationships={relationships}
+                        panelState={panelState}
+                        persistence={persistence}
+                        onCloseContextMenu={handleCloseContextMenu}
+                        onCloseRelationshipContextMenu={handleCloseRelationshipContextMenu}
+                        onCloseCanvasContextMenu={handleCloseCanvasContextMenu}
+                        onDeleteElement={handleDeleteElement}
+                        onAddRelationshipFromContext={(id) => { setPanelStateUI({ view: 'addRelationship', sourceElementId: id, targetElementId: null, isNewTarget: false }); setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); }}
+                        onDeleteRelationship={handleDeleteRelationship}
+                        onChangeRelationshipDirection={handleChangeRelationshipDirection}
+                        onZoomToFit={handleZoomToFit}
+                        onAutoLayout={handleStaticLayout}
+                        onSaveAsImage={handleSaveAsImage}
+                        importFileRef={importFileRef}
+                        isDarkMode={isDarkMode}
+                        onToggleNodeHighlight={handleToggleNodeHighlight}
+                        elements={elements} 
+                        
+                        onHideFromView={handleHideFromView}
+                        
+                        multiSelection={multiSelection}
+                        onAddToKanban={handleAddToKanban}
+                    />
+                </>
+            ) : (
+                <StartScreen 
+                    isDarkMode={isDarkMode} 
+                    persistence={persistence} 
+                    importFileRef={importFileRef} 
+                    onAbout={() => setIsAboutModalOpen(true)}
+                    onUserGuide={() => setIsUserGuideModalOpen(true)}
                 />
-                <ContextMenus 
-                    contextMenu={contextMenu}
-                    relationshipContextMenu={relationshipContextMenu}
-                    canvasContextMenu={canvasContextMenu}
-                    relationships={relationships}
-                    panelState={panelState}
-                    persistence={persistence}
-                    onCloseContextMenu={handleCloseContextMenu}
-                    onCloseRelationshipContextMenu={handleCloseRelationshipContextMenu}
-                    onCloseCanvasContextMenu={handleCloseCanvasContextMenu}
-                    onDeleteElement={handleDeleteElement}
-                    onAddRelationshipFromContext={(id) => { setPanelStateUI({ view: 'addRelationship', sourceElementId: id, targetElementId: null, isNewTarget: false }); setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); }}
-                    onDeleteRelationship={handleDeleteRelationship}
-                    onChangeRelationshipDirection={handleChangeRelationshipDirection}
-                    onZoomToFit={handleZoomToFit}
-                    onAutoLayout={handleStaticLayout}
-                    onSaveAsImage={handleSaveAsImage}
-                    importFileRef={importFileRef}
-                    isDarkMode={isDarkMode}
-                    onToggleNodeHighlight={handleToggleNodeHighlight}
-                    elements={elements} // Pass elements to ContextMenus
-                />
-            </>
-        ) : (
-            <StartScreen 
-                isDarkMode={isDarkMode} 
-                persistence={persistence} 
-                importFileRef={importFileRef} 
-                onAbout={() => setIsAboutModalOpen(true)}
-                onUserGuide={() => setIsUserGuideModalOpen(true)}
-            />
-        )}
+            )}
+        </div>
       </div>
 
       {/* Status Bar at the bottom */}
@@ -1850,14 +1442,30 @@ export default function App() {
                 setOriginalElements(null);
                 panelState.setIsSunburstPanelOpen(false);
             }}
-            centerNodeName={elements.find(e => e.id === panelState.sunburstState.centerId)?.name}
-
+            centerNodeName={panelState.sunburstState.centerId ? (elements.find(e => e.id === panelState.sunburstState.centerId)?.name || 'Unknown') : null}
+            
             nodeFilterState={nodeFilter}
             onClearNodeFilter={() => setNodeFilter(prev => ({ ...prev, active: false }))}
-            filterCenterNodeName={elements.find(e => e.id === nodeFilter.centerId)?.name}
-
+            filterCenterNodeName={nodeFilter.centerId ? (elements.find(e => e.id === nodeFilter.centerId)?.name || 'Unknown') : null}
+            
             selectionCount={multiSelection.size}
-            onClearSelection={() => { setMultiSelection(new Set()); setSelectedElementId(null); }}
+            onClearSelection={() => {
+                setMultiSelection(new Set());
+                setSelectedElementId(null);
+            }}
+            activeViewName={activeView?.name}
+            
+            tapestrySvg={activeView?.tapestrySvg}
+            tapestryVisible={activeView?.tapestryVisible}
+            
+            activeSchema={activeColorScheme}
+            schemes={colorSchemes}
+            onSchemaChange={setActiveSchemeId}
+
+            // View Props
+            views={views}
+            activeViewId={activeViewId}
+            onViewChange={setActiveViewId}
           />
       )}
     </div>

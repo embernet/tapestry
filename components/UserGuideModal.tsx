@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { TOOL_DOCUMENTATION } from '../documentation';
-import { TAPESTRY_PATTERNS } from './PatternAssets';
+import { PatternGalleryView } from './PatternGalleryModal';
 
 interface ModalProps {
   onClose: () => void;
@@ -32,6 +32,58 @@ const INTERFACE_ITEMS = [
     { id: 'interface-chat', name: "AI Chat", desc: "Chat with the graph using AI.", icon: <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /> },
     { id: 'interface-settings', name: "Settings", desc: "Configure API keys and prompts.", icon: <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /> },
     { id: 'interface-zoom', name: "Zoom Fit", desc: "Center the graph.", icon: <path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" /> },
+    { id: 'interface-selftest', name: "Self Test", desc: "Run automated diagnostics on the application.", icon: <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /> },
+];
+
+const SCENARIOS = [
+    {
+        title: "System Design & Analysis",
+        desc: "Mapping software architecture, supply chains, or organizational structures to identify dependencies and single points of failure."
+    },
+    {
+        title: "Strategic Planning",
+        desc: "Using SWOT, PESTEL, or Porter's Five Forces to map external factors against internal capabilities for robust decision making."
+    },
+    {
+        title: "Innovation & Ideation",
+        desc: "Applying TRIZ or SCAMPER methodologies to systematically break out of creative blocks and solve technical contradictions."
+    },
+    {
+        title: "Process Improvement",
+        desc: "Using Lean Six Sigma or Theory of Constraints (TOC) to identify bottlenecks, waste, and root causes in complex workflows."
+    },
+    {
+        title: "Learning & Curriculum Design",
+        desc: "Mapping Knowledge Dependencies & Prerequisites. Visualizing the relationships between concepts, skills, and learning outcomes to design effective educational paths. This allows users to identify \"bottleneck concepts\" (key ideas that must be mastered before progressing) and structure courses or self-learning roadmaps logically."
+    },
+    {
+        title: "Investigative Journalism & Research",
+        desc: "Connecting Disparate Data Points. Linking entities (people, organizations, events, locations) extracted from vast amounts of unstructured text or documents. This helps uncover hidden networks, track the flow of money or influence, and verify timelines by cross-referencing sources against a structured graph."
+    },
+    {
+        title: "Conflict Resolution & Negotiation",
+        desc: "Stakeholder & Interest Mapping. Modeling the various actors involved in a dispute, their underlying interests (needs, fears, desires), and their stated positions. This visualization helps mediators or negotiators identify \"zones of possible agreement\" (ZOPA) and uncover non-obvious trade-offs or shared interests that can lead to resolution."
+    },
+    {
+        title: "Product Lifecycle Management (PLM)",
+        desc: "Tracing Requirements to Implementation. Creating a traceability graph that links high-level business requirements to specific features, code modules, and test cases. This allows teams to instantly visualize the impact of a proposed change (impact analysis) and ensures that every feature developed is directly supporting a business goal."
+    },
+    {
+        title: "Horizon Scanning & Technology Scouting",
+        desc: "Tracking Emerging Trends & Signal Convergence. Visualizing weak signals, emerging technologies, and market shifts to anticipate future disruptions. This involves linking seemingly unrelated indicators (e.g., a new patent, a startup funding round, a regulatory change) to identify potential convergence points and assess their maturity levels (e.g., using TRL - Technology Readiness Levels) against strategic goals."
+    },
+    {
+        title: "Futurology & Scenario Planning",
+        desc: "Building Alternative Future Worlds. Constructing complex cause-and-effect trees to explore \"what if\" scenarios. By mapping drivers of change (social, technological, economic) against uncertainties, users can model multiple divergent futures (e.g., \"Utopian,\" \"Dystopian,\" \"Business as Usual\") to stress-test current strategies against a range of possible outcomes."
+    },
+    {
+        title: "Scientific Hypothesis Generation",
+        desc: "Graphing Biological & Chemical Pathways. Mapping relationships between genes, proteins, chemical compounds, and observed phenotypes to identify potential drug targets or biological mechanisms. This allows researchers to visually trace pathways, spot gaps in current literature, and hypothesize new interactions that can be tested experimentally."
+    },
+    {
+        title: "Mathematical Proof Construction",
+        desc: "Visualizing Logic & Theorem Dependencies. Structuring complex mathematical proofs by breaking them down into axioms, lemmas, and theorems. This creates a visual \"dependency graph\" of logic, helping mathematicians ensure circular reasoning is avoided and that every step of a complex proof is supported by established truths or derived statements."
+    }
 ];
 
 export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true }) => {
@@ -169,6 +221,30 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
         };
     }, [isMovingWindow, isResizingWindow]);
 
+    const renderStyledText = (text: string) => {
+        if (!text) return null;
+        const regex = /(\*\*.*?\*\*|\[\[.*?\|.*?\]\])/g;
+        const parts = text.split(regex);
+        return parts.map((part, i) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                return <strong key={i}>{part.slice(2, -2)}</strong>;
+            }
+            if (part.startsWith('[[') && part.endsWith(']]')) {
+                const content = part.slice(2, -2);
+                const [label, target] = content.split('|');
+                return (
+                    <button
+                        key={i}
+                        onClick={() => setActiveTab(target as any)}
+                        className="text-blue-500 hover:underline font-medium inline bg-transparent border-0 p-0 cursor-pointer"
+                    >
+                        {label}
+                    </button>
+                );
+            }
+            return <span key={i}>{part}</span>;
+        });
+    };
 
     // Theme Classes
     const bgClass = isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200';
@@ -187,7 +263,6 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
     const searchBg = isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900';
     const highlightText = isDarkMode ? 'text-blue-200' : 'text-blue-900';
     const cardBg = isDarkMode ? 'bg-gray-800 hover:bg-gray-750' : 'bg-white hover:bg-gray-50';
-    const svgContainerBg = isDarkMode ? 'bg-gray-900 border-gray-800' : 'bg-gray-100 border-gray-300';
     const codeBlockBg = isDarkMode ? 'bg-black text-green-400' : 'bg-gray-800 text-green-300';
 
     return (
@@ -306,22 +381,12 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                             <div className="space-y-4">
                                 <h4 className={`text-xl font-bold ${textHeader}`}>Common Scenarios</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className={`p-4 rounded-lg border ${itemBg}`}>
-                                        <h5 className={`font-bold mb-2 ${sectionTitle}`}>System Design & Analysis</h5>
-                                        <p className={`text-sm ${textDesc}`}>Mapping software architecture, supply chains, or organizational structures to identify dependencies and single points of failure.</p>
-                                    </div>
-                                    <div className={`p-4 rounded-lg border ${itemBg}`}>
-                                        <h5 className={`font-bold mb-2 ${sectionTitle}`}>Strategic Planning</h5>
-                                        <p className={`text-sm ${textDesc}`}>Using SWOT, PESTEL, or Porter's Five Forces to map external factors against internal capabilities for robust decision making.</p>
-                                    </div>
-                                    <div className={`p-4 rounded-lg border ${itemBg}`}>
-                                        <h5 className={`font-bold mb-2 ${sectionTitle}`}>Innovation & Ideation</h5>
-                                        <p className={`text-sm ${textDesc}`}>Applying TRIZ or SCAMPER methodologies to systematically break out of creative blocks and solve technical contradictions.</p>
-                                    </div>
-                                    <div className={`p-4 rounded-lg border ${itemBg}`}>
-                                        <h5 className={`font-bold mb-2 ${sectionTitle}`}>Process Improvement</h5>
-                                        <p className={`text-sm ${textDesc}`}>Using Lean Six Sigma or Theory of Constraints (TOC) to identify bottlenecks, waste, and root causes in complex workflows.</p>
-                                    </div>
+                                    {SCENARIOS.map((scenario, index) => (
+                                        <div key={index} className={`p-4 rounded-lg border ${itemBg}`}>
+                                            <h5 className={`font-bold mb-2 ${sectionTitle}`}>{scenario.title}</h5>
+                                            <p className={`text-sm ${textDesc}`}>{scenario.desc}</p>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 
@@ -352,41 +417,7 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                     )}
                     
                     {activeTab === 'patterns' && (
-                        <div className="space-y-12 max-w-5xl mx-auto pb-10">
-                            {/* Philosophical Intro */}
-                            <div className="max-w-4xl mx-auto space-y-6 border-b border-gray-700/50 pb-8">
-                                <h3 className={`text-3xl font-bold ${textHeader} tracking-tight`}>The Architecture of Thought</h3>
-                                <div className={`text-base md:text-lg leading-relaxed space-y-6 ${textDesc}`}>
-                                    <p>
-                                        Creativity arises when ideas clash and form structure that drives cognition. Blank pages present challenges because they contain no stimulus.
-                                    </p>
-                                    <p className={`pl-4 border-l-4 ${isDarkMode ? 'border-blue-500/50' : 'border-blue-400'} italic ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                                        Patterns, ideas, structure, axes of change, tensions, conflicts of interest, goals, risks, and understanding of the nuances of trade-offs demand and drive creativity as a psychological imperative resulting from evolution of billions of years honing us into problem solvers that can survive in a myriad of unpredictable situations.
-                                    </p>
-                                    <p>
-                                        Seek the edges, the boundaries, the differences, find people with other perspectives and engage in dialogue. Creativity will flow like a river.
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            {/* Gallery */}
-                            <div>
-                                <h4 className={`text-xl font-bold mb-6 ${textHeader}`}>Pattern Gallery</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {TAPESTRY_PATTERNS.map((pattern, idx) => (
-                                        <div key={idx} className={`${itemBg} border rounded-lg p-5 hover:border-blue-500 transition-colors group flex flex-col`}>
-                                            <div className={`h-40 w-full mb-4 rounded flex items-center justify-center overflow-hidden border ${svgContainerBg}`}>
-                                                <div className="w-20 h-20 opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-transform">
-                                                    {pattern.svg}
-                                                </div>
-                                            </div>
-                                            <h3 className="text-lg font-bold text-blue-400 mb-2">{pattern.name}</h3>
-                                            <p className={`text-sm ${textDesc} leading-relaxed`}>{pattern.desc}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
+                        <PatternGalleryView isDarkMode={isDarkMode} />
                     )}
 
                     {activeTab === 'index' && (
@@ -471,11 +502,11 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                                             {tool.guidance.sections.map((section, sIdx) => (
                                                 <div key={sIdx} className="text-xs leading-relaxed">
                                                     {section.title && <h5 className={`font-bold mb-1 ${sectionTitle}`}>{section.title}</h5>}
-                                                    {section.text && <p className={`mb-2 ${textDesc}`}>{section.text}</p>}
+                                                    {section.text && <p className={`mb-2 ${textDesc}`}>{renderStyledText(section.text)}</p>}
                                                     {section.items && (
                                                         <ul className={`list-disc pl-4 space-y-1 ${textDesc}`}>
                                                             {section.items.map((it, i) => (
-                                                                <li key={i} dangerouslySetInnerHTML={{ __html: it.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                                                                <li key={i}>{renderStyledText(it)}</li>
                                                             ))}
                                                         </ul>
                                                     )}
@@ -678,4 +709,4 @@ markdown.open_doc(id=doc_id)`}
             </div>
         </div>
     );
-}
+};

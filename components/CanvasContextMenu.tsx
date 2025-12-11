@@ -10,18 +10,32 @@ interface CanvasContextMenuProps {
     onSaveAsImage: () => void;
     isReportOpen: boolean; isMarkdownOpen: boolean; isJSONOpen: boolean; isFilterOpen: boolean; isMatrixOpen: boolean; isTableOpen: boolean; isGridOpen: boolean;
     isDarkMode: boolean;
+    
+    // New Props for Kanban
+    multiSelection?: Set<string>;
+    onAddToKanban?: (ids: string[], coords: { x: number; y: number }) => void;
+    allElementIds?: string[]; // All visible nodes
 }
 
 export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = (props) => {
     const ref = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const handleClick = (e: MouseEvent) => { if(ref.current && !ref.current.contains(e.target as Node)) props.onClose(); }
-        document.addEventListener('mousedown', handleClick);
-        return () => document.removeEventListener('mousedown', handleClick);
-    }, [props]);
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') props.onClose();
+        }
+        
+        // Use capture phase to catch clicks even if propagation is stopped
+        document.addEventListener('mousedown', handleClick, true);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handleClick, true);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [props.onClose]);
 
     const style = {
-        top: Math.min(props.y, window.innerHeight - 300),
+        top: Math.min(props.y, window.innerHeight - 350), // Adjusted height
         left: Math.min(props.x, window.innerWidth - 200)
     };
 
@@ -30,6 +44,13 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = (props) => {
     const hoverClass = props.isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100';
     const dividerClass = props.isDarkMode ? 'border-gray-700' : 'border-gray-200';
     const labelClass = props.isDarkMode ? 'text-gray-500' : 'text-gray-400';
+    
+    const handleKanbanAdd = (e: React.MouseEvent, ids: string[]) => {
+        if (props.onAddToKanban) {
+            props.onAddToKanban(ids, { x: e.clientX, y: e.clientY });
+            props.onClose();
+        }
+    };
 
     return (
         <div ref={ref} className={`fixed border rounded shadow-xl z-50 py-1 w-56 ${bgClass}`} style={style}>
@@ -40,6 +61,23 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = (props) => {
             <div className={`border-t my-1 ${dividerClass}`}></div>
             <div className={`px-4 py-1 text-xs font-bold uppercase ${labelClass}`}>Export</div>
             <button onClick={props.onSaveAsImage} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Save as Image</button>
+
+            {props.onAddToKanban && (
+                <>
+                    <div className={`border-t my-1 ${dividerClass}`}></div>
+                    <div className={`px-4 py-1 text-xs font-bold uppercase ${labelClass}`}>Kanban</div>
+                    {props.multiSelection && props.multiSelection.size > 0 && (
+                         <button onClick={(e) => handleKanbanAdd(e, Array.from(props.multiSelection!))} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>
+                            Add {props.multiSelection.size} selected nodes...
+                        </button>
+                    )}
+                    {props.allElementIds && props.allElementIds.length > 0 && (
+                        <button onClick={(e) => handleKanbanAdd(e, props.allElementIds!)} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>
+                            Add all {props.allElementIds.length} nodes...
+                        </button>
+                    )}
+                </>
+            )}
 
             <div className={`border-t my-1 ${dividerClass}`}></div>
             <div className={`px-4 py-1 text-xs font-bold uppercase ${labelClass}`}>Panels</div>

@@ -546,6 +546,38 @@ export const TRIZ_PRINCIPLES_FULL = [
 
 export const TOOL_DOCUMENTATION: ToolDocumentationItem[] = [
     {
+        id: 'ai',
+        name: "AI Assistant",
+        color: "text-purple-400",
+        desc: "Chat, Expand, Connect, and Critique.",
+        summary: "The AI Assistant is a versatile agent capable of analyzing your graph context. It offers multiple modes: standard Chat for queries, Expand to generate new related concepts, Connect to find missing relationships, and Critique to identify logical gaps or circular reasoning.",
+        icon: (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+        ),
+        subItems: [
+            { name: "Chat", desc: "Interact with your model using natural language.", icon: <path d="M8 10h.01M12 10h.01M16 10h.01" /> },
+            { name: "Expand", desc: "Generate related concepts for selected nodes.", icon: <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4" /> },
+            { name: "Connect", desc: "Find missing links between existing nodes.", icon: <path d="M13.828 10.172a4 4 0 00-5.656 0" /> },
+            { name: "Critique", desc: "Review model logic and find gaps.", icon: <path d="M9 5H7a2 2 0 00-2 2v12" /> }
+        ],
+        guidance: {
+            title: "AI Assistant Capabilities",
+            sections: [
+                {
+                    title: "Modes of Operation",
+                    items: [
+                        "**Chat:** Freeform conversation. Ask questions about the graph's structure, content, or implications.",
+                        "**Expand:** Select a node and use 'Expand' to generate 5-10 related concepts that grow your graph.",
+                        "**Connect:** Analyze the current nodes to find logical relationships that haven't been drawn yet.",
+                        "**Critique:** A 'Red Team' mode where the AI looks for contradictions, missing evidence, or weak arguments in your model."
+                    ]
+                }
+            ]
+        }
+    },
+    {
         id: 'schema',
         name: "Schema",
         color: "text-teal-400",
@@ -1109,6 +1141,85 @@ export const TOOL_DOCUMENTATION: ToolDocumentationItem[] = [
                 {
                     title: "Breaking Thought Loops",
                     text: "Random walks help break familiar thought loops, revealing fresh insights, hidden relationships, and a broader understanding of the context. This wider perspective is often what’s needed to tackle wicked problems effectively."
+                }
+            ]
+        }
+    },
+    {
+        id: 'scripts',
+        name: "Scripting (TScript)",
+        color: "text-emerald-400",
+        desc: "Automate graph operations.",
+        summary: "Tapestry Script (TScript) is a domain-specific language based on Python syntax for automating graph operations. Its purpose is to allow power users to perform complex batch operations, analyses, or data transformations that aren't covered by the UI tools. Principles involve procedural automation and graph traversal. Use this to auto-tag nodes based on properties, generate reports, or clean up data. Tip: Use the 'Record' button to generate script code from your UI actions.",
+        icon: <path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />,
+        subItems: [
+            { name: "Editor", desc: "Write and run TScript code.", icon: <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /> },
+            { name: "Library", desc: "Saved snippets and examples.", icon: <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /> }
+        ],
+        guidance: {
+            title: "TScript Automation",
+            sections: [
+                {
+                    title: "Python-like Syntax",
+                    text: "TScript supports variables, loops (`for`), conditions (`if/else`), and basic math, using Python-style indentation."
+                },
+                {
+                    title: "API Capabilities",
+                    items: [
+                        "**Graph:** `add_node`, `add_edge`, `query_nodes`, `set_attribute`.",
+                        "**Canvas:** `select_node`, `pan_to_node`, `highlight_node`.",
+                        "**Docs:** `create_doc`, `append_text`.",
+                        "For a complete reference, see the [[Deep dive Scripting Reference|scripting]]."
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        id: 'selftest',
+        name: "Self Test",
+        color: "text-red-400",
+        desc: "System Diagnostics.",
+        summary: "A built-in diagnostic tool to verify the integrity of the application. Its purpose is to run a suite of automated tests that check core functionality like rendering, data persistence, AI connectivity, and tool operations. Use this if you suspect a bug or after an update to ensure everything is working correctly.",
+        icon: <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />,
+        guidance: {
+            title: "System Self-Test",
+            sections: [
+                {
+                    title: "Automated Verification",
+                    text: "The Self Test runs a sequence of operations in a temporary isolated environment. It creates nodes, runs algorithms, and checks UI components to ensure the system is healthy."
+                }
+            ]
+        }
+    },
+    {
+        id: 'ai',
+        name: "AI Assistant",
+        color: "text-purple-400",
+        desc: "Chat, Expand, Connect, and Critique.",
+        summary: "The AI Assistant is a versatile agent capable of analyzing your graph context. It offers multiple modes: standard Chat for queries, Expand to generate new related concepts, Connect to find missing relationships, and Critique to identify logical gaps or circular reasoning.",
+        icon: (
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+        ),
+        subItems: [
+            { name: "Chat", desc: "Interact with your model using natural language.", icon: <path d="M8 10h.01M12 10h.01M16 10h.01" /> },
+            { name: "Expand", desc: "Generate related concepts for selected nodes.", icon: <path d="M4 8V4m0 0h4M4 4l5 5m11-1V4" /> },
+            { name: "Connect", desc: "Find missing links between existing nodes.", icon: <path d="M13.828 10.172a4 4 0 00-5.656 0" /> },
+            { name: "Critique", desc: "Review model logic and find gaps.", icon: <path d="M9 5H7a2 2 0 00-2 2v12" /> }
+        ],
+        guidance: {
+            title: "AI Assistant Capabilities",
+            sections: [
+                {
+                    title: "Modes of Operation",
+                    items: [
+                        "**Chat:** Freeform conversation. Ask questions about the graph's structure, content, or implications.",
+                        "**Expand:** Select a node and use 'Expand' to generate 5-10 related concepts that grow your graph.",
+                        "**Connect:** Analyze the current nodes to find logical relationships that haven't been drawn yet.",
+                        "**Critique:** A 'Red Team' mode where the AI looks for contradictions, missing evidence, or weak arguments in your model."
+                    ]
                 }
             ]
         }

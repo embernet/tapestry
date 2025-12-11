@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { Element, Relationship, RelationshipDirection, ModelActions, TapestryDocument, TapestryFolder } from '../types';
-import { generateUUID } from '../utils';
+import { generateUUID, normalizeTag } from '../utils';
 
 interface UseModelActionsProps {
     elementsRef: React.MutableRefObject<Element[]>;
@@ -43,18 +43,25 @@ export const useModelActions = ({
             addElement: (data) => {
                 const now = new Date().toISOString();
                 const id = generateUUID();
-                const count = elementsRef.current.length;
-                const angle = count * 0.5;
-                const radius = 50 + (5 * count);
-                const centerX = window.innerWidth / 2;
-                const centerY = window.innerHeight / 2;
-                const x = centerX + radius * Math.cos(angle);
-                const y = centerY + radius * Math.sin(angle);
+                
+                let x = data.x;
+                let y = data.y;
+
+                if (x === undefined || y === undefined) {
+                    const count = elementsRef.current.length;
+                    const angle = count * 0.5;
+                    const radius = 50 + (5 * count);
+                    const centerX = window.innerWidth / 2;
+                    const centerY = window.innerHeight / 2;
+                    x = centerX + radius * Math.cos(angle);
+                    y = centerY + radius * Math.sin(angle);
+                }
+
                 const newElement: Element = { 
                     id, 
                     name: data.name, 
                     notes: data.notes || '', 
-                    tags: data.tags || [], 
+                    tags: (data.tags || []).map(normalizeTag), 
                     attributes: data.attributes || {}, 
                     customLists: data.customLists || {},
                     createdAt: now, 
@@ -71,8 +78,14 @@ export const useModelActions = ({
             updateElement: (name, data) => {
                 const element = findElementByName(name);
                 if (!element) return false;
+                
                 const updatedElement = { ...element, ...data, updatedAt: new Date().toISOString() };
-                if (data.tags) { updatedElement.tags = Array.from(new Set([...element.tags, ...data.tags])); }
+                
+                // Explicitly replace tags if provided to allow reordering or removal
+                if (data.tags) { 
+                    updatedElement.tags = data.tags.map(normalizeTag); 
+                }
+                
                 elementsRef.current = elementsRef.current.map(e => e.id === element.id ? updatedElement : e);
                 setElements(prev => prev.map(e => e.id === element.id ? updatedElement : e));
                 return true;

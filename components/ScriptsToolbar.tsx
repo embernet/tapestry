@@ -69,10 +69,6 @@ const ScriptsToolbar: React.FC<ScriptsToolbarProps> = ({
                  </div>
              </button>
 
-             <div className={`p-2 border-b border-t text-[10px] font-bold uppercase tracking-wider text-center ${headerBg} ${textHeader}`}>
-                 Examples
-             </div>
-
              {EXAMPLE_SCRIPTS.map(ex => (
                  <button
                     key={ex.id}

@@ -18,3 +18,4 @@ export * from './SelfTestModal';
 export * from './UserGuideModal';
 export * from './AiDisclaimer';
 export * from './CreatorInfo';
+export * from './ChangelogModal';

@@ -2,14 +2,16 @@
 import React, { useRef, useEffect } from 'react';
 import { TapestryAnimator } from './TapestryAnimator';
 import { CreatorInfo } from './CreatorInfo';
+import { APP_VERSION, VERSION_NAME } from '../constants';
 
 interface ModalProps {
   onClose: () => void;
   isDarkMode?: boolean;
   onUserGuideClick?: () => void;
+  onChangelogClick?: () => void;
 }
 
-export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true, onUserGuideClick }) => {
+export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true, onUserGuideClick, onChangelogClick }) => {
     const ref = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const handleClick = (e: MouseEvent) => { if(ref.current && !ref.current.contains(e.target as Node)) onClose(); }
@@ -44,7 +46,11 @@ export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true, o
                         </div>
                         <div>
                             <h2 className={`text-4xl font-bold ${headerClass} tracking-tight`}>Tapestry Studio</h2>
-                            <p className="text-blue-400 text-xs font-bold uppercase tracking-[0.2em] mt-1">Visual Knowledge Graph</p>
+                            <div className="flex items-center gap-2 mt-1">
+                                <p className="text-blue-400 text-xs font-bold uppercase tracking-[0.2em]">Visual Knowledge Graph</p>
+                                <span className={`text-xs px-2 py-0.5 rounded font-mono ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>v{APP_VERSION}</span>
+                            </div>
+                            <p className={`text-xs mt-1 italic opacity-70 ${textClass}`}>{VERSION_NAME}</p>
                         </div>
                     </div>
 
@@ -53,22 +59,41 @@ export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true, o
                         Tapestry Studio is a tool for creating and exploring knowledge graphs. It helps you understand the relationships between ideas, people, organisations, and actions to find ways to improve situations and plan what to do next. It is a space for reflection, communication, and innovation.
                     </p>
 
-                    {onUserGuideClick && (
-                        <div className={`p-4 rounded border mb-8 flex items-center justify-between ${isDarkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'}`}>
-                            <div className="flex items-center gap-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                </svg>
-                                <span className={`font-medium ${isDarkMode ? 'text-blue-100' : 'text-blue-900'}`}>New to Tapestry?</span>
+                    <div className="grid grid-cols-2 gap-4 mb-8">
+                        {onUserGuideClick && (
+                            <div className={`p-4 rounded border flex flex-col gap-3 items-start ${isDarkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200'}`}>
+                                <div className="flex items-center gap-2 font-medium">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                                    </svg>
+                                    <span className={`${isDarkMode ? 'text-blue-100' : 'text-blue-900'}`}>Documentation</span>
+                                </div>
+                                <button 
+                                    onClick={onUserGuideClick}
+                                    className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-sm transition-colors"
+                                >
+                                    User Guide
+                                </button>
                             </div>
-                            <button 
-                                onClick={onUserGuideClick}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-bold text-sm transition-colors"
-                            >
-                                Open User Guide
-                            </button>
-                        </div>
-                    )}
+                        )}
+
+                        {onChangelogClick && (
+                            <div className={`p-4 rounded border flex flex-col gap-3 items-start ${isDarkMode ? 'bg-purple-900/20 border-purple-800' : 'bg-purple-50 border-purple-200'}`}>
+                                <div className="flex items-center gap-2 font-medium">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                    </svg>
+                                    <span className={`${isDarkMode ? 'text-purple-100' : 'text-purple-900'}`}>What's New</span>
+                                </div>
+                                <button 
+                                    onClick={onChangelogClick}
+                                    className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded font-bold text-sm transition-colors"
+                                >
+                                    Changelog
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
                     <div className={`border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} my-6`}></div>
                     <div className={`flex flex-col items-center gap-2 mt-8`}>

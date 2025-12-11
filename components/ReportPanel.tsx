@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Element, Relationship, RelationshipDirection, TapestryDocument, TapestryFolder, ColorScheme } from '../types';
-import { generateElementMarkdown } from '../utils';
+import { generateElementMarkdown, formatTag } from '../utils';
 
 interface ReportPanelProps {
   elements: Element[];
@@ -86,7 +86,7 @@ const ElementReportSection: React.FC<{
     <div id={`element-report-${element.id}`} className="py-4 scroll-mt-4">
       <h2 className={`text-xl font-bold mb-2 border-b pb-1 ${headingClass}`}>{element.name}</h2>
       <div className={`pl-2 space-y-2 ${textClass}`}>
-        {element.tags.length > 0 && <p><strong className={`font-semibold w-20 inline-block ${labelClass}`}>Tags:</strong> {element.tags.join(', ')}</p>}
+        {element.tags.length > 0 && <p><strong className={`font-semibold w-20 inline-block ${labelClass}`}>Tags:</strong> {element.tags.map(formatTag).join(', ')}</p>}
         
         {element.attributes && Object.keys(element.attributes).length > 0 && (
              <div className="mb-2">
@@ -104,7 +104,7 @@ const ElementReportSection: React.FC<{
                 {Object.entries(mergedCustomLists).map(([name, items]) => {
                     const listItems = items as string[];
                     return (
-                        listItems && listItems.length > 0 && (
+                        listItems && listItems.length > 0 ? (
                             <div key={name} className="mb-2">
                                 <strong className={`font-semibold block ${labelClass} mb-1`}>{name}:</strong>
                                 <ul className="list-disc list-inside pl-4 text-sm">
@@ -113,7 +113,7 @@ const ElementReportSection: React.FC<{
                                     ))}
                                 </ul>
                             </div>
-                        )
+                        ) : null
                     );
                 })}
              </div>
@@ -251,7 +251,7 @@ const WysiwigReport: React.FC<{
                 <h3 className={`text-lg font-semibold mb-2 ${subHeadingClass}`}>Tag Usage</h3>
                 {tagStats.size > 0 ? (
                     <ul className="list-disc list-inside">
-                        {Array.from(tagStats.entries()).map(([tag, count]) => <li key={tag}>{tag}: {count}</li>)}
+                        {Array.from(tagStats.entries()).map(([tag, count]) => <li key={tag}>{formatTag(tag)}: {count}</li>)}
                     </ul>
                 ) : <p className="text-gray-500">No tags used.</p>}
             </div>
@@ -300,7 +300,7 @@ const generateMarkdownReport = (
 
   appendixLines.push("\n## Tag Usage");
   if (tagStats.size > 0) {
-      Array.from(tagStats.entries()).forEach(([tag, count]) => appendixLines.push(`- ${tag}: ${count}`));
+      Array.from(tagStats.entries()).forEach(([tag, count]) => appendixLines.push(`- ${formatTag(tag)}: ${count}`));
   } else {
       appendixLines.push("No tags used.");
   }

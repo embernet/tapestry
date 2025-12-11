@@ -1,5 +1,6 @@
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { ColorScheme, GraphView } from '../types';
 
 interface StatusBarProps {
   nodeCount: number;
@@ -21,6 +22,22 @@ interface StatusBarProps {
   // Selection Mode
   selectionCount: number;
   onClearSelection: () => void;
+
+  activeViewName?: string;
+  
+  // View Decor
+  tapestrySvg?: string;
+  tapestryVisible?: boolean;
+
+  // Schema
+  activeSchema?: ColorScheme;
+  schemes?: ColorScheme[];
+  onSchemaChange?: (id: string) => void;
+
+  // Views
+  views?: GraphView[];
+  activeViewId?: string;
+  onViewChange?: (id: string) => void;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -36,8 +53,39 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   onClearNodeFilter,
   filterCenterNodeName,
   selectionCount,
-  onClearSelection
+  onClearSelection,
+  activeViewName,
+  tapestrySvg,
+  tapestryVisible,
+  activeSchema,
+  schemes,
+  onSchemaChange,
+  views,
+  activeViewId,
+  onViewChange
 }) => {
+  const [isSchemaMenuOpen, setIsSchemaMenuOpen] = useState(false);
+  const [isViewMenuOpen, setIsViewMenuOpen] = useState(false);
+  const schemaMenuRef = useRef<HTMLDivElement>(null);
+  const viewMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+        if (schemaMenuRef.current && !schemaMenuRef.current.contains(event.target as Node)) {
+            setIsSchemaMenuOpen(false);
+        }
+        if (viewMenuRef.current && !viewMenuRef.current.contains(event.target as Node)) {
+            setIsViewMenuOpen(false);
+        }
+    };
+    if (isSchemaMenuOpen || isViewMenuOpen) {
+        document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSchemaMenuOpen, isViewMenuOpen]);
+
   const bgClass = isDarkMode ? 'bg-gray-900 border-t border-gray-800 text-gray-400' : 'bg-white border-t border-gray-200 text-gray-600';
   const activeModeClass = isDarkMode ? 'bg-blue-900/30 text-blue-300 border-blue-800' : 'bg-blue-50 text-blue-700 border-blue-200';
 
@@ -45,12 +93,112 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   const displayEdgeCount = edgeCount === totalEdgeCount ? edgeCount : `${edgeCount} / ${totalEdgeCount}`;
 
   return (
-    <div className={`h-8 w-full flex items-center justify-between px-4 text-xs select-none z-[500] flex-shrink-0 ${bgClass}`}>
+    <div className={`h-8 w-full flex items-center px-4 text-xs select-none z-[500] flex-shrink-0 ${bgClass}`}>
       
       {/* Left: Stats */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-shrink-0">
+        
+        {/* View Selector */}
+        {views && activeViewId && onViewChange ? (
+             <div className="relative" ref={viewMenuRef}>
+                <button
+                    onClick={() => setIsViewMenuOpen(!isViewMenuOpen)}
+                    className={`font-bold flex items-center gap-1 cursor-pointer transition-colors ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-800 hover:text-black'}`}
+                    title="Change Active View"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 opacity-70" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" />
+                        <path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" />
+                    </svg>
+                    {views.find(v => v.id === activeViewId)?.name || activeViewName || 'Unknown View'}
+                </button>
+
+                {isViewMenuOpen && (
+                    <div className={`absolute bottom-full left-0 mb-2 w-48 rounded shadow-xl border overflow-hidden z-[1000] ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
+                        <div className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider opacity-50 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                            Select View
+                        </div>
+                        <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                            {views.map(v => (
+                                <button
+                                    key={v.id}
+                                    onClick={() => {
+                                        onViewChange(v.id);
+                                        setIsViewMenuOpen(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-xs font-medium truncate flex items-center justify-between ${
+                                        v.id === activeViewId
+                                        ? (isDarkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700')
+                                        : (isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100')
+                                    }`}
+                                >
+                                    {v.name}
+                                    {v.id === activeViewId && <span className="text-[10px] opacity-70">✓</span>}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+             </div>
+        ) : activeViewName ? (
+             <div className={`font-bold flex items-center gap-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 opacity-70" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M4 3a2 2 0 100 4h12a2 2 0 100-4H4z" />
+                    <path fillRule="evenodd" d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" clipRule="evenodd" />
+                 </svg>
+                 {activeViewName}
+             </div>
+        ) : null}
+
+        {/* Schema Selector */}
+        {activeSchema && schemes && onSchemaChange && (
+            <>
+                <div className="w-px h-3 bg-gray-600 mx-2"></div>
+                <div className="relative" ref={schemaMenuRef}>
+                    <button
+                        onClick={() => setIsSchemaMenuOpen(!isSchemaMenuOpen)}
+                        className={`font-bold flex items-center gap-1 cursor-pointer transition-colors ${isDarkMode ? 'text-gray-300 hover:text-white' : 'text-gray-800 hover:text-black'}`}
+                        title="Change Active Schema"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 opacity-70" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                        </svg>
+                        {activeSchema.name}
+                    </button>
+
+                    {isSchemaMenuOpen && (
+                        <div className={`absolute bottom-full left-0 mb-2 w-48 rounded shadow-xl border overflow-hidden z-[1000] ${isDarkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
+                            <div className={`px-3 py-2 text-[10px] font-bold uppercase tracking-wider opacity-50 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                                Select Schema
+                            </div>
+                            <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                                {schemes.map(s => (
+                                    <button
+                                        key={s.id}
+                                        onClick={() => {
+                                            onSchemaChange(s.id);
+                                            setIsSchemaMenuOpen(false);
+                                        }}
+                                        className={`w-full text-left px-3 py-2 text-xs font-medium truncate flex items-center justify-between ${
+                                            s.id === activeSchema.id
+                                            ? (isDarkMode ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700')
+                                            : (isDarkMode ? 'text-gray-300 hover:bg-gray-700' : 'text-gray-700 hover:bg-gray-100')
+                                        }`}
+                                    >
+                                        {s.name}
+                                        {s.id === activeSchema.id && <span className="text-[10px] opacity-70">✓</span>}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </>
+        )}
+
+        <div className="w-px h-3 bg-gray-600 mx-2"></div>
         <div className="flex items-center gap-1" title="Visible / Total Nodes">
-            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s-8-1.79-8-4" /></svg>
             <span className="font-mono font-bold">{displayNodeCount}</span>
             <span>Nodes</span>
         </div>
@@ -67,8 +215,18 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         )}
       </div>
 
-      {/* Center/Right: Modes */}
-      <div className="flex items-center gap-2">
+      {/* Center: Tapestry Runner */}
+      <div className="flex-grow h-full mx-4 relative overflow-hidden flex items-center justify-center opacity-30 pointer-events-none">
+         {tapestryVisible && tapestrySvg && (
+             <div 
+                 className="w-full h-full flex items-center"
+                 dangerouslySetInnerHTML={{ __html: tapestrySvg }} 
+             />
+         )}
+      </div>
+
+      {/* Right: Modes */}
+      <div className="flex items-center gap-2 flex-shrink-0">
           {sunburstState.active && (
               <div className={`flex items-center gap-2 px-2 py-0.5 rounded border ${activeModeClass}`}>
                   <span className="uppercase font-bold tracking-wider text-[10px]">Sunburst Mode</span>

@@ -22,8 +22,18 @@ export const RelationshipContextMenu: React.FC<RelationshipContextMenuProps> = (
         const handleClick = (e: MouseEvent) => { 
             if(ref.current && !ref.current.contains(e.target as Node)) onClose(); 
         }
-        document.addEventListener('mousedown', handleClick);
-        return () => document.removeEventListener('mousedown', handleClick);
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        }
+
+        // Use capture phase to catch clicks even if propagation is stopped
+        document.addEventListener('mousedown', handleClick, true);
+        document.addEventListener('keydown', handleKeyDown);
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClick, true);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
     }, [onClose]);
 
     // Prevent going off screen

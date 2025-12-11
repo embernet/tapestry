@@ -1,5 +1,5 @@
 
-import { Element, Relationship, RelationshipDirection, ChatMessage, ColorScheme } from './types';
+import { Element, Relationship, RelationshipDirection, ChatMessage, ColorScheme, GraphView, AIConfig } from './types';
 import { GoogleGenAI } from '@google/genai';
 
 /**
@@ -13,6 +13,15 @@ export const generateUUID = (): string => {
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+};
+
+export const normalizeTag = (tag: string): string => {
+  return tag.trim().toLowerCase();
+};
+
+export const formatTag = (tag: string): string => {
+  if (!tag) return '';
+  return tag.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
 };
 
 /**
@@ -44,6 +53,34 @@ export const isInIframe = () => {
   }
 };
 
+export const compareVersions = (a: string, b: string): number => {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const na = pa[i] || 0;
+    const nb = pb[i] || 0;
+    if (na > nb) return 1;
+    if (nb > na) return -1;
+  }
+  return 0;
+};
+
+export const createDefaultView = (): GraphView => {
+    return {
+        id: generateUUID(),
+        name: 'Full Graph',
+        description: 'Default view showing all nodes and relationships.',
+        tapestryVisible: false,
+        filters: {
+            tags: { included: [], excluded: [] },
+            date: { createdAfter: '', createdBefore: '', updatedAfter: '', updatedBefore: '' },
+            nodeFilter: { centerId: null, hops: 1, active: false }
+        },
+        explicitInclusions: [],
+        explicitExclusions: []
+    };
+};
+
 export const generateMarkdownFromGraph = (elements: Element[], relationships: Relationship[]): string => {
   const elementMap = new Map(elements.map(f => [f.id, f]));
   const handledElementIds = new Set<string>();
@@ -63,7 +100,7 @@ export const generateMarkdownFromGraph = (elements: Element[], relationships: Re
     let str = needsQuotes ? `"${element.name}"` : element.name;
 
     if (element.tags && element.tags.length > 0) {
-      str += `:${element.tags.join(',')}`;
+      str += `:${element.tags.map(formatTag).join(',')}`;
     }
     
     str += formatAttributes(element.attributes);
@@ -154,7 +191,7 @@ export const generateElementMarkdown = (
   const elementMap = new Map(allElements.map(e => [e.id, e]));
   const lines: string[] = [`## ${element.name}`];
   
-  if (element.tags.length > 0) lines.push(`**Tags:** ${element.tags.join(', ')}`);
+  if (element.tags.length > 0) lines.push(`**Tags:** ${element.tags.map(formatTag).join(', ')}`);
   if (element.attributes && Object.keys(element.attributes).length > 0) {
       lines.push("**Attributes:**");
       Object.entries(element.attributes).forEach(([k, v]) => {
@@ -234,19 +271,13 @@ export const generateSelectionReport = (elements: Element[], relationships: Rela
             }).filter(Boolean).join('\n');
         }
 
-        return `${el.name}\nTags: ${el.tags.join(', ')}\nRelationships:\n${relStrings}`;
+        return `${el.name}\nTags: ${el.tags.map(formatTag).join(', ')}\nRelationships:\n${relStrings}`;
     }).join('\n\n');
 };
 
 // --- AI Service Adapter ---
 
-export interface AIConfig {
-    provider: string;
-    apiKey: string;
-    modelId: string;
-    baseUrl?: string;
-    language?: string;
-}
+export { AIConfig };
 
 export const aiLogger = {
   listeners: [] as ((msg: ChatMessage) => void)[],

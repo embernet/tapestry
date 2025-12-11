@@ -181,9 +181,9 @@ export const CirclePackingPanel: React.FC<CirclePackingPanelProps> = ({
             .size([width, height])
             .padding(3);
 
-        const root = d3.hierarchy(hierarchyData)
+        const root: any = d3.hierarchy(hierarchyData)
             .sum((d: any) => d.value)
-            .sort((a, b) => (b.value || 0) - (a.value || 0));
+            .sort((a: any, b: any) => (b.value || 0) - (a.value || 0));
 
         const nodes = pack(root).descendants();
         
@@ -194,7 +194,7 @@ export const CirclePackingPanel: React.FC<CirclePackingPanelProps> = ({
             if (found) initialFocus = found;
         }
 
-        let focus = initialFocus;
+        let focus: any = initialFocus;
         let view: [number, number, number];
 
         // Color Scale for Groups (Depth based)
@@ -267,8 +267,8 @@ export const CirclePackingPanel: React.FC<CirclePackingPanelProps> = ({
             if (d.parent === focus) return 1;
 
             // Rule 2: Label Modes
-            if (labelMode === 'always') return (d.r * k > 10) ? 1 : 0; // Basic clutter filter
-            if (labelMode === 'zoom') return (d.r * k > 40) ? 1 : 0; // Only large ones
+            if (labelMode === 'always') return ((d as any).r * k > 10) ? 1 : 0; // Basic clutter filter
+            if (labelMode === 'zoom') return ((d as any).r * k > 40) ? 1 : 0; // Only large ones
             
             // Rule 3: Hover mode default state is hidden (unless rule 1 applies)
             if (labelMode === 'hover') return 0;
@@ -318,7 +318,7 @@ export const CirclePackingPanel: React.FC<CirclePackingPanelProps> = ({
                 .attr("transform", (d: any) => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`)
                 .attr("width", (d: any) => d.r * 2 * k)
                 .attr("height", (d: any) => d.r * 2 * k)
-                .attr("x", (d: any) => -d.r * k)
+                .attr("x", (d: any) => -d.r * k) // Access r from any cast
                 .attr("y", (d: any) => -d.r * k)
                 .style("display", (d: any) => (d.r * k > 10) ? "inline" : "none");
 

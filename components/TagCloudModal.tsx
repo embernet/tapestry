@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship } from '../types';
-import { AIConfig, callAI } from '../utils';
+import { AIConfig, callAI, formatTag } from '../utils';
 import { Type } from '@google/genai';
 import { promptStore } from '../services/PromptStore';
 
@@ -113,7 +113,7 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
         const counts = new Map<string, number>();
         elements.forEach(e => e.tags.forEach(t => counts.set(t, (counts.get(t) || 0) + 1)));
         const max = Math.max(...Array.from(counts.values()), 1);
-        const rawItems = Array.from(counts.entries()).map(([text, value]) => ({ text, value }));
+        const rawItems = Array.from(counts.entries()).map(([text, value]) => ({ text: formatTag(text), originalText: text, value }));
         return { items: rawItems, max };
     }, [elements]);
 
@@ -378,7 +378,7 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
         if (currentView.type === 'all_nodes') return 'Relationship Cloud';
         if (currentView.type === 'all_words') return 'Node Name Analysis';
         if (currentView.type === 'all_full_text') return 'Full Text Analysis';
-        if (currentView.type === 'elements_by_tag') return `Elements: ${currentView.tag}`;
+        if (currentView.type === 'elements_by_tag') return `Elements: ${formatTag(currentView.tag)}`;
         if (currentView.type === 'elements_by_word') return `Elements with "${currentView.word}"`;
         return 'Word Cloud';
     };

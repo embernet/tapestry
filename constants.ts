@@ -2,6 +2,69 @@
 import { ColorScheme, SystemPromptConfig, ScriptSnippet } from './types';
 import { promptStore } from './services/PromptStore';
 
+export const APP_VERSION = '0.5.0';
+export const VERSION_NAME = 'Pattern Weaver';
+
+export interface ChangelogEntry {
+    version: string;
+    date: string;
+    changes: string[];
+}
+
+export const CHANGELOG: ChangelogEntry[] = [
+    {
+        version: '0.5.0',
+        date: '2025-12-09',
+        changes: [
+            'Tapestry Script (TScript): Automate graph operations with a Python-like syntax.',
+            'Self-Test Diagnostic Tool: Automated verification of system integrity.',
+            'Enhanced User Guide: Searchable documentation and interactive tool references.',
+            'Pattern Gallery: Explore systemic patterns like "The Weave" and "The Helix".'
+        ]
+    },
+    {
+        version: '0.4.0',
+        date: '2025-11-30',
+        changes: [
+            'Explorer Tools: Sunburst visualization, Random Walk mode, and Adjacency Matrix.',
+            'Word Cloud Transformations: AI-powered linguistic shifts (Antonyms, Synonyms, Metaphors).',
+            'Visualisation Suite: Treemaps, Circle Packing, and Attribute Grid.',
+            'Story Mode: Capture and present graph views sequentially.',
+            'Advanced View Management: Save custom views with specific filters and layouts.'
+        ]
+    },
+    {
+        version: '0.3.0',
+        date: '2025-11-25',
+        changes: [
+            'AI Strategy Tools: SWOT, PESTEL, Porter’s Five Forces, and Custom Matrix builders.',
+            'Problem Solving Frameworks: TRIZ, SCAMPER, Lean Six Sigma, and Soft Systems Methodology.',
+            'Diagram Editor: Mermaid.js integration for generating flowcharts from graph data.',
+            'Kanban Board: Manage nodes as tasks with drag-and-drop columns.'
+        ]
+    },
+    {
+        version: '0.2.0',
+        date: '2025-11-23',
+        changes: [
+            'AI Assistant: Chat, Expand, Connect, and Critique modes.',
+            'Graph Analysis: Network stats, articulation points, and structural filters.',
+            'Word Clouds: Visualise Tag and Node Name frequencies.',
+            'Bulk Edit: Tools for mass tagging and property updates.'
+        ]
+    },
+    {
+        version: '0.1.0',
+        date: '2025-11-20',
+        changes: [
+            'Initial Release: Core Graph Editor with Nodes and Relationships.',
+            'Persistence: Save/Load models to local browser storage or disk.',
+            'Data Formats: Import/Export support for Markdown and JSON.',
+            'Basic Filtering: Filter nodes by tags and dates.'
+        ]
+    }
+];
+
 export const NODE_MAX_WIDTH = 160;
 export const NODE_PADDING = 10;
 export const LINK_DISTANCE = 250;
@@ -108,12 +171,15 @@ Available Tools (Libraries):
    - delete_node(id="...") -> returns boolean
    - add_edge(source="ID", target="ID", label="...") -> returns edge object
    - get_neighbors(id="...") -> returns list of nodes
-   - get_connections(id="...") -> returns list of objects {id, neighbor, label, arrow}
+   - get_connections(id="...") -> returns list of objects {id, neighbor, label, arrow, isSource}
    - set_attribute(id="...", key="...", value="...") -> returns boolean
    - add_tag(id="...", tag="...") -> returns boolean
    - remove_tag(id="...", tag="...") -> returns boolean
    - set_highlight(id="...", color="#hex") -> sets persistent highlight
    - clear_highlight(id="...") -> removes persistent highlight
+   - get_formatted_attributes(id="...") -> returns list of strings "Key: Value"
+   - get_formatted_lists(id="...") -> returns list of strings "List: Item1, Item2"
+   - get_date() -> returns string
 
 2. canvas
    - select_node(id="...") -> opens details panel for node
@@ -126,15 +192,6 @@ Available Tools (Libraries):
    - create_doc(title="...", content="...") -> creates new doc, returns ID
    - append_text(doc="ID_OR_TITLE", text="...") -> appends text to doc
    - open_doc(id="...") -> opens document panel
-
-Example Script:
-found = []
-nodes = graph.query_nodes(tag="Risk")
-for n in nodes:
-  if "High" in n.tags:
-     found.append(n.name)
-
-print("High risks found: " + found.length())
 `;
 
 export const DEFAULT_SNIPPETS: ScriptSnippet[] = [
@@ -157,127 +214,45 @@ canvas.clear_highlights()`
     {
         id: 'sys-report',
         name: 'Generate Report Doc',
-        description: 'Creates a comprehensive report with separate sections for Goals, Tasks, Risks, etc.',
+        description: 'Creates a simple report iterating all nodes and their properties.',
         isSystem: true,
-        code: `report = "# System Analysis Report\\n\\n"
-sect_goal = "## Goals\\n"
-sect_uh = "## Useful & Harmful\\n"
-sect_task = "## Tasks & Actions\\n"
-sect_risk = "## Risks & Issues\\n"
-sect_other = "## Other Elements\\n"
-has_other = False
-
+        code: `report = "# System Report\\n\\n"
 nodes = graph.get_all_nodes()
-print("Analyzing " + nodes.length + " nodes...")
+print("Generating report for " + nodes.length + " nodes...")
 
 for n in nodes:
-    # 1. Build Details
-    details = "### " + n.name + "\\n"
+    report = report + "## " + n.name + "\\n"
     
+    # Tags
     if n.tags.length > 0:
-        details = details + "- **Tags:** "
+        report = report + "**Tags:** "
         for t in n.tags:
-             details = details + t + ", "
-        details = details + "\\n"
+            report = report + t + ", "
+        report = report + "\\n"
     
+    # Notes
     if n.notes:
-        details = details + "- **Notes:** " + n.notes + "\\n"
+        report = report + "\\n**Notes:**\\n" + n.notes + "\\n"
     
-    # Connections
-    conns = graph.get_connections(id=n.id)
-    if conns.length > 0:
-        details = details + "- **Relationships:**\\n"
-        for c in conns:
-            # Format: - --> TargetName (Label)
-            line = "  - " + "\`" + c.arrow + "\`" + " " + c.neighbor.name
-            if c.label:
-                line = line + " (" + c.label + ")"
-            details = details + line + "\\n"
-    
-    details = details + "\\n"
+    # Attributes
+    attrs = graph.get_formatted_attributes(id=n.id)
+    if attrs.length > 0:
+        report = report + "\\n**Attributes:**\\n"
+        for a in attrs:
+            report = report + "- " + a + "\\n"
+            
+    # Lists
+    lists = graph.get_formatted_lists(id=n.id)
+    if lists.length > 0:
+        report = report + "\\n**Lists:**\\n"
+        for l in lists:
+            report = report + "- " + l + "\\n"
+            
+    report = report + "\\n---\\n\\n"
 
-    # 2. Categorize
-    matched = False
-    
-    if "Goal" in n.tags:
-        sect_goal = sect_goal + details
-        matched = True
-    
-    # Useful/Harmful
-    is_uh = False
-    if "Useful" in n.tags:
-        is_uh = True
-    if "Harmful" in n.tags:
-        is_uh = True
-    
-    if is_uh:
-        sect_uh = sect_uh + details
-        matched = True
-        
-    # Tasks/Actions
-    is_ta = False
-    if "Task" in n.tags:
-        is_ta = True
-    if "Action" in n.tags:
-        is_ta = True
-    
-    if is_ta:
-        sect_task = sect_task + details
-        matched = True
-
-    # Risks/Issues
-    is_ri = False
-    if "Risk" in n.tags:
-        is_ri = True
-    if "Issue" in n.tags:
-        is_ri = True
-    
-    if is_ri:
-        sect_risk = sect_risk + details
-        matched = True
-        
-    if matched == False:
-        sect_other = sect_other + details
-        has_other = True
-
-final_content = report + sect_goal + sect_uh + sect_task + sect_risk
-
-if has_other:
-    final_content = final_content + sect_other
-
-doc_id = markdown.create_doc(title="Full System Report", content=final_content)
+doc_id = markdown.create_doc(title="Node Report", content=report)
 markdown.open_doc(id=doc_id)
 print("Report generated.")`
-    },
-    {
-        id: 'sys-goals-tasks',
-        name: 'Goals & Tasks Report',
-        description: 'Generates a report listing all Goals and their connected Tasks.',
-        isSystem: true,
-        code: `doc_content = "# Goals and Tasks\\n\\n"
-
-goals = graph.query_nodes(tag="Goal")
-
-if goals.length() == 0:
-    doc_content += "No goals found."
-else:
-    for goal in goals:
-        doc_content += "## Goal: " + goal.name + "\\n"
-        connections = graph.get_connections(id=goal.id)
-        
-        has_tasks = False
-        for connection in connections:
-            neighbor_node = connection.neighbor
-            if "Task" in neighbor_node.tags:
-                doc_content += "- " + neighbor_node.name + "\\n"
-                has_tasks = True
-        
-        if not has_tasks:
-            doc_content += "  No tasks associated.\\n"
-        doc_content += "\\n"
-
-new_doc = markdown.create_doc(title="Goals and Tasks Report", content=doc_content)
-markdown.open_doc(id=new_doc.id)`
     },
     {
         id: 'sys-reset',
@@ -297,10 +272,6 @@ print("View reset.")`
 all_nodes = graph.get_all_nodes()
 count = 0
 
-print("Clearing previous persistent highlights...")
-for n in all_nodes:
-    graph.clear_highlight(id=n.id)
-
 print("Checking for missing attribute: " + required_key)
 
 for node in all_nodes:
@@ -314,37 +285,6 @@ for node in all_nodes:
 print("Total found: " + count)`
     },
     {
-        id: 'sys-tag-neighbors',
-        name: 'Tag Neighbors',
-        description: 'Finds neighbors of a specific node and adds a tag to them.',
-        isSystem: true,
-        code: `center_name = "Project X"
-center = graph.get_node_by_name(name=center_name)
-
-if center != None:
-    neighbors = graph.get_neighbors(id=center.id)
-    for n in neighbors:
-        graph.add_tag(id=n.id, tag="Related-to-X")
-        canvas.highlight_node(id=n.id, color="#4ade80")
-    print("Tagged neighbors.")
-else:
-    print("Center node not found.")`
-    },
-    {
-        id: 'sys-chain',
-        name: 'Create Chain',
-        description: 'Creates three connected nodes in a sequence.',
-        isSystem: true,
-        code: `n1 = graph.add_node(name="Step 1", tags="Process")
-n2 = graph.add_node(name="Step 2", tags="Process")
-n3 = graph.add_node(name="Step 3", tags="Process")
-
-graph.add_edge(source=n1.id, target=n2.id, label="next")
-graph.add_edge(source=n2.id, target=n3.id, label="next")
-
-canvas.pan_to_node(id=n2.id)`
-    },
-    {
         id: 'sys-cleanup',
         name: 'Cleanup Tagged',
         description: 'Deletes all nodes with a specific tag (Use with caution).',
@@ -355,112 +295,100 @@ nodes = graph.query_nodes(tag=tag_to_delete)
 for n in nodes:
     graph.delete_node(id=n.id)
     print("Deleted " + n.name)`
-    },
-    {
-        id: 'sys-isolate',
-        name: 'Find & Isolate',
-        description: 'Selects a node and clears everything else from view (simulated by highlighting only one).',
-        isSystem: true,
-        code: `target_name = "Core Problem"
-node = graph.get_node_by_name(name=target_name)
-
-if node != None:
-    canvas.clear_selection()
-    canvas.select_node(id=node.id)
-    canvas.pan_to_node(id=node.id)
-    print("Focused on " + node.name)
-else:
-    print("Node not found.")`
     }
 ];
 
 export const EXAMPLE_SCRIPTS = [
     {
-        id: 'ex-create-walk',
-        name: 'Ex: Create & Walk',
-        code: `# 1. Create a chain of nodes
-start = graph.add_node(name="Start", tags="Step")
-mid = graph.add_node(name="Process", tags="Step")
-end = graph.add_node(name="End", tags="Step")
+        id: 'rep-doc',
+        name: 'Generate Report Doc',
+        code: `date = graph.get_date()
+report = "# Graph Report\\n"
+report += "**Generated:** " + date + "\\n\\n"
 
-graph.add_edge(source=start.id, target=mid.id, label="next")
-graph.add_edge(source=mid.id, target=end.id, label="next")
+# Tracking for appendix
+all_tags = []
+all_rel_labels = []
 
-print("Created chain. Starting walk...")
+nodes = graph.get_all_nodes()
 
-# 2. Query and animate
-steps = graph.query_nodes(tag="Step")
-
-for node in steps:
-    print("Visiting: " + node.name)
-    canvas.pan_to_node(id=node.id)
-    canvas.highlight_node(id=node.id, color="#facc15")
-    sleep(0.8)
-
-canvas.clear_highlights()
-print("Walk complete.")
-`
-    },
-    {
-        id: 'ex-attributes',
-        name: 'Ex: Attribute Logic',
-        code: `# 1. Setup Test Data
-city1 = graph.add_node(name="London Office")
-graph.set_attribute(id=city1.id, key="location", value="UK")
-graph.set_attribute(id=city1.id, key="status", value="active")
-
-city2 = graph.add_node(name="Paris Office")
-graph.set_attribute(id=city2.id, key="location", value="France")
-graph.set_attribute(id=city2.id, key="status", value="active")
-
-city3 = graph.add_node(name="Tokyo Office")
-graph.set_attribute(id=city3.id, key="location", value="Japan")
-graph.set_attribute(id=city3.id, key="status", value="planning")
-
-print("Nodes created.")
-sleep(0.5)
-
-# 2. Query by attribute (Status: active)
-active_nodes = graph.query_nodes(status="active")
-print("Found " + active_nodes.length + " active offices.")
-
-for node in active_nodes:
-    print("Auditing: " + node.name)
-    canvas.select_node(id=node.id)
+for n in nodes:
+    # Node Header
+    report += "## " + n.name + "\\n"
     
-    # Mark as audited
-    graph.set_attribute(id=node.id, key="audited", value="true")
-    graph.add_tag(id=node.id, tag="Audited")
+    # Tags
+    if n.tags:
+        report += "**Tags:** "
+        for t in n.tags:
+            report += t + ", "
+            
+            # Simple manual uniqueness check
+            is_new = True
+            if t in all_tags:
+                is_new = False
+            
+            if is_new == True:
+                all_tags.append(t)
+        
+        report += "\\n"
     
-    sleep(0.8)
+    # Notes
+    if n.notes:
+        report += "**Notes:**\\n" + n.notes + "\\n"
+        
+    # Attributes
+    attrs = graph.get_formatted_attributes(id=n.id)
+    if attrs:
+        report += "**Attributes:**\\n"
+        for a in attrs:
+            report += "- " + a + "\\n"
+            
+    # Lists
+    lists = graph.get_formatted_lists(id=n.id)
+    if lists:
+        report += "**Lists:**\\n"
+        for l in lists:
+            report += "- " + l + "\\n"
 
-canvas.clear_selection()
-print("Audit complete.")
-`
-    },
-    {
-        id: 'ex-report',
-        name: 'Ex: Auto-Report',
-        code: `# 1. Ensure we have data
-n1 = graph.add_node(name="Risk A", tags="Risk", notes="High probability")
-n2 = graph.add_node(name="Risk B", tags="Risk", notes="Low impact")
+    # Relationships
+    conns = graph.get_connections(id=n.id)
+    if conns:
+        report += "**Relationships:**\\n"
+        for c in conns:
+            # Format: <source node> <relationship name> <target node>
+            line = ""
+            if c.isSource == True:
+                line = n.name + " " + c.label + " " + c.neighbor.name
+            else:
+                line = c.neighbor.name + " " + c.label + " " + n.name
+            
+            report += "- " + line + "\\n"
+            
+            if c.label:
+                is_label_new = True
+                if c.label in all_rel_labels:
+                    is_label_new = False
+                
+                if is_label_new == True:
+                    all_rel_labels.append(c.label)
+    
+    report += "\\n---\\n\\n"
 
-# 2. Query
-risk_nodes = graph.query_nodes(tag="Risk")
-print("Found " + risk_nodes.length + " risks.")
+# Appendix
+report += "# Appendix\\n"
 
-# 3. Build Markdown
-report_text = "# Risk Assessment Report\\n\\n"
+report += "## Tags Used\\n"
+for t in all_tags:
+    report += "- " + t + "\\n"
 
-for node in risk_nodes:
-    line = "- **" + node.name + "**: " + node.notes + "\\n"
-    report_text = report_text + line
+report += "\\n## Relationships Used\\n"
+for l in all_rel_labels:
+    report += "- " + l + "\\n"
 
-# 4. Create Document
-doc_id = markdown.create_doc(title="Generated Risk Report", content=report_text)
+# Create Document
+doc_id = markdown.create_doc(title="Graph Report " + date, content=report)
 markdown.open_doc(id=doc_id)
-
-print("Document created.")
+print("Report generated and opened.")
 `
     }
 ];
@@ -580,6 +508,61 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
       { label: 'Relates to', description: 'Make or show a connection between.' },
     ],
     defaultRelationshipLabel: 'Relates to'
+  },
+  {
+    id: 'scheme-testing',
+    name: 'Testing & QA',
+    tagColors: {
+      'Test': '#06b6d4', // cyan-500
+      'Bug': '#ef4444', // red-500
+      'Requirement': '#a855f7', // purple-500
+      'Feature': '#f97316', // orange-500
+      'Component': '#6366f1', // indigo-500
+      'Pass': '#22c55e', // green-500
+      'Fail': '#f43f5e', // rose-500
+      'Blocked': '#f59e0b', // amber-500
+      'Flaky': '#be185d', // pink-700
+      'Environment': '#64748b', // slate-500
+      'Data': '#78716c', // stone-500
+      'Coverage': '#84cc16' // lime-500
+    },
+    tagDescriptions: {
+        'Test': 'A specific set of steps to verify functionality.',
+        'Bug': 'An error, flaw, or fault in the system.',
+        'Requirement': 'A condition or capability needed by a user.',
+        'Feature': 'A distinct piece of functionality or system capability.',
+        'Component': 'A modular part of the system architecture.',
+        'Pass': 'Execution was successful.',
+        'Fail': 'Execution failed or produced unexpected results.',
+        'Blocked': 'Cannot be executed due to external factors.',
+        'Flaky': 'Inconsistent results (sometimes pass, sometimes fail).',
+        'Environment': 'The hardware/software context (e.g., Staging, Prod).',
+        'Data': 'Input values or database state required for testing.',
+        'Coverage': 'Measure of code or requirements tested.'
+    },
+    relationshipDefinitions: [
+      { label: 'verifies', description: 'Confirms that a requirement or feature works as expected.' },
+      { label: 'implements', description: 'Feature fulfills a requirement.' },
+      { label: 'tests', description: 'Test targets a specific Feature or Component.' },
+      { label: 'exposes', description: 'Reveals a defect or bug.' },
+      { label: 'blocks', description: 'Prevents execution or progress.' },
+      { label: 'resolves', description: 'Fixes or closes a bug.' },
+      { label: 'regresses', description: 'Causes a previously fixed bug to reappear.' },
+      { label: 'requires', description: 'Dependent on data, environment, or other feature.' },
+      { label: 'contains', description: 'Hierarchical relationship (System contains Component contains Feature).' },
+      { label: 'relates to', description: 'General association.' }
+    ],
+    defaultRelationshipLabel: 'verifies',
+    customLists: {
+        'Severity': ['Critical', 'High', 'Medium', 'Low'],
+        'Priority': ['P0', 'P1', 'P2', 'P3'],
+        'Status': ['Draft', 'Active', 'Deprecated']
+    },
+    customListDescriptions: {
+        'Severity': 'Impact on the system.',
+        'Priority': 'Order of resolution.',
+        'Status': 'Lifecycle state of the test or requirement.'
+    }
   },
   {
     id: 'scheme-useful-harmful',

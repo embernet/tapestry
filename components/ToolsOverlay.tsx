@@ -18,6 +18,7 @@ import TagCloudToolbar from './TagCloudToolbar';
 import BulkEditToolbar from './BulkEditToolbar';
 import ScriptsToolbar from './ScriptsToolbar';
 import CommandBar from './CommandBar';
+import DataIoToolbar from './DataIoToolbar';
 import { Element, Relationship, ColorScheme, CustomStrategyTool, NodeShape } from '../types';
 
 // Tools that expand horizontally and should hide others when active
@@ -74,6 +75,7 @@ interface ToolsOverlayProps {
   handleExplorerToolSelect: (tool: any) => void;
   handleTagCloudToolSelect: (tool: any) => void;
   handleMermaidToolSelect: (tool: any) => void;
+  handleDataToolSelect: (tool: any) => void;
   setSettingsInitialTab: (tab: any) => void;
   setIsSettingsModalOpen: (open: boolean) => void;
   
@@ -186,6 +188,15 @@ export const ToolsOverlay: React.FC<ToolsOverlayProps> = (props) => {
                         }}
                         isCollapsed={tools.activeTool !== 'scripts'}
                         onToggle={() => tools.toggleTool('scripts')}
+                        isDarkMode={isDarkMode}
+                    />
+                )}
+
+                {isToolVisible('data') && (
+                    <DataIoToolbar
+                        onSelectTool={props.handleDataToolSelect}
+                        isCollapsed={tools.activeTool !== 'data'}
+                        onToggle={() => tools.toggleTool('data')}
                         isDarkMode={isDarkMode}
                     />
                 )}

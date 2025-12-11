@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Element, ColorScheme } from '../types';
 import AttributesEditor from './AttributesEditor';
 import ListEditor from './ListEditor';
+import { normalizeTag, formatTag } from '../utils';
 
 interface ElementEditorProps {
   elementData: Partial<Element>;
@@ -96,16 +97,18 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
 
   const addTag = (tag: string) => {
       if (!tag) return;
+      const normalizedTag = normalizeTag(tag);
       const currentTags = elementData.tags || [];
-      // Avoid duplicates (case insensitive check, preserve case of new tag)
-      if (!currentTags.some(t => t.toLowerCase() === tag.toLowerCase())) {
-          const newTags = [...currentTags, tag];
+      // Avoid duplicates
+      if (!currentTags.includes(normalizedTag)) {
+          const newTags = [...currentTags, normalizedTag];
           onDataChange({ ...elementData, tags: newTags }, true);
       }
   };
 
   const removeTag = (tagToRemove: string) => {
       const currentTags = elementData.tags || [];
+      // tagToRemove is from the mapped list, so it is already normalized (lowercase)
       const newTags = currentTags.filter(t => t !== tagToRemove);
       onDataChange({ ...elementData, tags: newTags }, true);
   };
@@ -144,9 +147,10 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
         <div className="flex flex-wrap gap-2 mb-2">
             {currentTags.map(tag => {
                 // Find color if available in ANY schema for styling
+                // Tags are stored lowercase, so we compare lowercase
                 let color = '#4b5563'; // gray-600 default
                 for (const s of colorSchemes) {
-                    const c = s.tagColors[Object.keys(s.tagColors).find(k => k.toLowerCase() === tag.toLowerCase()) || ''];
+                    const c = s.tagColors[Object.keys(s.tagColors).find(k => k.toLowerCase() === tag) || ''];
                     if (c) { color = c; break; }
                 }
                 
@@ -158,7 +162,7 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
                         style={{ backgroundColor: color, textShadow: '0px 1px 1px rgba(0,0,0,0.5)' }}
                         title="Click to remove"
                     >
-                        {tag}
+                        {formatTag(tag)}
                         <span className="ml-1.5 text-white/70 hover:text-white font-bold">&times;</span>
                     </span>
                 );
@@ -183,7 +187,7 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
             </p>
             <div className="flex flex-wrap gap-1.5">
                 {activeSchemeTags.map(tag => {
-                    const isApplied = currentTags.some(t => t.toLowerCase() === tag.toLowerCase());
+                    const isApplied = currentTags.some(t => t === normalizeTag(tag));
                     const color = activeScheme?.tagColors[tag] || '#4b5563';
                     if (isApplied) return null;
                     
@@ -221,7 +225,7 @@ const ElementEditor: React.FC<ElementEditorProps> = ({
             {otherSchemaView !== 'none' && (
                 <div className={`flex flex-wrap gap-1.5 p-2 rounded border ${isDarkMode ? 'bg-gray-800/50 border-gray-700/50' : 'bg-gray-50 border-gray-200'}`}>
                     {displayedOtherTags.map(tag => {
-                         const isApplied = currentTags.some(t => t.toLowerCase() === tag.toLowerCase());
+                         const isApplied = currentTags.some(t => t === normalizeTag(tag));
                          if (isApplied) return null;
                          
                          // Find color

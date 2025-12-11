@@ -16,6 +16,23 @@ export const GuidancePanel: React.FC<GuidancePanelProps> = ({ content, onClose, 
   const headerClass = isDarkMode ? 'text-white border-gray-700 bg-gray-900' : 'text-gray-900 border-gray-200 bg-gray-50';
   const sectionTitleClass = isDarkMode ? 'text-blue-400' : 'text-blue-600';
 
+  const renderStyledText = (text: string) => {
+    if (!text) return null;
+    const regex = /(\*\*.*?\*\*|\[\[.*?\|.*?\]\])/g;
+    const parts = text.split(regex);
+    return parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i}>{part.slice(2, -2)}</strong>;
+        }
+        if (part.startsWith('[[') && part.endsWith(']]')) {
+            const content = part.slice(2, -2);
+            const [label] = content.split('|');
+            return <span key={i} className="text-blue-400 font-medium">{label}</span>;
+        }
+        return <span key={i}>{part}</span>;
+    });
+  };
+
   return (
     <div className={`w-full h-full flex flex-col ${bgClass}`}>
       <div className={`p-4 border-b flex-shrink-0 flex justify-between items-center ${headerClass}`}>
@@ -35,11 +52,11 @@ export const GuidancePanel: React.FC<GuidancePanelProps> = ({ content, onClose, 
         {content.sections.map((section, idx) => (
             <div key={idx}>
                 {section.title && <h3 className={`text-lg font-bold mb-3 ${sectionTitleClass}`}>{section.title}</h3>}
-                {section.text && <p className="mb-3">{section.text}</p>}
+                {section.text && <p className="mb-3">{renderStyledText(section.text)}</p>}
                 {section.items && (
                     <ul className="list-disc pl-5 space-y-2">
                         {section.items.map((item, i) => (
-                            <li key={i} dangerouslySetInnerHTML={{ __html: item.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} />
+                            <li key={i}>{renderStyledText(item)}</li>
                         ))}
                     </ul>
                 )}

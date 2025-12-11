@@ -365,6 +365,7 @@ export class ScriptEngine {
     }
 
     evaluate(expr: string, ctx: RuntimeContext): any {
+        expr = expr.trim();
         if (!expr) return null;
 
         // 0. Membership 'in'
@@ -421,9 +422,43 @@ export class ScriptEngine {
                 .replace(/\\t/g, '\t')
                 .replace(/\\"/g, '"');
         }
+
+        // 4. List Literal (e.g. ["a", "b"] or [])
+        if (expr.startsWith('[') && expr.endsWith(']')) {
+            const content = expr.slice(1, -1).trim();
+            if (!content) return [];
+            
+            const items = [];
+            let current = '';
+            let inQuote = false;
+            let bracketDepth = 0;
+            
+            for (let i = 0; i < content.length; i++) {
+                const char = content[i];
+                if (char === '"' || char === "'") {
+                    inQuote = !inQuote;
+                } else if (char === '[' && !inQuote) {
+                    bracketDepth++;
+                } else if (char === ']' && !inQuote) {
+                    bracketDepth--;
+                }
+                
+                if (char === ',' && !inQuote && bracketDepth === 0) {
+                    items.push(this.evaluate(current.trim(), ctx));
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            if (current.trim()) {
+                items.push(this.evaluate(current.trim(), ctx));
+            }
+            return items;
+        }
         
-        // 4. Primitives & Vars
-        if (!isNaN(Number(expr))) return Number(expr);
+        // 5. Primitives & Vars
+        // Use strict regex for numbers to avoid empty arrays [] being parsed as 0 by Number()
+        if (/^-?\d+(\.\d+)?$/.test(expr)) return Number(expr);
         if (expr === 'True' || expr === 'true') return true;
         if (expr === 'False' || expr === 'false') return false;
         if (expr === 'None' || expr === 'null') return null;

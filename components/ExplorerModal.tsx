@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Element, Relationship } from '../types';
 import * as d3Import from 'd3';
+import { formatTag } from '../utils';
 
 const d3: any = d3Import;
 
@@ -22,7 +23,6 @@ const D3Treemap: React.FC<{
         svg.selectAll("*").remove();
 
         const textColor = isDarkMode ? "#6b7280" : "#9ca3af";
-        const titleColor = isDarkMode ? "#fff" : "#1f2937";
 
         // Handle empty data gracefully
         if (!data.children || data.children.length === 0) {
@@ -97,29 +97,26 @@ const D3Treemap: React.FC<{
             .text((d: any) => d.data.name)
             .attr("font-size", "12px")
             .attr("font-weight", "bold")
-            .attr("fill", titleColor)
+            .attr("fill", "#fff")
             .attr("opacity", 0.7)
             .style("pointer-events", "none");
 
     }, [data, width, height, onLeafClick, isDarkMode]);
 
-    const bgClass = isDarkMode ? "bg-gray-900" : "bg-white";
-    return <svg ref={svgRef} width={width} height={height} className={`${bgClass} rounded transition-colors`} />;
+    return <svg ref={svgRef} width={width} height={height} className="rounded" />;
 };
 
-// --- Treemap Panel ---
 interface TreemapPanelProps {
     elements: Element[];
     relationships: Relationship[];
-    onNodeSelect: (elementId: string) => void;
+    onNodeSelect: (id: string) => void;
     isDarkMode: boolean;
 }
 
 export const TreemapPanel: React.FC<TreemapPanelProps> = ({ elements, relationships, onNodeSelect, isDarkMode }) => {
+    const [view, setView] = useState<'tags' | 'relationships'>('tags');
     const containerRef = useRef<HTMLDivElement>(null);
-    const [dimensions, setDimensions] = useState({ width: 400, height: 300 });
-    const [view, setView] = useState<'tags' | 'relationships' | 'attribute'>('tags');
-    const [groupByAttribute, setGroupByAttribute] = useState<string>('');
+    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
     useEffect(() => {
         if (containerRef.current) {
@@ -135,17 +132,6 @@ export const TreemapPanel: React.FC<TreemapPanelProps> = ({ elements, relationsh
             return () => resizeObserver.disconnect();
         }
     }, []);
-
-    // Extract all unique attribute keys available in the elements
-    const availableAttributes = useMemo(() => {
-        const keys = new Set<string>();
-        elements.forEach(el => {
-            if (el.attributes) {
-                Object.keys(el.attributes).forEach(k => keys.add(k));
-            }
-        });
-        return Array.from(keys).sort();
-    }, [elements]);
 
     const treemapData = useMemo(() => {
         if (view === 'tags') {
@@ -163,11 +149,11 @@ export const TreemapPanel: React.FC<TreemapPanelProps> = ({ elements, relationsh
             return {
                 name: "Tags",
                 children: Object.entries(tagGroups).map(([tag, items]) => ({
-                    name: tag,
+                    name: formatTag(tag),
                     children: items
                 }))
             };
-        } else if (view === 'relationships') {
+        } else {
             // View by Outgoing Relationships
             const relGroups: Record<string, any[]> = {};
             relationships.forEach(rel => {
@@ -185,176 +171,102 @@ export const TreemapPanel: React.FC<TreemapPanelProps> = ({ elements, relationsh
                     children: items
                 }))
             };
-        } else if (view === 'attribute') {
-             const groups: Record<string, any[]> = {};
-             
-             elements.forEach(el => {
-                let val = 'Undefined';
-                if (groupByAttribute && el.attributes && el.attributes[groupByAttribute]) {
-                    val = el.attributes[groupByAttribute];
-                }
-                
-                if (!groups[val]) groups[val] = [];
-                
-                // Calculate weight (degree)
-                const degree = relationships.filter(r => r.source === el.id || r.target === el.id).length + 1;
-                groups[val].push({ name: el.name, value: degree, id: el.id });
-             });
-
-             return {
-                name: groupByAttribute || "Attributes",
-                children: Object.entries(groups).map(([key, items]) => ({
-                    name: key,
-                    children: items
-                }))
-            };
         }
-        return { name: "Root", children: [] };
-    }, [elements, relationships, view, groupByAttribute]);
-
-    const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
-    const headerBg = isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-200';
-    const contentBg = isDarkMode ? 'bg-gray-900' : 'bg-white';
-    const titleColor = isDarkMode ? 'text-yellow-400' : 'text-yellow-600';
-    const borderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
+    }, [elements, relationships, view]);
 
     return (
-        <div className={`w-full h-full flex flex-col ${bgClass}`}>
-            <div className={`p-4 border-b ${borderClass} ${headerBg}`}>
-                <h2 className={`text-xl font-bold ${titleColor}`}>Treemap</h2>
-            </div>
-            <div className={`flex-grow flex flex-col overflow-hidden p-2 ${contentBg}`}>
-                <div className="flex flex-wrap justify-center gap-2 mb-2 items-center">
+        <div className={`w-full h-full flex flex-col ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+            <div className={`p-4 border-b flex justify-between items-center flex-shrink-0 ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
+                <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Treemap Explorer</h2>
+                <div className="flex gap-2">
                     <button 
                         onClick={() => setView('tags')}
                         className={`px-3 py-1 rounded text-xs font-bold transition-colors ${view === 'tags' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'}`}
                     >
-                        Tags
+                        By Tags
                     </button>
                     <button 
                         onClick={() => setView('relationships')}
                         className={`px-3 py-1 rounded text-xs font-bold transition-colors ${view === 'relationships' ? 'bg-green-600 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'}`}
                     >
-                        Relationships
+                        By Relationships
                     </button>
-                    <button 
-                        onClick={() => setView('attribute')}
-                        className={`px-3 py-1 rounded text-xs font-bold transition-colors ${view === 'attribute' ? 'bg-purple-600 text-white' : 'bg-gray-700 text-gray-400 hover:text-white'}`}
-                    >
-                        Attribute
-                    </button>
-                    
-                    {view === 'attribute' && (
-                        <select 
-                            value={groupByAttribute} 
-                            onChange={(e) => setGroupByAttribute(e.target.value)}
-                            className={`text-xs rounded border px-2 py-1 outline-none ${isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                        >
-                            <option value="">-- Select --</option>
-                            {availableAttributes.map(k => <option key={k} value={k}>{k}</option>)}
-                        </select>
-                    )}
                 </div>
-                <div className="flex-grow rounded border border-gray-700 overflow-hidden" ref={containerRef}>
-                    <D3Treemap 
-                        data={treemapData} 
-                        width={dimensions.width} 
-                        height={dimensions.height} 
-                        onLeafClick={(d) => onNodeSelect(d.id)}
-                        isDarkMode={isDarkMode}
-                    />
-                </div>
+            </div>
+            
+            <div className="flex-grow p-4 overflow-hidden" ref={containerRef}>
+                 <D3Treemap 
+                    data={treemapData} 
+                    width={dimensions.width} 
+                    height={dimensions.height} 
+                    onLeafClick={(d) => onNodeSelect(d.id)}
+                    isDarkMode={isDarkMode}
+                />
             </div>
         </div>
     );
 };
 
-// --- Tag Distribution Panel ---
-interface TagDistributionPanelProps {
-    elements: Element[];
-    isDarkMode: boolean;
-}
-
-export const TagDistributionPanel: React.FC<TagDistributionPanelProps> = ({ elements, isDarkMode }) => {
+export const TagDistributionPanel: React.FC<{ elements: Element[], isDarkMode: boolean }> = ({ elements, isDarkMode }) => {
     const tagStats = useMemo(() => {
         const counts = new Map<string, number>();
         elements.forEach(e => e.tags.forEach(t => counts.set(t, (counts.get(t) || 0) + 1)));
         return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
     }, [elements]);
 
-    const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
-    const headerBg = isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-200';
-    const titleColor = isDarkMode ? 'text-blue-400' : 'text-blue-600';
-    const textColor = isDarkMode ? 'text-gray-300' : 'text-gray-700';
-    const barBg = isDarkMode ? 'bg-gray-900' : 'bg-gray-100';
-    const countColor = isDarkMode ? 'text-gray-400' : 'text-gray-600';
-
     return (
-        <div className={`w-full h-full flex flex-col ${bgClass}`}>
-            <div className={`p-4 border-b ${headerBg}`}>
-                <h2 className={`text-xl font-bold ${titleColor}`}>Tag Frequency</h2>
+        <div className={`w-full h-full flex flex-col ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+             <div className={`p-4 border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
+                <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Tag Frequency</h2>
             </div>
-            <div className="flex-grow p-4 overflow-y-auto custom-scrollbar">
+            <div className="flex-grow overflow-y-auto p-4 custom-scrollbar">
                 <div className="space-y-2">
                     {tagStats.map(([tag, count]) => (
-                        <div key={tag} className="flex items-center gap-2 text-sm">
-                            <div className={`w-32 text-right truncate font-medium ${textColor}`}>{tag}</div>
-                            <div className={`flex-grow ${barBg} rounded-full h-6 overflow-hidden relative`}>
+                        <div key={tag} className="flex items-center gap-2 text-xs">
+                            <div className={`w-24 text-right truncate ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{formatTag(tag)}</div>
+                            <div className={`flex-grow rounded-full h-4 overflow-hidden relative ${isDarkMode ? 'bg-gray-900' : 'bg-gray-200'}`}>
                                 <div 
-                                    className="h-full bg-blue-600 rounded-full transition-all duration-500" 
-                                    style={{ width: `${Math.max(1, (count / (tagStats[0]?.[1] || 1)) * 100)}%` }}
+                                    className="h-full bg-blue-500 rounded-full" 
+                                    style={{ width: `${Math.max(5, (count / tagStats[0][1]) * 100)}%` }}
                                 ></div>
-                                <span className={`absolute right-3 top-1 text-xs font-bold ${countColor}`}>{count}</span>
+                                <span className={`absolute right-2 top-0 text-[9px] leading-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{count}</span>
                             </div>
                         </div>
                     ))}
-                    {tagStats.length === 0 && <p className="text-gray-500 italic text-center mt-4">No tags found.</p>}
+                    {tagStats.length === 0 && <p className="text-gray-500 italic text-center py-4">No tags found.</p>}
                 </div>
             </div>
         </div>
     );
 };
 
-// --- Relationship Distribution Panel ---
-interface RelationshipDistributionPanelProps {
-    relationships: Relationship[];
-    isDarkMode: boolean;
-}
-
-export const RelationshipDistributionPanel: React.FC<RelationshipDistributionPanelProps> = ({ relationships, isDarkMode }) => {
+export const RelationshipDistributionPanel: React.FC<{ relationships: Relationship[], isDarkMode: boolean }> = ({ relationships, isDarkMode }) => {
     const relStats = useMemo(() => {
         const counts = new Map<string, number>();
         relationships.forEach(r => counts.set(r.label, (counts.get(r.label) || 0) + 1));
         return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
     }, [relationships]);
 
-    const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
-    const headerBg = isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-200';
-    const titleColor = isDarkMode ? 'text-green-400' : 'text-green-600';
-    const textColor = isDarkMode ? 'text-gray-300' : 'text-gray-700';
-    const barBg = isDarkMode ? 'bg-gray-900' : 'bg-gray-100';
-    const countColor = isDarkMode ? 'text-gray-400' : 'text-gray-600';
-
     return (
-        <div className={`w-full h-full flex flex-col ${bgClass}`}>
-            <div className={`p-4 border-b ${headerBg}`}>
-                <h2 className={`text-xl font-bold ${titleColor}`}>Relationship Usage</h2>
+        <div className={`w-full h-full flex flex-col ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
+             <div className={`p-4 border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
+                <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Relationship Usage</h2>
             </div>
-            <div className="flex-grow p-4 overflow-y-auto custom-scrollbar">
+            <div className="flex-grow overflow-y-auto p-4 custom-scrollbar">
                 <div className="space-y-2">
                     {relStats.map(([label, count]) => (
-                        <div key={label} className="flex items-center gap-2 text-sm">
-                            <div className={`w-32 text-right truncate font-medium ${textColor}`}>{label}</div>
-                            <div className={`flex-grow ${barBg} rounded-full h-6 overflow-hidden relative`}>
+                        <div key={label} className="flex items-center gap-2 text-xs">
+                            <div className={`w-24 text-right truncate ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{label}</div>
+                            <div className={`flex-grow rounded-full h-4 overflow-hidden relative ${isDarkMode ? 'bg-gray-900' : 'bg-gray-200'}`}>
                                 <div 
-                                    className="h-full bg-green-600 rounded-full transition-all duration-500" 
-                                    style={{ width: `${Math.max(1, (count / (relStats[0]?.[1] || 1)) * 100)}%` }}
+                                    className="h-full bg-green-500 rounded-full" 
+                                    style={{ width: `${Math.max(5, (count / relStats[0][1]) * 100)}%` }}
                                 ></div>
-                                <span className={`absolute right-3 top-1 text-xs font-bold ${countColor}`}>{count}</span>
+                                <span className={`absolute right-2 top-0 text-[9px] leading-4 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{count}</span>
                             </div>
                         </div>
                     ))}
-                    {relStats.length === 0 && <p className="text-gray-500 italic text-center mt-4">No relationships found.</p>}
+                    {relStats.length === 0 && <p className="text-gray-500 italic text-center py-4">No relationships found.</p>}
                 </div>
             </div>
         </div>

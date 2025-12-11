@@ -2,7 +2,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Element, Relationship, CsvColumnConfig, CsvColumnMappingType, RelationshipDirection } from '../types';
 import { parseCSV, generateCSV, guessColumnMapping } from '../utils/csvParser';
-import { generateUUID } from '../utils';
+import { generateUUID, normalizeTag } from '../utils';
 
 interface CsvToolModalProps {
     isOpen: boolean;
@@ -259,7 +259,7 @@ export const CsvToolModal: React.FC<CsvToolModalProps> = ({
 
                     switch (conf.mappingType) {
                         case 'notes': element.notes = val; break;
-                        case 'tags': element.tags = [...element.tags, ...val.split(conf.separator || ',').map(t => t.trim()).filter(Boolean)]; break;
+                        case 'tags': element.tags = [...element.tags, ...val.split(conf.separator || ',').map(t => normalizeTag(t)).filter(Boolean)]; break;
                         case 'x': const x = parseFloat(val); if (!isNaN(x)) element.x = x; break;
                         case 'y': const y = parseFloat(val); if (!isNaN(y)) element.y = y; break;
                         case 'created': element.createdAt = val; break;

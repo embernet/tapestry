@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Script, ScriptSnippet } from '../types';
 import { ScriptEngine, ScriptParser, ScriptProgram, RuntimeContext } from '../services/ScriptEngine';
@@ -274,7 +273,7 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
         
         while (runtimeContextRef.current.status !== 'completed' && runtimeContextRef.current.status !== 'error') {
             await engine.step(programRef.current, runtimeContextRef.current);
-            if (runtimeContextRef.current.status === 'error') {
+            if ((runtimeContextRef.current.status as string) === 'error') {
                 throw new Error("Runtime Error");
             }
         }
@@ -487,7 +486,7 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
                 <select 
                     value={activeScriptId || ''} 
                     onChange={(e) => setActiveScriptId(e.target.value)}
-                    className={`text-xs rounded border p-1 max-w-[140px] outline-none ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                    className={`text-xs rounded border p-1 max-w-[140px] outline-none ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                 >
                     <option value="" disabled>Select Script</option>
                     {scripts.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -567,7 +566,7 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
                             placeholder="Search..." 
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className={`flex-grow text-xs rounded border px-2 py-1 outline-none ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                            className={`flex-grow text-xs rounded border px-2 py-1 outline-none ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                         />
                         <button 
                             onClick={handleAddSnippet}
@@ -639,7 +638,7 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
                                 value={aiInput}
                                 onChange={(e) => setAiInput(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleAiSend()}
-                                className={`flex-grow text-xs rounded border px-2 py-1 outline-none ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                                className={`flex-grow text-xs rounded border px-2 py-1 outline-none ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
                             />
                             <button 
                                 onClick={handleAiSend}
