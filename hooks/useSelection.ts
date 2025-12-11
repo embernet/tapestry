@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useMemo } from 'react';
 import { Element, Relationship, PanelState, RelationshipDirection, GraphView, ColorScheme } from '../types';
 import { generateUUID } from '../utils';
@@ -33,6 +34,18 @@ interface UseSelectionProps {
     // Highlight Tool
     isHighlightToolActive: boolean;
     handleToggleNodeHighlight: (id: string) => void;
+
+    // Lifted State
+    selectedElementId: string | null;
+    setSelectedElementId: React.Dispatch<React.SetStateAction<string | null>>;
+    multiSelection: Set<string>;
+    setMultiSelection: React.Dispatch<React.SetStateAction<Set<string>>>;
+    selectedRelationshipId: string | null;
+    setSelectedRelationshipId: React.Dispatch<React.SetStateAction<string | null>>;
+    panelStateUI: PanelState;
+    setPanelStateUI: React.Dispatch<React.SetStateAction<PanelState>>;
+    focusMode: 'narrow' | 'wide' | 'zoom';
+    setFocusMode: React.Dispatch<React.SetStateAction<'narrow' | 'wide' | 'zoom'>>;
 }
 
 export const useSelection = ({
@@ -45,14 +58,15 @@ export const useSelection = ({
     isRandomWalkOpen, setWalkState,
     graphCanvasRef,
     isSunburstPanelOpen, sunburstState, setSunburstState, setOriginalElements, originalElements, setIsPhysicsModeActive,
-    isHighlightToolActive, handleToggleNodeHighlight
+    isHighlightToolActive, handleToggleNodeHighlight,
+    
+    // Lifted state props
+    selectedElementId, setSelectedElementId,
+    multiSelection, setMultiSelection,
+    selectedRelationshipId, setSelectedRelationshipId,
+    panelStateUI, setPanelStateUI,
+    focusMode, setFocusMode
 }: UseSelectionProps) => {
-
-    const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-    const [multiSelection, setMultiSelection] = useState<Set<string>>(new Set());
-    const [selectedRelationshipId, setSelectedRelationshipId] = useState<string | null>(null);
-    const [panelStateUI, setPanelStateUI] = useState<PanelState>({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
-    const [focusMode, setFocusMode] = useState<'narrow' | 'wide' | 'zoom'>('narrow');
 
     // --- Derived ---
     const selectedElement = useMemo(() => elements.find(f => f.id === selectedElementId), [elements, selectedElementId]);
@@ -143,7 +157,7 @@ export const useSelection = ({
         isHighlightToolActive, handleToggleNodeHighlight, isRandomWalkOpen, setWalkState, elements, graphCanvasRef, 
         isSimulationMode, runImpactSimulation, isSunburstPanelOpen, sunburstState, originalElements, setOriginalElements, 
         setElements, setSunburstState, setIsPhysicsModeActive, isBulkEditActive, bulkTagsToAdd, bulkTagsToRemove, 
-        multiSelection, selectedElementId
+        multiSelection, selectedElementId, setSelectedElementId, setMultiSelection, setPanelStateUI, setSelectedRelationshipId
     ]);
 
     const handleLinkClick = useCallback((relationshipId: string) => { 
@@ -151,14 +165,14 @@ export const useSelection = ({
         setSelectedElementId(null); 
         setMultiSelection(new Set()); 
         setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); 
-    }, []);
+    }, [setSelectedRelationshipId, setSelectedElementId, setMultiSelection, setPanelStateUI]);
 
     const handleCanvasClick = useCallback(() => { 
         setSelectedElementId(null); 
         setMultiSelection(new Set()); 
         setSelectedRelationshipId(null); 
         setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); 
-    }, []);
+    }, [setSelectedElementId, setMultiSelection, setSelectedRelationshipId, setPanelStateUI]);
 
     const handleNodeConnect = useCallback((sourceId: string, targetId: string) => { 
         const currentScheme = colorSchemes.find(s => s.id === activeSchemeId); 
@@ -170,7 +184,7 @@ export const useSelection = ({
         setSelectedRelationshipId(newRelId); 
         setSelectedElementId(null); 
         setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); 
-    }, [activeSchemeId, colorSchemes, setRelationships]);
+    }, [activeSchemeId, colorSchemes, setRelationships, setSelectedRelationshipId, setSelectedElementId, setPanelStateUI]);
   
     const handleNodeConnectToNew = useCallback((sourceId: string, coords: { x: number; y: number }) => { 
         const now = new Date().toISOString(); 
@@ -217,7 +231,7 @@ export const useSelection = ({
         setPanelStateUI({ view: 'addRelationship', sourceElementId: sourceId, targetElementId: newElement.id, isNewTarget: true }); 
         setSelectedElementId(null); 
         setSelectedRelationshipId(null); 
-    }, [defaultTags, activeView, colorSchemes, activeSchemeId, setElements, setRelationships]);
+    }, [defaultTags, activeView, colorSchemes, activeSchemeId, setElements, setRelationships, setPanelStateUI, setSelectedElementId, setSelectedRelationshipId]);
 
     const handleCompleteAddRelationship = useCallback(() => {
         if (panelStateUI.targetElementId) {
@@ -226,7 +240,7 @@ export const useSelection = ({
             setSelectedElementId(panelStateUI.sourceElementId || null);
         }
         setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false });
-    }, [panelStateUI]);
+    }, [panelStateUI, setSelectedElementId, setPanelStateUI]);
 
     const handleCancelAddRelationship = useCallback(() => { 
         // If we created a temporary target node and cancel, we should delete it
@@ -236,7 +250,7 @@ export const useSelection = ({
         } 
         setSelectedElementId(panelStateUI.sourceElementId || null); 
         setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); 
-    }, [panelStateUI, setElements, setRelationships]);
+    }, [panelStateUI, setElements, setRelationships, setSelectedElementId, setPanelStateUI]);
 
     const handleToggleFocusMode = useCallback(() => { 
         setFocusMode(prev => { 
@@ -244,7 +258,7 @@ export const useSelection = ({
             if (prev === 'wide') return 'zoom'; 
             return 'narrow'; 
         }); 
-    }, []);
+    }, [setFocusMode]);
 
     const handleFocusSingle = useCallback((elementId: string) => {
         // Trigger select logic without the event
@@ -258,11 +272,9 @@ export const useSelection = ({
     }, [elements, handleNodeClick, graphCanvasRef]);
 
     return {
-        selectedElementId, setSelectedElementId,
-        multiSelection, setMultiSelection,
-        selectedRelationshipId, setSelectedRelationshipId,
-        panelStateUI, setPanelStateUI,
-        focusMode, setFocusMode,
+        // Expose state for convenience if needed, but primarily for hook consumers
+        // selectedElementId, setSelectedElementId, 
+        // multiSelection, setMultiSelection,
         
         selectedElement,
         selectedRelationship,

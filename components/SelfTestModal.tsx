@@ -31,10 +31,10 @@ export const SelfTestModal: React.FC<SelfTestModalProps> = ({
     const [showRawLogs, setShowRawLogs] = useState(false);
     const [autoScroll, setAutoScroll] = useState(true);
     
-    // Window State - Bottom Left positioning
+    // Window State - Top Left positioning (Safer visibility)
     const [position, setPosition] = useState(() => ({ 
-        x: 20, 
-        y: typeof window !== 'undefined' ? window.innerHeight - 450 : 500 
+        x: 50, 
+        y: 100 
     }));
     const [isDragging, setIsDragging] = useState(false);
     const dragStartRef = useRef({ x: 0, y: 0 });

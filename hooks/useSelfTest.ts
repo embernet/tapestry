@@ -163,12 +163,16 @@ export const useSelfTest = ({
     };
 
     const runSelfTest = async () => {
+        // Open Modal and Set Status first
         setIsSelfTestModalOpen(true);
         setTestStatus('preparing');
         setTestLogs([]);
         setExecutionIndex(0);
         stopRef.current = false;
         
+        // Wait briefly for UI to render the modal before freezing with synchronous heavy lifting
+        await new Promise(r => setTimeout(r, 200));
+
         // 0. RESET STATE & CREATE NEW MODEL MANUALLY
         panelState.closeAllPanels();
         tools.setActiveTool(null);
