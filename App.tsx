@@ -199,6 +199,27 @@ export default function App() {
   
   // 6. Graph View Hook (Filtered Data)
   const { filteredElements, filteredRelationships } = useGraphView({ elements, relationships, activeView, panelState, analysisFilterState });
+  
+  // --- Independent Node Positioning Logic ---
+  const handleNodeMove = useCallback((id: string, x: number, y: number) => {
+      // If we are in the default "Full Graph" view (usually first view or named "Full Graph"), update global state
+      const isDefaultView = activeViewId === views[0].id || views.find(v => v.id === activeViewId)?.name === 'Full Graph';
+
+      if (isDefaultView) {
+          setElements(prev => prev.map(e => e.id === id ? { ...e, x, y, fx: x, fy: y, updatedAt: new Date().toISOString() } : e));
+      } else {
+          // In a custom view, update the view-specific overrides
+          if (activeView) {
+              const currentPositions = activeView.nodePositions || {};
+              handleUpdateActiveView({
+                  nodePositions: {
+                      ...currentPositions,
+                      [id]: { x, y }
+                  }
+              });
+          }
+      }
+  }, [activeViewId, views, activeView, handleUpdateActiveView]);
 
   // 7. Clipboard Hook
   const { internalClipboard, handleCopy, handlePaste } = useClipboard(
@@ -432,7 +453,7 @@ const isRightPanelOpen = useMemo(() => { return panelDefinitions.some(p => p.isO
         <div className="flex-grow relative overflow-hidden">
             {persistence.currentModelId ? (
                 <>
-                    <GraphCanvas ref={graphCanvasRef} elements={filteredElements} relationships={filteredRelationships} onNodeClick={handleNodeClick} onLinkClick={handleLinkClick} onCanvasClick={handleCanvasClick} onCanvasDoubleClick={handleAddElement} onNodeContextMenu={handleNodeContextMenu} onLinkContextMenu={handleLinkContextMenu} onCanvasContextMenu={handleCanvasContextMenu} onNodeConnect={handleNodeConnect} onNodeConnectToNew={handleNodeConnectToNew} activeColorScheme={activeColorScheme} selectedElementId={selectedElementId} setSelectedElementId={setSelectedElementId} multiSelection={multiSelection} setMultiSelection={setMultiSelection} selectedRelationshipId={selectedRelationshipId} focusMode={focusMode} setElements={setElements} isPhysicsModeActive={isPhysicsModeActive} layoutParams={layoutParams} onJiggleTrigger={jiggleTrigger} isBulkEditActive={isBulkEditActive} isSimulationMode={isSimulationMode} simulationState={simulationState} analysisHighlights={analysisHighlights} isDarkMode={isDarkMode} nodeShape={nodeShape} isHighlightToolActive={isHighlightToolActive} />
+                    <GraphCanvas ref={graphCanvasRef} elements={filteredElements} relationships={filteredRelationships} onNodeClick={handleNodeClick} onLinkClick={handleLinkClick} onCanvasClick={handleCanvasClick} onCanvasDoubleClick={handleAddElement} onNodeContextMenu={handleNodeContextMenu} onLinkContextMenu={handleLinkContextMenu} onCanvasContextMenu={handleCanvasContextMenu} onNodeConnect={handleNodeConnect} onNodeConnectToNew={handleNodeConnectToNew} activeColorScheme={activeColorScheme} selectedElementId={selectedElementId} setSelectedElementId={setSelectedElementId} multiSelection={multiSelection} setMultiSelection={setMultiSelection} selectedRelationshipId={selectedRelationshipId} focusMode={focusMode} setElements={setElements} onNodeMove={handleNodeMove} isPhysicsModeActive={isPhysicsModeActive} layoutParams={layoutParams} onJiggleTrigger={jiggleTrigger} isBulkEditActive={isBulkEditActive} isSimulationMode={isSimulationMode} simulationState={simulationState} analysisHighlights={analysisHighlights} isDarkMode={isDarkMode} nodeShape={nodeShape} isHighlightToolActive={isHighlightToolActive} />
                     <ContextMenus contextMenu={contextMenu} relationshipContextMenu={relationshipContextMenu} canvasContextMenu={canvasContextMenu} relationships={relationships} panelState={panelState} persistence={persistence} onCloseContextMenu={handleCloseContextMenu} onCloseRelationshipContextMenu={handleCloseRelationshipContextMenu} onCloseCanvasContextMenu={handleCloseCanvasContextMenu} onDeleteElement={handleDeleteElement} onAddRelationshipFromContext={(id) => { setPanelStateUI({ view: 'addRelationship', sourceElementId: id, targetElementId: null, isNewTarget: false }); setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); }} onDeleteRelationship={handleDeleteRelationship} onChangeRelationshipDirection={handleChangeRelationshipDirection} onZoomToFit={handleZoomToFit} onAutoLayout={handleStaticLayout} onSaveAsImage={handleSaveAsImage} importFileRef={importFileRef} isDarkMode={isDarkMode} onToggleNodeHighlight={handleToggleNodeHighlight} elements={elements} onHideFromView={handleHideFromView} multiSelection={multiSelection} onAddToKanban={handleAddToKanban} />
                 </>
             ) : (

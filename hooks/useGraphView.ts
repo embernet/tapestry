@@ -10,7 +10,7 @@ interface UseGraphViewProps {
         isSunburstPanelOpen: boolean;
         sunburstState: { active: boolean, centerId: string | null, hops: number };
     };
-    analysisFilterState: { mode: 'hide' | 'hide_others' | 'none', ids: Set<string> };
+    analysisFilterState: { mode: 'hide' | 'hide_others' | 'none', ids: Set<string> } | undefined;
 }
 
 export const useGraphView = ({
@@ -50,7 +50,7 @@ export const useGraphView = ({
         if (!activeView) return elements;
 
         // 1. Get View Config
-        const { explicitInclusions, explicitExclusions, filters } = activeView;
+        const { explicitInclusions, explicitExclusions, filters, nodePositions } = activeView;
         const { tags, date, nodeFilter: viewNodeFilter } = filters;
         const inclusionSet = new Set(explicitInclusions);
         const exclusionSet = new Set(explicitExclusions);
@@ -82,7 +82,7 @@ export const useGraphView = ({
 
             // Include Logic: If includedTagSet has content, node must have at least one.
             const hasIncludedTag = element.tags.some(tag => includedTagSet.has(tag));
-            if (includedTagSet.size > 0 && !hasIncludedTag && element.tags.length > 0) return false;
+            if (includedTagSet.size > 0 && !hasIncludedTag) return false;
 
             // E. Date Filters
             const createdDate = element.createdAt.substring(0, 10);
@@ -104,10 +104,29 @@ export const useGraphView = ({
         }
 
         // B. Analysis Filter (Hide/Hide Others from NetworkAnalysisPanel)
-        if (analysisFilterState.mode === 'hide') {
+        if (analysisFilterState && analysisFilterState.mode === 'hide') {
             viewNodes = viewNodes.filter(e => !analysisFilterState.ids.has(e.id));
-        } else if (analysisFilterState.mode === 'hide_others') {
+        } else if (analysisFilterState && analysisFilterState.mode === 'hide_others') {
             viewNodes = viewNodes.filter(e => analysisFilterState.ids.has(e.id));
+        }
+
+        // 4. Position Overrides
+        // If the view has specific positions stored for nodes, use them.
+        // Otherwise, fall back to the global position on the element.
+        if (nodePositions) {
+            return viewNodes.map(el => {
+                const override = nodePositions[el.id];
+                if (override) {
+                    return {
+                        ...el,
+                        x: override.x,
+                        y: override.y,
+                        fx: override.x, // Fix position in D3 to prevent drift
+                        fy: override.y
+                    };
+                }
+                return el;
+            });
         }
 
         return viewNodes;

@@ -265,6 +265,8 @@ export interface GraphView {
   explicitExclusions: string[]; 
   // Camera State
   camera?: { x: number, y: number, k: number };
+  // Node Positions Override
+  nodePositions?: Record<string, { x: number, y: number }>;
 }
 
 export interface ModelMetadata {

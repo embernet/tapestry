@@ -25,7 +25,8 @@ interface GraphCanvasProps {
   setMultiSelection: React.Dispatch<React.SetStateAction<Set<string>>>;
   selectedRelationshipId: string | null;
   focusMode: 'narrow' | 'wide' | 'zoom';
-  setElements: React.Dispatch<React.SetStateAction<Element[]>>;
+  setElements: React.Dispatch<React.SetStateAction<Element[]>>; // Retain for legacy direct updates if needed, but prefer onNodeMove
+  onNodeMove?: (id: string, x: number, y: number) => void; // New Prop
   isPhysicsModeActive: boolean;
   layoutParams: { linkDistance: number; repulsion: number };
   onJiggleTrigger?: number;
@@ -138,6 +139,7 @@ function getRectIntersection(sNode: D3Node, tNode: { x?: number; y?: number }) {
 }
 
 const createDragHandler = (
+  onNodeMove: ((id: string, x: number, y: number) => void) | undefined,
   setElementsState: React.Dispatch<React.SetStateAction<Element[]>>,
   onNodeClickCallback: (elementId: string, event: MouseEvent) => void,
   onNodeConnectCallback: (sourceId: string, targetId: string) => void,
@@ -194,7 +196,6 @@ const createDragHandler = (
 
     if (isMoving) {
         // D3 v6+ automatically handles transforms for us in event.dx/dy if attached correctly
-        // so we do not divide by transform.k here.
         const dx = event.dx;
         const dy = event.dy;
 
@@ -274,16 +275,25 @@ const createDragHandler = (
         const nodeMap = new Map(d3Nodes.map(n => [n.id, { x: n.x, y: n.y, fx: n.fx, fy: n.fy }]));
         const isGroupDrag = multiSelection.has(d.id);
 
-        setElementsState(prev => prev.map(el => {
-            // If in group drag, update all selected. Else update dragged one.
-            if (isGroupDrag ? multiSelection.has(el.id) : el.id === d.id) {
-                const d3N = nodeMap.get(el.id);
-                if (d3N) {
-                    return { ...el, x: d3N.x, y: d3N.y, fx: d3N.fx, fy: d3N.fy, updatedAt: new Date().toISOString() };
+        if (onNodeMove) {
+            // New way: Call handler for each moved node
+             d3Nodes.forEach((n: any) => {
+                 if (isGroupDrag ? multiSelection.has(n.id) : n.id === d.id) {
+                     onNodeMove(n.id, n.x, n.y);
+                 }
+             });
+        } else {
+            // Fallback: Direct state update (Legacy)
+            setElementsState(prev => prev.map(el => {
+                if (isGroupDrag ? multiSelection.has(el.id) : el.id === d.id) {
+                    const d3N = nodeMap.get(el.id);
+                    if (d3N) {
+                        return { ...el, x: d3N.x, y: d3N.y, fx: d3N.fx, fy: d3N.fy, updatedAt: new Date().toISOString() };
+                    }
                 }
-            }
-            return el;
-        }));
+                return el;
+            }));
+        }
     } else {
         // Connect drag end
         const dropTargetElement = event.sourceEvent.target as HTMLElement;
@@ -312,6 +322,7 @@ const createPhysicsDragHandler = (
     simulation: any, 
     onNodeClickCallback: (elementId: string, event: MouseEvent) => void,
     setElementsState: React.Dispatch<React.SetStateAction<Element[]>>,
+    onNodeMove: ((id: string, x: number, y: number) => void) | undefined,
     multiSelection: Set<string>
 ) => {
   let startX = 0;
@@ -353,8 +364,6 @@ const createPhysicsDragHandler = (
         hasMoved = true;
     }
 
-    // Update fx/fy for all selected nodes
-    // D3 v6+ handles zoom transform in dx/dy automatically
     const dx = event.dx;
     const dy = event.dy;
 
@@ -364,7 +373,6 @@ const createPhysicsDragHandler = (
         .each((n: any) => {
             if (n.fx !== undefined && n.fx !== null) n.fx += dx;
             if (n.fy !== undefined && n.fy !== null) n.fy += dy;
-            // Note: n.x/n.y will be updated by simulation tick
         });
   }
 
@@ -379,11 +387,8 @@ const createPhysicsDragHandler = (
         onNodeClickCallback(d.id, event.sourceEvent);
     }
 
-    // Unpin nodes (or keep them fixed if that's the design, here we unpin)
-    // NOTE: Standard d3 force drag unpins on end.
     const isGroupDrag = multiSelection.has(d.id);
     
-    // Capture final positions before unpinning to save state
     const d3Nodes = d3.select(this.ownerSVGElement).selectAll('.node').data() as D3Node[];
     const nodeMap = new Map(d3Nodes.map(n => [n.id, { x: n.x, y: n.y }]));
 
@@ -394,16 +399,23 @@ const createPhysicsDragHandler = (
             n.fy = null;
         });
     
-    // Sync back to React
-    setElementsState(prev => prev.map(el => {
-        if (isGroupDrag ? multiSelection.has(el.id) : el.id === d.id) {
-            const d3N = nodeMap.get(el.id);
-            if (d3N) {
-                return { ...el, x: d3N.x, y: d3N.y, fx: null, fy: null, updatedAt: new Date().toISOString() };
+    if (onNodeMove) {
+         d3Nodes.forEach((n: any) => {
+             if (isGroupDrag ? multiSelection.has(n.id) : n.id === d.id) {
+                 onNodeMove(n.id, n.x!, n.y!);
+             }
+         });
+    } else {
+        setElementsState(prev => prev.map(el => {
+            if (isGroupDrag ? multiSelection.has(el.id) : el.id === d.id) {
+                const d3N = nodeMap.get(el.id);
+                if (d3N) {
+                    return { ...el, x: d3N.x, y: d3N.y, fx: null, fy: null, updatedAt: new Date().toISOString() };
+                }
             }
-        }
-        return el;
-    }));
+            return el;
+        }));
+    }
   }
 
   return d3.drag()
@@ -432,6 +444,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   selectedRelationshipId,
   focusMode,
   setElements,
+  onNodeMove,
   isPhysicsModeActive,
   layoutParams,
   onJiggleTrigger,
@@ -461,11 +474,10 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       initialSelection: Set<string>;
   } | null>(null);
   
-  // Ref to prevent click event on canvas after drag selection
   const preventClickRef = useRef(false);
 
-  // Use a separate useEffect to attach/detach window listeners for selection drag
-  // This avoids stale closures and re-binding listeners constantly
+  // ... (Selection Logic - handleMouseMove, handleMouseUp, handleSelectionMouseDown) ...
+  // Keeping selection logic same as original file, omitted for brevity but assumed present
   useEffect(() => {
     if (!isSelecting) return;
 
@@ -475,14 +487,12 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             
-            // Update ref for logic
             selectionDragRef.current = {
                 ...selectionDragRef.current,
                 currentX: x,
                 currentY: y
             };
             
-            // Update visual box
             setSelectionBox({ 
                 startX: selectionDragRef.current.startX, 
                 startY: selectionDragRef.current.startY, 
@@ -490,7 +500,6 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
                 currentY: y 
             });
 
-            // --- Dynamic Selection Logic ---
             const box = selectionDragRef.current;
             const xMin = Math.min(box.startX, box.currentX);
             const xMax = Math.max(box.startX, box.currentX);
@@ -501,43 +510,30 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
                  const transform = d3.zoomTransform(svgRef.current);
                  const boxSelection = new Set<string>();
 
-                 // We iterate through D3 nodes to get current positions
                  d3.select(gRef.current).selectAll('.node').each(function(d: any) {
                      if (d.x !== undefined && d.y !== undefined) {
-                         // Convert simulation coords to screen coords
                          const screenX = d.x * transform.k + transform.x;
                          const screenY = d.y * transform.k + transform.y;
                          
-                         // Check intersection
                          if (screenX >= xMin && screenX <= xMax && screenY >= yMin && screenY <= yMax) {
                              boxSelection.add(d.id);
                          }
                      }
                  });
                  
-                 // Determine final selection based on Modifier keys
                  let finalSelection: Set<string>;
-                 
                  if (e.metaKey || e.ctrlKey) {
-                     // Invert Selection (XOR)
-                     // Keep everything in initial, toggle everything in box
                      finalSelection = new Set(box.initialSelection);
                      boxSelection.forEach(id => {
-                         if (finalSelection.has(id)) {
-                             finalSelection.delete(id);
-                         } else {
-                             finalSelection.add(id);
-                         }
+                         if (finalSelection.has(id)) finalSelection.delete(id);
+                         else finalSelection.add(id);
                      });
                  } else if (e.shiftKey) {
-                     // Add to selection
                      finalSelection = new Set([...box.initialSelection, ...boxSelection]);
                  } else {
-                     // Replace selection
                      finalSelection = boxSelection;
                  }
                  
-                 // Update state if selection changed to trigger visual feedback
                  setMultiSelection(prev => {
                      if (prev.size === finalSelection.size && [...prev].every(id => finalSelection.has(id))) {
                          return prev;
@@ -558,18 +554,15 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
              const width = Math.abs(box.currentX - box.startX);
              const height = Math.abs(box.currentY - box.startY);
              
-             // Only clear if it was a tiny drag (click)
              if (width < 5 && height < 5) {
                  setMultiSelection(new Set());
                  setSelectedElementId(null);
              } else {
-                 // Significant drag happened, keep selection and prevent subsequent click
                  preventClickRef.current = true;
                  setTimeout(() => { preventClickRef.current = false; }, 100);
              }
         }
         
-        // Reset State
         setIsSelecting(false);
         selectionDragRef.current = null;
         setSelectionBox(null);
@@ -585,7 +578,6 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   }, [isSelecting, setMultiSelection, setSelectedElementId]);
 
   const handleSelectionMouseDown = (e: React.MouseEvent) => {
-      // Alt + Left Click starts selection
       if (e.button === 0 && e.altKey && svgRef.current) {
           e.preventDefault();
           e.stopPropagation();
@@ -593,8 +585,6 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
           const rect = svgRef.current.getBoundingClientRect();
           const x = e.clientX - rect.left;
           const y = e.clientY - rect.top;
-
-          // Capture current selection for adding to it
           const initialSelection = new Set(multiSelection);
 
           const initBox = { 
@@ -606,7 +596,6 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
           };
           
           selectionDragRef.current = initBox;
-          // For UI rendering, we just need coords
           setSelectionBox({ startX: x, startY: y, currentX: x, currentY: y });
           setIsSelecting(true);
       }
@@ -642,7 +631,6 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
 
     if (boundsWidth <= 0 || boundsHeight <= 0) return;
 
-    // Increased padding from 0.9 to 0.8 to provide more space around the model
     const padding = 0.8;
     let scale = padding * Math.min(width / boundsWidth, height / boundsHeight);
     
@@ -685,41 +673,30 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     },
     exportAsImage: (filename: string, bgColor: string = '#ffffff') => {
         if (!svgRef.current) return;
-        
         const svg = svgRef.current;
         const serializer = new XMLSerializer();
         let source = serializer.serializeToString(svg);
-        
-        // Namespace fix
         if(!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)){
             source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
         }
         if(!source.match(/^<svg[^>]+xmlns:xlink/)){
             source = source.replace(/^<svg/, '<svg xmlns:xlink="http://www.w3.org/1999/xlink"');
         }
-        
-        // Fix for foreignObject issues in some browsers (ensure XHTML namespace)
         source = source.replace(/<foreignObject/g, '<foreignObject xmlns="http://www.w3.org/2000/svg"');
-
         const svgBlob = new Blob([source], {type: "image/svg+xml;charset=utf-8"});
         const url = URL.createObjectURL(svgBlob);
-        
         const img = new Image();
         img.onload = () => {
             const canvas = document.createElement("canvas");
             const rect = svg.getBoundingClientRect();
-            const scale = 2; // Higher resolution
+            const scale = 2; 
             canvas.width = rect.width * scale;
             canvas.height = rect.height * scale;
             const ctx = canvas.getContext("2d");
             if (ctx) {
-                // Background
                 ctx.fillStyle = bgColor;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                // Draw
                 ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                
-                // Download
                 const a = document.createElement('a');
                 a.download = filename;
                 a.href = canvas.toDataURL("image/png");
@@ -736,19 +713,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
   const highlightedNodeIds = useMemo(() => {
     const ids = new Set<string>();
     if (multiSelection.size > 0) {
-        // If multi-selection is active, highlight all selected nodes
-        multiSelection.forEach(id => {
-            ids.add(id);
-        });
-        // Highlight internal connections between selected nodes if multiple
-        if (multiSelection.size > 1) {
-             relationships.forEach(rel => {
-                if (multiSelection.has(rel.source as string) && multiSelection.has(rel.target as string)) {
-                    // Keep them visible, effectively handled by node opacity check logic
-                }
-            });
-        }
-        // Ensure primary selection connections shown if only one
+        multiSelection.forEach(id => { ids.add(id); });
         if (multiSelection.size === 1 && selectedElementId) {
              relationships.forEach(rel => {
                 if (rel.source === selectedElementId) ids.add(rel.target as string);
@@ -762,11 +727,9 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
             ids.add(rel.target as string);
         }
     }
-
     if (analysisHighlights) {
         analysisHighlights.forEach((_, id) => ids.add(id));
     }
-
     return ids;
   }, [selectedElementId, selectedRelationshipId, relationships, multiSelection, analysisHighlights]);
 
@@ -780,39 +743,26 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     }
   }, [focusMode, highlightedNodeIds]);
 
-  // Respond to layout param changes
   useEffect(() => {
       if (simulationRef.current && isPhysicsModeActive) {
           const sim = simulationRef.current;
-          
-          // Update existing forces rather than replacing them to maintain state
           const linkForce = sim.force('link');
-          if (linkForce) {
-              linkForce.distance(layoutParams.linkDistance);
-          }
-
+          if (linkForce) linkForce.distance(layoutParams.linkDistance);
           const chargeForce = sim.force('charge');
-          if (chargeForce) {
-              chargeForce.strength(layoutParams.repulsion);
-          }
-
+          if (chargeForce) chargeForce.strength(layoutParams.repulsion);
           sim.alpha(0.3).restart();
       }
   }, [layoutParams, isPhysicsModeActive]);
 
-  // Respond to jiggle trigger
   useEffect(() => {
       if (onJiggleTrigger && simulationRef.current && isPhysicsModeActive) {
-          const sim = simulationRef.current;
-          sim.alpha(0.5).restart();
+          simulationRef.current.alpha(0.5).restart();
       }
   }, [onJiggleTrigger, isPhysicsModeActive]);
 
   const handleCanvasContextMenu = (event: React.MouseEvent) => {
     const target = event.target as HTMLElement;
-    if (target.closest('.node') || target.closest('.link-label-group')) {
-        return;
-    }
+    if (target.closest('.node') || target.closest('.link-label-group')) return;
     onCanvasContextMenu(event);
   };
 
@@ -839,7 +789,6 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     }
     
     const simulation = simulationRef.current;
-    
     const simGetter = simulation as any;
     const existingNodesMap = new Map((simGetter.nodes() as D3Node[]).map((node: D3Node) => [node.id, node]));
     const d3Nodes = elements.map(element => {
@@ -859,16 +808,15 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
 
     simulation.nodes(d3Nodes);
     
-    // Theme Colors
-    const linkColor = isDarkMode ? '#6b7280' : '#4b5563'; // gray-500 : gray-600
-    const textFillColor = isDarkMode ? '#9ca3af' : '#374151'; // gray-400 : gray-700
-    const selectedLinkColor = '#60a5fa'; // blue-400
+    const linkColor = isDarkMode ? '#6b7280' : '#4b5563'; 
+    const textFillColor = isDarkMode ? '#9ca3af' : '#374151'; 
+    const selectedLinkColor = '#60a5fa';
 
     const link = linkGroup.selectAll('.link')
       .data(d3Links, (d: any) => d.id)
       .join('path')
       .attr('class', 'link')
-      .attr('id', (d: any) => d.id) // Ensure ID is set on path for label textPath reference
+      .attr('id', (d: any) => d.id)
       .attr('stroke', (d: any) => (d.id === selectedRelationshipId ? selectedLinkColor : linkColor))
       .attr('stroke-width', (d: any) => (d.id === selectedRelationshipId ? 3 : 2))
       .attr('fill', 'none')
@@ -883,7 +831,6 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         const sourceId = typeof l.source === 'object' ? (l.source as D3Node).id : l.source as string;
         const targetId = typeof l.target === 'object' ? (l.target as D3Node).id : l.target as string;
         
-        // Highlight link if connected to selection
         const isConnectedToSelection = multiSelection.has(sourceId) || multiSelection.has(targetId);
         return isConnectedToSelection ? 1.0 : 0.2;
       })
@@ -947,30 +894,21 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
       .attr('class', 'node')
       .on('contextmenu', (event: any, d: any) => onNodeContextMenu(event, d.id))
       .on('mouseenter', function(event: any, d: any) {
-          // Show Quick Add Buttons
-          if (isBulkEditActive || isPhysicsModeActive || isHighlightToolActive) return; // Don't show in special modes
-          
+          if (isBulkEditActive || isPhysicsModeActive || isHighlightToolActive) return;
           const group = d3.select(this);
           const width = d.width || NODE_MAX_WIDTH;
           const height = d.height || 80;
           const w2 = width / 2;
           const h2 = height / 2;
-          const pad = 15; // Distance from edge
+          const pad = 15;
           const btnR = 7;
-          
-          // Gap buffer ensures mouse can travel to button without leaving the group
           const gapBuffer = 15;
           const extension = pad + btnR + gapBuffer;
 
-          // Remove existing if any (cleanup)
           group.selectAll('.quick-add-group').remove();
           group.selectAll('.bridge-group').remove();
 
-          // 1. Insert "Bridge" group at the bottom (first child) so it is behind the node
-          // This ensures the main node center is still clickable (via Move Zone or Text),
-          // but the "air" around the node captures mouse events to keep the menu open.
           const bridgeGroup = group.insert('g', ':first-child').attr('class', 'bridge-group');
-          
           bridgeGroup.append('rect')
               .attr('width', width + extension * 2)
               .attr('height', height + extension * 2)
@@ -978,12 +916,10 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
               .attr('y', -(height / 2) - extension)
               .attr('rx', 20).attr('ry', 20)
               .attr('fill', 'transparent') 
-              .style('pointer-events', 'all'); // Ensure it catches hover
+              .style('pointer-events', 'all');
 
-          // 2. Append Controls Group (on top)
           const controls = group.append('g').attr('class', 'quick-add-group');
           
-          // 8 Positions: N, NE, E, SE, S, SW, W, NW
           const directions = [
               { id: 'n',  x: 0, y: -h2 - pad, vx: 0, vy: -1 },
               { id: 'ne', x: w2 + pad, y: -h2 - pad, vx: 1, vy: -1 },
@@ -1005,7 +941,6 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
               .style('opacity', 0)
               .on('click', (e: any, p: any) => {
                   e.stopPropagation();
-                  // Calculate new position (approx 200px away)
                   const dist = 200;
                   const newX = (d.x || 0) + (p.vx * dist);
                   const newY = (d.y || 0) + (p.vy * dist);
@@ -1018,8 +953,6 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
                       .attr('fill', isDarkMode ? '#1f2937' : '#ffffff')
                       .attr('stroke', '#3b82f6')
                       .attr('stroke-width', 1.5);
-                  
-                  // Plus sign
                   btn.append('path')
                       .attr('d', 'M-3 0 h6 M0 -3 v6')
                       .attr('stroke', '#3b82f6')
@@ -1038,45 +971,35 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
           return ((multiSelection.size === 0 && !selectedRelationshipId) || highlightedNodeIds.has(d.id)) ? 1.0 : 0.2;
       });
 
-    // --- Node Shape Rendering Logic ---
     (node.selectAll('*') as any).remove(); 
 
-    // Determine shape dimensions based on mode
     const getShapeSize = (nodeShape: NodeShape) => {
-        if (nodeShape === 'circle') return { w: 60, h: 60 }; // R = 30
-        if (nodeShape === 'point') return { w: 12, h: 12 };  // R = 6
-        return { w: NODE_MAX_WIDTH, h: 80 }; // Rect/Oval default
+        if (nodeShape === 'circle') return { w: 60, h: 60 };
+        if (nodeShape === 'point') return { w: 12, h: 12 };
+        return { w: NODE_MAX_WIDTH, h: 80 };
     };
 
     const currentShapeSize = getShapeSize(nodeShape as NodeShape);
     const isCompact = nodeShape === 'circle' || nodeShape === 'point';
 
-    // --- Highlighter "Scribble" Path ---
     node.append('path')
         .attr('class', 'highlight-scribble')
         .attr('fill', 'none')
         .attr('stroke-linecap', 'round')
         .attr('stroke-linejoin', 'round')
-        // We hide it initially or use display: none if not highlighted, logic below handles d/stroke
         .attr('d', '')
-        .attr('stroke-width', 3) // Thinner for smaller shapes
+        .attr('stroke-width', 3)
         .attr('stroke-opacity', 0.6)
         .attr('filter', 'url(#marker-blur)')
-        .style('pointer-events', 'none'); // Let clicks pass through
+        .style('pointer-events', 'none');
 
-    // --- Main Shape ---
     if (nodeShape === 'oval') {
-        node.append('ellipse')
-            .attr('rx', (d: any) => (d.width || NODE_MAX_WIDTH)/2)
-            .attr('ry', (d: any) => (d.height || 80)/2);
+        node.append('ellipse').attr('rx', (d: any) => (d.width || NODE_MAX_WIDTH)/2).attr('ry', (d: any) => (d.height || 80)/2);
     } else if (nodeShape === 'circle') {
-        node.append('circle')
-            .attr('r', 30);
+        node.append('circle').attr('r', 30);
     } else if (nodeShape === 'point') {
-        node.append('circle')
-            .attr('r', 6);
+        node.append('circle').attr('r', 6);
     } else {
-        // Rectangle (Default)
         node.append('rect')
             .attr('width', (d: any) => d.width || NODE_MAX_WIDTH)
             .attr('height', (d: any) => d.height || 80)
@@ -1085,7 +1008,6 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
             .attr('rx', 8).attr('ry', 8);
     }
 
-    // Apply styling to the shape (whether rect, circle, or ellipse)
     node.select(nodeShape === 'oval' ? 'ellipse' : (isCompact ? 'circle' : 'rect'))
         .attr('fill', (d: any) => {
             if (!activeColorScheme) return DEFAULT_NODE_COLOR;
@@ -1098,11 +1020,11 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .attr('stroke', (d: any) => {
             if (simulationState && simulationState[d.id]) {
                 const state = simulationState[d.id];
-                if (state === 'increased') return '#22c55e'; // Green
-                if (state === 'decreased') return '#ef4444'; // Red
+                if (state === 'increased') return '#22c55e';
+                if (state === 'decreased') return '#ef4444';
             }
-            if (multiSelection.has(d.id)) return '#eab308'; // Yellow-500
-            return '#cbd5e1'; // Default border
+            if (multiSelection.has(d.id)) return '#eab308';
+            return '#cbd5e1';
         })
         .style('transition', 'stroke 0.2s ease, stroke-width 0.2s ease, filter 0.2s ease')
         .attr('stroke-width', (d: any) => {
@@ -1117,9 +1039,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
             return null;
         });
 
-    // --- Text Content ---
-    const fo = node.append('foreignObject')
-        .attr('pointer-events', 'none');
+    const fo = node.append('foreignObject').attr('pointer-events', 'none');
         
     const div = fo.append('xhtml:div')
         .style('width', '100%')
@@ -1134,65 +1054,35 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .html((d: any) => d.name);
 
     if (isCompact) {
-        // Text OUTSIDE to the right
         const offsetX = nodeShape === 'circle' ? 35 : 12;
-        fo.attr('width', 200)
-          .attr('height', 40)
-          .attr('x', offsetX)
-          .attr('y', -20); // Centered vertically relative to circle center
-          
-        div.style('color', isDarkMode ? '#ffffff' : '#000000')
-           .style('text-shadow', isDarkMode ? '0px 0px 4px #000' : '0px 0px 4px #fff')
-           .style('text-align', 'left')
-           .style('padding', '0');
+        fo.attr('width', 200).attr('height', 40).attr('x', offsetX).attr('y', -20);
+        div.style('color', isDarkMode ? '#ffffff' : '#000000').style('text-shadow', isDarkMode ? '0px 0px 4px #000' : '0px 0px 4px #fff').style('text-align', 'left').style('padding', '0');
     } else {
-        // Text INSIDE
         fo.attr('width', NODE_MAX_WIDTH);
-        
-        div.style('color', '#1f2937')
-           .style('text-align', 'center')
-           .style('min-height', '80px')
-           .style('padding', `${NODE_PADDING * 1.5}px ${NODE_PADDING}px`);
+        div.style('color', '#1f2937').style('text-align', 'center').style('min-height', '80px').style('padding', `${NODE_PADDING * 1.5}px ${NODE_PADDING}px`);
     }
 
-    // --- Move Zone (Interaction Layer) ---
-    node.append('rect')
-        .attr('class', 'move-zone')
-        .attr('fill', 'transparent');
+    node.append('rect').attr('class', 'move-zone').attr('fill', 'transparent');
 
-    // --- Size Calculation Loop ---
     node.each(function (d: any) {
         const nodeElement = d3.select(this);
-        
-        // Determine logical dimensions for connections
         let width = NODE_MAX_WIDTH;
         let height = 80;
         
         if (isCompact) {
-            // Fixed size for connections
             width = currentShapeSize.w;
             height = currentShapeSize.h;
         } else {
-            // Dynamic size based on text
             const foDiv = nodeElement.select('div').node();
             if (foDiv) {
                 height = foDiv.scrollHeight;
                 width = NODE_MAX_WIDTH;
+                nodeElement.select('foreignObject').attr('width', width).attr('height', height).attr('x', -width / 2).attr('y', -height / 2);
                 
-                // Update FO size/pos for internal text
-                nodeElement.select('foreignObject')
-                    .attr('width', width).attr('height', height)
-                    .attr('x', -width / 2).attr('y', -height / 2);
-                
-                // Update Shape size
                 if (nodeShape === 'oval') {
-                    nodeElement.select('ellipse')
-                        .attr('rx', width/2)
-                        .attr('ry', height/2);
+                    nodeElement.select('ellipse').attr('rx', width/2).attr('ry', height/2);
                 } else {
-                    nodeElement.select('rect:not(.move-zone)')
-                        .attr('width', width).attr('height', height)
-                        .attr('x', -width / 2).attr('y', -height / 2);
+                    nodeElement.select('rect:not(.move-zone)').attr('width', width).attr('height', height).attr('x', -width / 2).attr('y', -height / 2);
                 }
             }
         }
@@ -1201,49 +1091,32 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         dNode.width = width;
         dNode.height = height;
             
-        // Scribble Path update: Check META highlight OR Analysis highlight
         const metaHighlight = d.meta?.highlightColor;
         const analysisHighlight = analysisHighlights?.get(d.id);
         const activeHighlightColor = analysisHighlight || metaHighlight;
 
         if (activeHighlightColor) {
              const scribblePath = generateScribblePath(width, height, d.id);
-             
-             nodeElement.select('.highlight-scribble')
-                .attr('d', scribblePath)
-                .attr('stroke', activeHighlightColor) 
-                .style('display', 'block');
+             nodeElement.select('.highlight-scribble').attr('d', scribblePath).attr('stroke', activeHighlightColor).style('display', 'block');
         } else {
-             nodeElement.select('.highlight-scribble')
-                .style('display', 'none');
+             nodeElement.select('.highlight-scribble').style('display', 'none');
         }
         
         const CONNECT_BORDER_WIDTH = isCompact ? 5 : 20;
         const moveZoneWidth = Math.max(0, width - 2 * CONNECT_BORDER_WIDTH);
         const moveZoneHeight = Math.max(0, height - 2 * CONNECT_BORDER_WIDTH);
         
-        nodeElement.select('.move-zone')
-            .attr('width', moveZoneWidth)
-            .attr('height', moveZoneHeight)
-            .attr('x', -moveZoneWidth / 2)
-            .attr('y', -moveZoneHeight / 2);
+        nodeElement.select('.move-zone').attr('width', moveZoneWidth).attr('height', moveZoneHeight).attr('x', -moveZoneWidth / 2).attr('y', -moveZoneHeight / 2);
     });
     
-    // Apply Cursor Style based on Mode
-    let cursorStyle = 'default';
-    
-    // Custom SVG Cursor for Bulk Edit (pink lightning bolt to match toolbar)
     const bulkCursorSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ec4899" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>`);
     const bulkCursor = `url("data:image/svg+xml;charset=utf-8,${bulkCursorSvg}") 12 12, auto`;
-
-    // Custom SVG Cursor for Highlight Pen (yellow highlighter)
     const highlightCursorSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#facc15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h3l6-6"/><path d="m22 2-2.5 2.5"/><path d="M13.5 6.5 8 12"/></svg>`);
     const highlightCursor = `url("data:image/svg+xml;charset=utf-8,${highlightCursorSvg}") 2 22, auto`;
-
-    // Custom SVG Cursor for Connect Mode (blue plus circle)
     const connectCursorSvg = encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="rgba(255,255,255,0.2)" stroke="#3b82f6" stroke-width="2" /><path d="M12 7v10M7 12h10" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" /></svg>`);
     const connectCursor = `url("data:image/svg+xml;charset=utf-8,${connectCursorSvg}") 12 12, crosshair`;
 
+    let cursorStyle = 'default';
     let moveZoneCursor = isPhysicsModeActive ? 'grab' : 'move';
 
     if (isBulkEditActive) {
@@ -1253,12 +1126,12 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         cursorStyle = highlightCursor;
         moveZoneCursor = highlightCursor;
     } else if (isSimulationMode) {
-        cursorStyle = 'pointer'; // Click to stimulate
+        cursorStyle = 'pointer';
         moveZoneCursor = 'pointer';
     } else if (isPhysicsModeActive) {
         cursorStyle = 'grab';
     } else {
-        cursorStyle = connectCursor; // Custom Connect Cursor
+        cursorStyle = connectCursor;
     }
 
     node.style('cursor', cursorStyle);
@@ -1266,7 +1139,6 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
 
     const zoom = d3.zoom()
         .filter((event: any) => {
-            // Allow zoom if NO buttons are pressed (wheel) OR if left button is pressed WITHOUT Alt
             return (!event.button && !event.altKey) || (event.button === 0 && !event.altKey);
         })
         .on('zoom', (event: any) => {
@@ -1283,10 +1155,8 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         onCanvasClick();
     });
     
-    // Add SVG text/background double click listener
     svg.on('dblclick.zoom', null)
       .on('dblclick', (event: any) => {
-        // Check if click target is svg background
         if (event.target.tagName === 'svg' || event.target === svg.node() || event.target.tagName === 'rect' && event.target.classList.contains('selection-box')) {
             const node = g.node();
             if (node) {
@@ -1302,7 +1172,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .force('charge', d3.forceManyBody().strength(layoutParams.repulsion))
         .force('center', d3.forceCenter(width / 2, height / 2));
 
-      const physicsDragHandler = createPhysicsDragHandler(simulation, onNodeClick, setElements, multiSelection);
+      const physicsDragHandler = createPhysicsDragHandler(simulation, onNodeClick, setElements, onNodeMove, multiSelection);
       node.call(physicsDragHandler as any);
     } else {
       simulation
@@ -1310,7 +1180,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
         .force('charge', null)
         .force('center', null);
         
-      const staticDragHandler = createDragHandler(setElements, onNodeClick, onNodeConnect, onNodeConnectToNew, multiSelection);
+      const staticDragHandler = createDragHandler(onNodeMove, setElements, onNodeClick, onNodeConnect, onNodeConnectToNew, multiSelection);
       node.call(staticDragHandler as any);
     }
 
@@ -1336,7 +1206,7 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     
     (simulation.alpha(0.3) as any).restart();
 
-  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, multiSelection, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, onLinkContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState, isSimulationMode, analysisHighlights, isDarkMode, nodeShape, isHighlightToolActive]);
+  }, [elements, relationships, activeColorScheme, selectedElementId, selectedRelationshipId, multiSelection, onNodeClick, onLinkClick, onCanvasClick, onCanvasDoubleClick, onNodeContextMenu, onLinkContextMenu, setElements, onNodeConnect, onNodeConnectToNew, focusMode, isPhysicsModeActive, highlightedNodeIds, onCanvasContextMenu, isBulkEditActive, simulationState, isSimulationMode, analysisHighlights, isDarkMode, nodeShape, isHighlightToolActive, onNodeMove]);
 
   return (
     <div className={`w-full h-full flex-grow cursor-grab active:cursor-grabbing select-none ${isDarkMode ? 'bg-gray-900' : 'bg-gray-50'}`} 
@@ -1345,104 +1215,53 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     >
       <svg ref={svgRef} className="w-full h-full">
         <defs>
-          <marker
-            id="arrow"
-            viewBox="0 -5 10 10"
-            refX={10}
-            refY={0}
-            markerWidth={6}
-            markerHeight={6}
-            orient="auto">
+          <marker id="arrow" viewBox="0 -5 10 10" refX={10} refY={0} markerWidth={6} markerHeight={6} orient="auto">
             <path d="M0,-5L10,0L0,5" fill="#6b7280"></path>
           </marker>
-          <marker
-            id="arrow-rev"
-            viewBox="0 -5 10 10"
-            refX={0}
-            refY={0}
-            markerWidth={6}
-            markerHeight={6}
-            orient="auto">
+          <marker id="arrow-rev" viewBox="0 -5 10 10" refX={0} refY={0} markerWidth={6} markerHeight={6} orient="auto">
             <path d="M10,-5L0,0L10,5" fill="#6b7280"></path>
           </marker>
-          {/* Light Mode Markers */}
-          <marker
-            id="arrow-light"
-            viewBox="0 -5 10 10"
-            refX={10}
-            refY={0}
-            markerWidth={6}
-            markerHeight={6}
-            orient="auto">
+          <marker id="arrow-light" viewBox="0 -5 10 10" refX={10} refY={0} markerWidth={6} markerHeight={6} orient="auto">
             <path d="M0,-5L10,0L0,5" fill="#4b5563"></path>
           </marker>
-          <marker
-            id="arrow-rev-light"
-            viewBox="0 -5 10 10"
-            refX={0}
-            refY={0}
-            markerWidth={6}
-            markerHeight={6}
-            orient="auto">
+          <marker id="arrow-rev-light" viewBox="0 -5 10 10" refX={0} refY={0} markerWidth={6} markerHeight={6} orient="auto">
             <path d="M10,-5L0,0L10,5" fill="#4b5563"></path>
           </marker>
-
           <filter id="marker-blur">
             <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" />
           </filter>
-
           <filter id="glow-green" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
-            <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-            </feMerge>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
             <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#22c55e" floodOpacity="0.8" />
           </filter>
           <filter id="glow-red" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
-            <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-            </feMerge>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
             <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#ef4444" floodOpacity="0.8" />
           </filter>
           <filter id="glow-yellow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
-            <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-            </feMerge>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
             <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#eab308" floodOpacity="0.8" />
           </filter>
           <filter id="glow-blue" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
-            <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-            </feMerge>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
             <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#3b82f6" floodOpacity="0.8" />
           </filter>
           <filter id="glow-orange" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
-            <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-            </feMerge>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
             <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#f97316" floodOpacity="0.8" />
           </filter>
           <filter id="glow-purple" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
-            <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-            </feMerge>
+            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
             <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor="#a855f7" floodOpacity="0.8" />
           </filter>
         </defs>
         <g ref={gRef}></g>
-        
-        {/* Selection Box Overlay */}
         {selectionBox && (
             <rect 
                 x={Math.min(selectionBox.startX, selectionBox.currentX)}

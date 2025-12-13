@@ -77,7 +77,8 @@ export const createDefaultView = (): GraphView => {
             nodeFilter: { centerId: null, hops: 1, active: false }
         },
         explicitInclusions: [],
-        explicitExclusions: []
+        explicitExclusions: [],
+        nodePositions: {}
     };
 };
 
