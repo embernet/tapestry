@@ -1,5 +1,7 @@
+
 import React from 'react';
 import { NodeShape } from '../types';
+import { AutoLayoutIcon } from '../icons/AutoLayoutIcon';
 
 interface LayoutToolbarProps {
   linkDistance: number;
@@ -190,9 +192,7 @@ const LayoutToolbar: React.FC<LayoutToolbarProps> = ({
                                 className={`flex flex-col items-center justify-center p-1 rounded border transition-colors h-8 w-8 disabled:opacity-30 ${iconButtonBg}`}
                                 title="Auto Layout"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4h6v6H4zM14 14h6v6h-6zM10 10l4 4" />
-                                </svg>
+                                <AutoLayoutIcon className="h-5 w-5" />
                             </button>
                         </div>
 

@@ -4,6 +4,7 @@ import { useClickOutside } from '../hooks/useClickOutside';
 import { HelpMenu } from './HelpMenu';
 import { ViewSelect } from './ViewSelect';
 import { GraphView } from '../types';
+import { AutoLayoutIcon } from '../icons/AutoLayoutIcon';
 
 interface AppHeaderProps {
   currentModelName: string;
@@ -287,6 +288,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             <div className={`absolute top-full left-0 mt-2 w-64 border rounded-lg shadow-xl py-2 flex flex-col z-50 text-sm animate-fade-in-down ${menuBg}`}>
                 <div className={`px-4 py-2 text-xs font-bold uppercase tracking-wider text-red-500`}>System Menu</div>
                 
+                <button onClick={() => { onSelfTest(); setIsSystemMenuOpen(false); }} className={`w-full text-left px-4 py-2 flex items-center gap-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} ${menuItemHover}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    Run Self Test
+                </button>
+                
                 <button onClick={() => { onToggleDebug(); setIsSystemMenuOpen(false); }} className={`w-full text-left px-4 py-2 flex items-center gap-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} ${menuItemHover}`}>
                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.5 2C6.5 2 4 4.5 4 7.5c0 1.2.4 2.3 1 3.2-.6.9-1 2-1 3.2 0 2.5 2 4.5 4.5 4.5h.5c.3 2 2 3.5 4 3.5s3.7-1.5 4-3.5h.5c2.5 0 4.5-2 4.5-4.5 0-1.2-.4-2.3-1-3.2.6-.9 1-2 1-3.2C21 4.5 18.5 2 15.5 2c-1.2 0-2.3.4-3.2 1-.9-.6-2-1-3.2-1z" /></svg>
                     Toggle Debug Mode
@@ -360,10 +366,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             </svg>
         </button>
 
-        <button onClick={onAutoLayout} title="Auto Layout (Static)" className={`p-2 rounded-md transition ${textClass} hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-400`}>
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7" />
-            </svg>
+        <button onClick={onAutoLayout} title="Auto Layout" className={`p-2 rounded-md transition ${textClass} hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-400`}>
+            <AutoLayoutIcon className="h-6 w-6" />
         </button>
         
         <button onClick={() => panelState.setIsDocumentPanelOpen((prev: boolean) => !prev)} title="Documents" className={`p-2 rounded-md transition ${textClass}`}>
@@ -383,7 +387,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
         </button>
-        
+
         <button onClick={() => panelState.setIsReportPanelOpen((prev: boolean) => !prev)} title="Report View" className={`p-2 rounded-md transition ${textClass}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -397,7 +401,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
         <button onClick={() => onOpenSettings('general')} title="Settings" className={`p-2 rounded-md transition ${textClass}`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
             </svg>
         </button>
         

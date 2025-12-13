@@ -5,6 +5,8 @@ import { promptStore } from './services/PromptStore';
 export const APP_VERSION = '0.5.0';
 export const VERSION_NAME = 'Pattern Weaver';
 
+export const AUTO_GENERATED_TAG = 'added_by_tapestry';
+
 export interface ChangelogEntry {
     version: string;
     date: string;

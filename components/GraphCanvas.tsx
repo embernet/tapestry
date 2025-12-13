@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, forwardRef, useImperativeHandle, useMemo, useState } from 'react';
 import * as d3Import from 'd3';
 import { Element, Relationship, ColorScheme, D3Node, D3Link, RelationshipDirection, SimulationNodeState, NodeShape } from '../types';
-import { LINK_DISTANCE, NODE_MAX_WIDTH, NODE_PADDING, DEFAULT_NODE_COLOR } from '../constants';
+import { LINK_DISTANCE, NODE_MAX_WIDTH, NODE_PADDING, DEFAULT_NODE_COLOR, AUTO_GENERATED_TAG } from '../constants';
 
 const d3: any = d3Import;
 
@@ -1056,10 +1056,34 @@ const GraphCanvas = forwardRef<GraphCanvasRef, GraphCanvasProps>(({
     if (isCompact) {
         const offsetX = nodeShape === 'circle' ? 35 : 12;
         fo.attr('width', 200).attr('height', 40).attr('x', offsetX).attr('y', -20);
-        div.style('color', isDarkMode ? '#ffffff' : '#000000').style('text-shadow', isDarkMode ? '0px 0px 4px #000' : '0px 0px 4px #fff').style('text-align', 'left').style('padding', '0');
+        
+        // Auto-generated styling logic here
+        div.each(function(d: any) {
+            const isAuto = d.tags && d.tags.includes(AUTO_GENERATED_TAG);
+            const defaultColor = isDarkMode ? '#ffffff' : '#000000';
+            d3.select(this)
+                .style('color', isAuto ? '#3b82f6' : defaultColor)
+                .style('text-shadow', isDarkMode ? '0px 0px 4px #000' : '0px 0px 4px #fff')
+                .style('text-align', 'left')
+                .style('padding', '0');
+        });
+        
     } else {
         fo.attr('width', NODE_MAX_WIDTH);
-        div.style('color', '#1f2937').style('text-align', 'center').style('min-height', '80px').style('padding', `${NODE_PADDING * 1.5}px ${NODE_PADDING}px`);
+        
+        // Auto-generated styling logic here
+        div.each(function(d: any) {
+            const isAuto = d.tags && d.tags.includes(AUTO_GENERATED_TAG);
+            const defaultColor = '#1f2937';
+            // Note: For non-compact shapes (rectangles), text is usually dark regardless of mode because 
+            // DEFAULT_NODE_COLOR is light. However, user might expect blue text.
+            // '#3b82f6' is a vibrant blue (blue-500).
+            d3.select(this)
+                .style('color', isAuto ? '#3b82f6' : defaultColor)
+                .style('text-align', 'center')
+                .style('min-height', '80px')
+                .style('padding', `${NODE_PADDING * 1.5}px ${NODE_PADDING}px`);
+        });
     }
 
     node.append('rect').attr('class', 'move-zone').attr('fill', 'transparent');
