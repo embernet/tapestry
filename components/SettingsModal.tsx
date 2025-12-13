@@ -192,9 +192,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const getPromptValue = (key: string, fallbackKey?: string) => {
       const prompts = modelSettings.toolPrompts || DEFAULT_TOOL_PROMPTS;
+      
+      // 1. If explicitly defined in user settings (even as empty string), return it
       if (prompts[key] !== undefined) return prompts[key];
-      if (fallbackKey && prompts[fallbackKey] !== undefined) return ""; // Return empty to show placeholder
-      return DEFAULT_TOOL_PROMPTS[key] || "";
+      
+      // 2. If no user setting, check for a specific default constant
+      if (DEFAULT_TOOL_PROMPTS[key] !== undefined) return DEFAULT_TOOL_PROMPTS[key];
+
+      // 3. Fallback to parent category if neither exist
+      if (fallbackKey && prompts[fallbackKey] !== undefined) return ""; // Empty to show placeholder
+      
+      return "";
   };
 
   // AI Connection Logic

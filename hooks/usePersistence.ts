@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { ModelMetadata, ColorScheme, SystemPromptConfig, Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, DateFilterState, PanelLayout, Script, GraphView } from '../types';
-import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG } from '../constants';
+import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, DEFAULT_TOOL_PROMPTS } from '../constants';
 import { generateUUID, computeContentHash, isInIframe, createDefaultView } from '../utils';
 
 // Keys
@@ -165,7 +165,13 @@ export const usePersistence = ({
         }
 
         if (data.systemPromptConfig) {
-            setSystemPromptConfig({ ...DEFAULT_SYSTEM_PROMPT_CONFIG, ...data.systemPromptConfig });
+            // Deep merge tool prompts to ensure new defaults appear even if old config exists
+            const mergedPrompts = { ...DEFAULT_TOOL_PROMPTS, ...(data.systemPromptConfig.toolPrompts || {}) };
+            setSystemPromptConfig({ 
+                ...DEFAULT_SYSTEM_PROMPT_CONFIG, 
+                ...data.systemPromptConfig,
+                toolPrompts: mergedPrompts
+            });
         } else {
             setSystemPromptConfig(DEFAULT_SYSTEM_PROMPT_CONFIG);
         }
