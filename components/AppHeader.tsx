@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { HelpMenu } from './HelpMenu';
@@ -300,6 +301,21 @@ const AppHeader: React.FC<AppHeaderProps> = ({
       </div>
 
       <div className={`border-l h-6 mx-1 ${dividerClass}`}></div>
+      
+      {/* View Select */}
+      <ViewSelect
+          views={views}
+          activeViewId={activeViewId}
+          onSelectView={onSelectView}
+          onCreateView={onCreateView}
+          onDuplicateView={onDuplicateView}
+          onRenameView={onRenameView}
+          onDeleteView={onDeleteView}
+          onEditView={onEditView}
+          isDarkMode={isDarkMode}
+      />
+      
+      <div className={`border-l h-6 mx-1 ${dividerClass}`}></div>
         
         {/* Standard Toolbar Buttons */}
         <button onClick={onNewModel} title="New Model..." className={`p-2 rounded-md transition ${textClass}`}>
@@ -351,7 +367,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
         <button onClick={onAutoLayout} title="Auto Layout (Static)" className={`p-2 rounded-md transition ${textClass} hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-400`}>
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16m-7 6h7" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4h6v6H4zM14 14h6v6h-6zM10 10l4 4" />
             </svg>
         </button>
         

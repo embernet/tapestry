@@ -1,12 +1,12 @@
 
-import React, { useRef, ReactNode, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PanelLayout } from '../types';
 
 export interface PanelDefinition {
   id: string;
   title: string;
-  icon: ReactNode;
-  content: ReactNode;
+  icon: React.ReactNode;
+  content: React.ReactNode;
   isOpen: boolean;
   onToggle: () => void;
 }
@@ -14,226 +14,187 @@ export interface PanelDefinition {
 interface RightPanelContainerProps {
   panels: PanelDefinition[];
   layouts: Record<string, PanelLayout>;
-  onLayoutChange: (newLayouts: Record<string, PanelLayout>) => void;
+  onLayoutChange: React.Dispatch<React.SetStateAction<Record<string, PanelLayout>>>;
   activeDockedId: string | null;
-  onActiveDockedIdChange: (id: string | null) => void;
+  onActiveDockedIdChange: React.Dispatch<React.SetStateAction<string | null>>;
   globalZIndex: number;
-  onGlobalZIndexChange: (zIndex: number) => void;
+  onGlobalZIndexChange: React.Dispatch<React.SetStateAction<number>>;
   isDarkMode: boolean;
 }
 
-const DEFAULT_WIDTH = 600;
-const DEFAULT_HEIGHT = 500;
-
-const RightPanelContainer: React.FC<RightPanelContainerProps> = ({ 
-  panels, 
-  layouts, 
-  onLayoutChange, 
-  activeDockedId, 
+const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
+  panels,
+  layouts,
+  onLayoutChange,
+  activeDockedId,
   onActiveDockedIdChange,
   globalZIndex,
   onGlobalZIndexChange,
   isDarkMode
 }) => {
-  // Refs for drag/resize operations to avoid closure staleness
-  const dragRef = useRef<{
+  // --- State ---
+  const [dragState, setDragState] = useState<{
     type: 'move' | 'resize' | 'tab-detach';
     panelId: string;
     startX: number;
     startY: number;
-    initialLayout: PanelLayout;
-    hasDetached?: boolean;
+    initialLayout?: PanelLayout;
+    initialMouseX?: number; // For converting tab to floating at mouse pos
+    initialMouseY?: number;
   } | null>(null);
 
-  // Keep a ref of layouts updated so event listeners can access latest state without re-binding
-  const layoutsRef = useRef(layouts);
-  useEffect(() => {
-      layoutsRef.current = layouts;
-  }, [layouts]);
+  // --- Filtering ---
+  const dockedPanels = useMemo(() => 
+    panels.filter(p => p.isOpen && (!layouts[p.id] || !layouts[p.id].isFloating)),
+  [panels, layouts]);
 
-  // --- Synchronization ---
+  const floatingPanels = useMemo(() => 
+    panels.filter(p => p.isOpen && layouts[p.id]?.isFloating),
+  [panels, layouts]);
 
-  // Ensure we have an active docked tab if any docked panels are open
+  // --- Effects ---
+
+  // Ensure active docked ID is valid
   useEffect(() => {
-    const openDockedPanels = panels.filter(p => p.isOpen && !layouts[p.id]?.isFloating);
-    
-    // If the currently active docked ID is not open or no longer docked, switch to the last opened one
-    if (openDockedPanels.length > 0) {
-        const isActiveValid = openDockedPanels.some(p => p.id === activeDockedId);
-        if (!activeDockedId || !isActiveValid) {
-            onActiveDockedIdChange(openDockedPanels[openDockedPanels.length - 1].id);
-        }
+    if (dockedPanels.length === 0) {
+      if (activeDockedId !== null) onActiveDockedIdChange(null);
     } else {
-        if (activeDockedId !== null) {
-            onActiveDockedIdChange(null);
-        }
+      // If current active is not in docked list, switch to the last one (most recently opened/valid)
+      if (!activeDockedId || !dockedPanels.find(p => p.id === activeDockedId)) {
+        onActiveDockedIdChange(dockedPanels[dockedPanels.length - 1].id);
+      }
     }
-  }, [panels, layouts, activeDockedId, onActiveDockedIdChange]);
+  }, [dockedPanels.map(p => p.id).join(','), activeDockedId]);
+
+  // Handle Global Mouse Events for Dragging
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragState) return;
+      e.preventDefault();
+
+      const dx = e.clientX - dragState.startX;
+      const dy = e.clientY - dragState.startY;
+
+      if (dragState.type === 'move' && dragState.initialLayout) {
+        onLayoutChange(prev => ({
+          ...prev,
+          [dragState.panelId]: {
+            ...prev[dragState.panelId],
+            x: dragState.initialLayout!.x + dx,
+            y: dragState.initialLayout!.y + dy
+          }
+        }));
+      } else if (dragState.type === 'resize' && dragState.initialLayout) {
+        onLayoutChange(prev => ({
+          ...prev,
+          [dragState.panelId]: {
+            ...prev[dragState.panelId],
+            w: Math.max(300, dragState.initialLayout!.w + dx),
+            h: Math.max(200, dragState.initialLayout!.h + dy)
+          }
+        }));
+      } else if (dragState.type === 'tab-detach') {
+         // Threshold to detach
+         if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+             const panelId = dragState.panelId;
+             const nextZ = globalZIndex + 1;
+             onGlobalZIndexChange(nextZ);
+             
+             // Convert to floating layout at mouse position
+             const width = 400;
+             const height = 500;
+             const x = e.clientX - width / 2;
+             const y = e.clientY - 20;
+
+             onLayoutChange(prev => ({
+                 ...prev,
+                 [panelId]: {
+                     x, y, w: width, h: height,
+                     zIndex: nextZ,
+                     isFloating: true
+                 }
+             }));
+             
+             // Switch drag state to 'move' immediately for the new floating window
+             setDragState({
+                 type: 'move',
+                 panelId,
+                 startX: e.clientX,
+                 startY: e.clientY,
+                 initialLayout: { x, y, w: width, h: height, zIndex: nextZ, isFloating: true }
+             });
+         }
+      }
+    };
+
+    const handleMouseUp = () => {
+      setDragState(null);
+    };
+
+    if (dragState) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [dragState, onLayoutChange, globalZIndex, onGlobalZIndexChange]);
+
 
   // --- Handlers ---
 
-  const bringToFront = (panelId: string) => {
-    const next = globalZIndex + 1;
-    onGlobalZIndexChange(next);
-    onLayoutChange({
-        ...layouts,
-        [panelId]: { ...layouts[panelId], zIndex: next }
-    });
-    return next;
-  };
-
-  const handleDock = (panelId: string) => {
-    onLayoutChange({
-      ...layouts,
-      [panelId]: { ...layouts[panelId], isFloating: false }
-    });
-    onActiveDockedIdChange(panelId);
-  };
-
-  const handleFloat = (panelId: string, x: number, y: number) => {
-    const nextZ = globalZIndex + 1;
-    onGlobalZIndexChange(nextZ);
-    
-    const newLayout = {
-        x,
-        y,
-        w: layouts[panelId]?.w || DEFAULT_WIDTH,
-        h: layouts[panelId]?.h || DEFAULT_HEIGHT,
-        zIndex: nextZ,
-        isFloating: true
-    };
-
-    onLayoutChange({
-        ...layouts,
-        [panelId]: newLayout
-    });
-    
-    return newLayout;
-  };
-
-  // --- Drag & Resize Logic ---
-
   const handleMouseDown = (e: React.MouseEvent, panelId: string, type: 'move' | 'resize' | 'tab-detach') => {
-    e.preventDefault();
-    e.stopPropagation(); // Prevent bubbling
-
+    // Stop propagation to prevent canvas drag
+    e.stopPropagation();
+    
+    // Bring to front if floating
     if (type !== 'tab-detach') {
-        bringToFront(panelId);
-    } else {
-        // Activate tab on press (bring to front in dock)
-        onActiveDockedIdChange(panelId);
+        const nextZ = globalZIndex + 1;
+        onGlobalZIndexChange(nextZ);
+        onLayoutChange(prev => ({
+            ...prev,
+            [panelId]: { ...prev[panelId], zIndex: nextZ }
+        }));
     }
 
-    const currentLayout = layouts[panelId] || { x: 100, y: 100, w: DEFAULT_WIDTH, h: DEFAULT_HEIGHT, zIndex: globalZIndex, isFloating: false };
-
-    dragRef.current = {
+    setDragState({
       type,
       panelId,
       startX: e.clientX,
       startY: e.clientY,
-      initialLayout: currentLayout,
-      hasDetached: false
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  };
-
-  const onMouseMove = (e: MouseEvent) => {
-    if (!dragRef.current) return;
-    const { type, panelId, startX, startY, hasDetached } = dragRef.current;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-
-    // Handle Tab Detach Threshold
-    if (type === 'tab-detach' && !hasDetached) {
-        // Threshold check (10px)
-        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-            // Calculate float position (centered on mouse)
-            const newW = DEFAULT_WIDTH;
-            const newH = DEFAULT_HEIGHT;
-            const newX = e.clientX - (newW / 2);
-            const newY = e.clientY - 20; // offset for header
-
-            // Trigger Float
-            const floatLayout = handleFloat(panelId, newX, newY);
-
-            // Manually update ref to avoid race conditions before re-render
-            layoutsRef.current[panelId] = floatLayout;
-
-            // Transition drag mode
-            dragRef.current.hasDetached = true;
-            dragRef.current.type = 'move';
-            dragRef.current.initialLayout = floatLayout;
-            // Reset start points for smoother drag continuation
-            dragRef.current.startX = e.clientX;
-            dragRef.current.startY = e.clientY;
-        }
-        return;
-    }
-
-    // Standard Move/Resize
-    const initialLayout = dragRef.current.initialLayout;
-    const nextLayout = { ...initialLayout };
-
-    if (dragRef.current.type === 'move') {
-        // For move, we use the reset startX/Y if we just detached, or original if standard move
-        nextLayout.x = initialLayout.x + (e.clientX - dragRef.current.startX);
-        nextLayout.y = initialLayout.y + (e.clientY - dragRef.current.startY);
-    } else if (dragRef.current.type === 'resize') {
-        nextLayout.w = Math.max(300, initialLayout.w + dx);
-        nextLayout.h = Math.max(200, initialLayout.h + dy);
-    }
-
-    layoutsRef.current[panelId] = nextLayout; 
-    onLayoutChange({ ...layoutsRef.current });
-  };
-
-  const onMouseUp = () => {
-    dragRef.current = null;
-    document.removeEventListener('mousemove', onMouseMove);
-    document.removeEventListener('mouseup', onMouseUp);
-  };
-
-  // --- Categorize Panels ---
-  
-  const openPanels = panels.filter(p => p.isOpen);
-  const floatingPanels = openPanels.filter(p => layouts[p.id]?.isFloating);
-  const dockedPanels = openPanels.filter(p => !layouts[p.id]?.isFloating);
-
-  const handleCloseDock = () => {
-    // Only close docked panels, leave floating ones alone
-    dockedPanels.forEach(panel => {
-        if (panel.isOpen) {
-            panel.onToggle();
-        }
+      initialLayout: layouts[panelId] ? { ...layouts[panelId] } : undefined
     });
   };
 
-  const containerClass = isDarkMode 
-    ? 'bg-gray-800 border-gray-700' 
-    : 'bg-white border-gray-200';
-  
-  const headerClass = isDarkMode
-    ? 'bg-gray-900 border-gray-700'
-    : 'bg-gray-100 border-gray-200';
-
-  const tabClass = (isActive: boolean) => {
-      if (isActive) {
-          return isDarkMode 
-            ? 'bg-gray-800 text-blue-400 border-t-2 border-t-blue-400'
-            : 'bg-white text-blue-600 border-t-2 border-t-blue-600';
-      }
-      return isDarkMode 
-        ? 'text-gray-400 hover:bg-gray-700 hover:text-gray-200 bg-gray-900/50'
-        : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700 bg-gray-50';
+  const handleCloseDock = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      dockedPanels.forEach(p => p.onToggle());
   };
+
+  const handleDockPanel = (panelId: string) => {
+      onLayoutChange(prev => {
+          const next = { ...prev };
+          if (next[panelId]) {
+              next[panelId] = { ...next[panelId], isFloating: false };
+          }
+          return next;
+      });
+      onActiveDockedIdChange(panelId);
+  };
+
+  // --- Styles ---
+  const containerClass = isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200';
+  const headerClass = isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-200';
+  const tabClass = (isActive: boolean) => isActive 
+      ? (isDarkMode ? 'bg-gray-800 text-blue-400 border-b-transparent' : 'bg-white text-blue-600 border-b-transparent') 
+      : (isDarkMode ? 'bg-gray-900 text-gray-500 hover:bg-gray-800 hover:text-gray-300' : 'bg-gray-100 text-gray-600 hover:bg-gray-50');
 
   return (
     <>
       {/* --- DOCKED CONTAINER --- */}
       {dockedPanels.length > 0 && (
-        <div className={`absolute top-20 right-4 bottom-4 w-[600px] z-30 flex flex-col border rounded-lg shadow-2xl overflow-hidden transition-all ${containerClass}`}>
+        <div className={`absolute top-[80px] right-4 bottom-4 w-[600px] z-30 flex flex-col border rounded-lg shadow-2xl overflow-hidden transition-all pointer-events-auto ${containerClass}`}>
           
           {/* Dock Toolbar */}
           <div className={`flex items-center justify-between h-8 px-3 border-b select-none ${headerClass}`}>
@@ -256,21 +217,26 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
           </div>
 
           {/* Tab Bar */}
-          <div className={`flex overflow-x-auto border-b w-full ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}>
+          <div className={`flex overflow-x-auto border-b w-full custom-scrollbar ${isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-gray-100 border-gray-200'}`}>
             {dockedPanels.map(panel => (
               <div
                 key={panel.id}
-                className={`group relative flex items-center h-10 px-4 py-2 cursor-pointer select-none border-r min-w-[100px] flex-shrink-0 transition-colors ${isDarkMode ? 'border-gray-700' : 'border-gray-200'} ${tabClass(panel.id === activeDockedId)}`}
-                onMouseDown={(e) => handleMouseDown(e, panel.id, 'tab-detach')}
+                className={`group relative flex items-center h-10 px-4 py-2 cursor-pointer select-none border-r min-w-[120px] max-w-[200px] flex-shrink-0 transition-colors border-b-2 ${isDarkMode ? 'border-r-gray-700' : 'border-r-gray-300'} ${tabClass(panel.id === activeDockedId)}`}
+                onMouseDown={(e) => {
+                    if (e.button === 0) {
+                        onActiveDockedIdChange(panel.id);
+                        handleMouseDown(e, panel.id, 'tab-detach');
+                    }
+                }}
                 title="Click to activate, Drag to detach"
               >
-                <span className="mr-2 opacity-70">{panel.icon}</span>
-                <span className="text-sm font-semibold whitespace-nowrap">{panel.title}</span>
+                <span className={`mr-2 opacity-70 ${panel.id === activeDockedId ? 'text-blue-500' : ''}`}>{panel.icon}</span>
+                <span className="text-xs font-bold truncate flex-grow">{panel.title}</span>
                 
                 {/* Close X (small) */}
                 <button 
                     onClick={(e) => { e.stopPropagation(); panel.onToggle(); }}
-                    className="ml-2 opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 p-0.5 rounded"
+                    className="ml-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 p-0.5 rounded"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -285,85 +251,89 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
             {dockedPanels.map(panel => (
                 <div 
                     key={panel.id} 
-                    data-testid={`panel-${panel.id}`}
-                    className={`absolute inset-0 ${panel.id === activeDockedId ? 'block' : 'hidden'}`}
+                    className={`absolute inset-0 flex flex-col ${panel.id === activeDockedId ? 'block' : 'hidden'}`}
                 >
                     {panel.content}
                 </div>
             ))}
+            {dockedPanels.length === 0 && (
+                <div className="flex items-center justify-center h-full text-gray-500 text-sm italic">
+                    No active panels
+                </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* --- FLOATING WINDOWS --- */}
+      {/* --- FLOATING PANELS --- */}
       {floatingPanels.map(panel => {
-        const layout = layouts[panel.id];
-        if (!layout) return null;
+          const layout = layouts[panel.id];
+          if (!layout) return null;
 
-        return (
-          <div
-            key={panel.id}
-            data-testid={`panel-${panel.id}`}
-            className={`fixed flex flex-col border rounded-lg shadow-2xl overflow-hidden ${containerClass}`}
-            style={{
-              left: layout.x,
-              top: layout.y,
-              width: layout.w,
-              height: layout.h,
-              zIndex: layout.zIndex
-            }}
-            onMouseDown={() => bringToFront(panel.id)}
-          >
-            {/* Floating Header */}
+          return (
             <div
-              className={`flex items-center justify-between h-8 px-2 border-b cursor-move select-none ${headerClass}`}
-              onMouseDown={(e) => handleMouseDown(e, panel.id, 'move')}
+                key={panel.id}
+                className={`fixed flex flex-col rounded-lg shadow-2xl overflow-hidden border pointer-events-auto ${containerClass}`}
+                style={{
+                    left: layout.x,
+                    top: layout.y,
+                    width: layout.w,
+                    height: layout.h,
+                    zIndex: layout.zIndex
+                }}
+                onMouseDown={() => {
+                    const nextZ = globalZIndex + 1;
+                    onGlobalZIndexChange(nextZ);
+                    onLayoutChange(prev => ({ ...prev, [panel.id]: { ...prev[panel.id], zIndex: nextZ } }));
+                }}
             >
-              <div className={`flex items-center space-x-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                <span className="scale-75 opacity-70">{panel.icon}</span>
-                <span className="text-xs font-bold">{panel.title}</span>
-              </div>
-              
-              <div className="flex items-center space-x-1">
-                {/* Pin/Dock Button */}
-                <button
-                  onClick={() => handleDock(panel.id)}
-                  title="Dock"
-                  className="text-blue-400 hover:text-blue-300 p-1 rounded hover:bg-opacity-10 hover:bg-black transition-colors"
+                {/* Floating Header */}
+                <div 
+                    className={`h-9 flex items-center justify-between px-3 cursor-move select-none border-b ${headerClass}`}
+                    onMouseDown={(e) => handleMouseDown(e, panel.id, 'move')}
+                    onDoubleClick={() => handleDockPanel(panel.id)}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 transform rotate-45" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                  </svg>
-                </button>
-                {/* Close Button */}
-                <button
-                  onClick={panel.onToggle}
-                  title="Close"
-                  className="text-gray-500 hover:text-red-400 p-1 rounded hover:bg-opacity-10 hover:bg-black transition-colors"
+                    <div className="flex items-center gap-2 overflow-hidden">
+                         <span className="text-gray-500">{panel.icon}</span>
+                         <span className={`text-xs font-bold truncate ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{panel.title}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <button 
+                            onClick={() => handleDockPanel(panel.id)}
+                            className="p-1 text-gray-400 hover:text-blue-500 rounded"
+                            title="Dock Panel"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                            </svg>
+                        </button>
+                        <button 
+                            onClick={panel.onToggle}
+                            className="p-1 text-gray-400 hover:text-red-500 rounded"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-grow overflow-hidden relative">
+                    {panel.content}
+                </div>
+
+                {/* Resize Handle */}
+                <div 
+                    className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50 flex items-end justify-end p-0.5"
+                    onMouseDown={(e) => handleMouseDown(e, panel.id, 'resize')}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+                     <svg viewBox="0 0 10 10" className="w-3 h-3 text-gray-500 opacity-50">
+                        <path d="M10 10 L10 0 L0 10 Z" fill="currentColor" />
+                    </svg>
+                </div>
             </div>
-
-            {/* Content */}
-            <div className={`flex-grow overflow-hidden relative ${isDarkMode ? 'bg-gray-800' : 'bg-white'}`}>
-                {panel.content}
-            </div>
-
-            {/* Resize Handle */}
-            <div
-              className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize z-50 flex items-end justify-end p-0.5"
-              onMouseDown={(e) => handleMouseDown(e, panel.id, 'resize')}
-            >
-                <svg viewBox="0 0 10 10" className="w-2 h-2 text-gray-500 opacity-50">
-                    <path d="M10 10 L10 0 L0 10 Z" fill="currentColor" />
-                </svg>
-            </div>
-          </div>
-        );
+          );
       })}
     </>
   );

@@ -115,7 +115,7 @@ export default function App() {
   const openViewDetails = useCallback(() => {
       const width = 450; const height = 650;
       const x = Math.max(50, (window.innerWidth - width) / 2);
-      const y = 100;
+      const y = 180;
       setPanelLayouts(prev => ({ ...prev, 'view-details': { x, y, w: width, h: height, zIndex: panelZIndex + 1, isFloating: true } }));
       setPanelZIndex(prev => prev + 1);
       panelState.setIsViewDetailsPanelOpen(true);

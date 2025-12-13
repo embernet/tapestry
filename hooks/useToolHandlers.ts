@@ -1,15 +1,13 @@
 
 import { useCallback } from 'react';
-import { 
-    TrizToolType, LssToolType, TocToolType, SsmToolType, 
-    ExplorerToolType, TagCloudToolType, SwotToolType, 
-    VisualiseToolType, MermaidToolType, DataToolType
-} from '../types';
 
 interface UseToolHandlersProps {
     tools: any;
     panelState: any;
-    windowManagement: any;
+    windowManagement: {
+        openPanelAt: (id: string, layout: any) => void;
+        setPanelZIndex: React.Dispatch<React.SetStateAction<number>>;
+    };
     focusMode: any;
     setFocusMode: any;
     isRandomWalkOpen: boolean;
@@ -38,209 +36,229 @@ export const useToolHandlers = ({
     promptStore
 }: UseToolHandlersProps) => {
 
-    const { openPanelAt, setPanelZIndex } = windowManagement;
+    const { openPanelAt } = windowManagement;
 
-    const handleTrizToolSelect = useCallback((tool: TrizToolType) => {
-        tools.setActiveTrizTool(tool);
-        tools.setIsTrizModalOpen(true);
-        tools.setTrizInitialParams(null);
+    const handleVisualiseToolSelect = useCallback((tool: string) => {
+        // Clear active tool from toolbar
         tools.setActiveTool(null);
-    }, [tools]);
 
-    const handleLssToolSelect = useCallback((tool: LssToolType) => {
-        tools.setActiveLssTool(tool);
-        tools.setIsLssModalOpen(true);
-        tools.setLssInitialParams(null);
-        tools.setActiveTool(null);
-    }, [tools]);
-
-    const handleTocToolSelect = useCallback((tool: TocToolType) => {
-        tools.setActiveTocTool(tool);
-        tools.setIsTocModalOpen(true);
-        tools.setTocInitialParams(null);
-        tools.setActiveTool(null);
-    }, [tools]);
-
-    const handleSsmToolSelect = useCallback((tool: SsmToolType) => {
-        tools.setActiveSsmTool(tool);
-        tools.setIsSsmModalOpen(true);
-        tools.setSsmInitialParams(null);
-        tools.setActiveTool(null);
-    }, [tools]);
-
-    const handleAnalysisToolSelect = useCallback((toolId: string) => {
-        tools.setActiveTool(null);
-        const defaultLayout = { x: 100, y: 160, w: 400, h: 500, isFloating: true };
+        let width = Math.min(window.innerWidth * 0.8, 1000);
+        let availableHeight = window.innerHeight - 180 - 20; 
+        let height = Math.min(availableHeight, 800); 
+        let x = (window.innerWidth - width) / 2;
+        let y = 180;
         
-        if (toolId === 'network') {
-            panelState.setIsNetworkAnalysisOpen(true);
-        } else if (toolId === 'tags') {
-            openPanelAt('tag-dist', defaultLayout);
-            panelState.setIsTagDistPanelOpen(true);
-        } else if (toolId === 'relationships') {
-            openPanelAt('rel-dist', defaultLayout);
-            panelState.setIsRelDistPanelOpen(true);
+        if (tool === 'circle_packing') {
+            const chromeHeight = 135; // Header (~65px) + Controls (~70px)
+            const topMargin = 180; // Adjusted to clear tools bar
+            const bottomMargin = 20;
+            const maxWidth = Math.min(window.innerWidth * 0.9, 1200);
+            const maxAvailableHeight = window.innerHeight - topMargin - bottomMargin;
+            
+            // We want canvas to be square: canvasW = canvasH
+            // windowW = canvasW
+            // windowH = canvasH + chromeHeight
+            
+            // Constraints:
+            // windowW <= maxWidth
+            // windowH <= maxAvailableHeight  -> canvasH + chrome <= maxAvailableHeight -> canvasH <= maxAvailableHeight - chrome
+            
+            const maxCanvasSize = Math.min(maxWidth, maxAvailableHeight - chromeHeight);
+            const canvasSize = Math.max(300, maxCanvasSize); // Enforce minimum
+            
+            width = canvasSize;
+            height = canvasSize + chromeHeight;
+            x = (window.innerWidth - width) / 2;
+            y = topMargin;
+        }
+
+        const defaultLayout = { 
+           w: width, 
+           h: height, 
+           x: x, 
+           y: y, 
+           isFloating: true 
+        };
+
+        if (tool === 'matrix') {
+             if (!panelState.isMatrixPanelOpen) openPanelAt('matrix', defaultLayout);
+             panelState.setIsMatrixPanelOpen((prev: boolean) => !prev);
+        }
+        else if (tool === 'table') {
+             if (!panelState.isTablePanelOpen) openPanelAt('table', defaultLayout);
+             panelState.setIsTablePanelOpen((prev: boolean) => !prev);
+        }
+        else if (tool === 'grid') {
+             if (!panelState.isGridPanelOpen) openPanelAt('grid', defaultLayout);
+             panelState.setIsGridPanelOpen((prev: boolean) => !prev);
+        }
+        else if (tool === 'treemap') {
+             if (!panelState.isTreemapPanelOpen) openPanelAt('treemap', defaultLayout);
+             panelState.setIsTreemapPanelOpen((prev: boolean) => !prev);
+        }
+        else if (tool === 'circle_packing') {
+             if (!panelState.isCirclePackingPanelOpen) openPanelAt('circle_packing', defaultLayout);
+             panelState.setIsCirclePackingPanelOpen((prev: boolean) => !prev);
+        }
+        else if (tool === 'mermaid') {
+             tools.handleOpenTool('mermaid');
         }
     }, [tools, panelState, openPanelAt]);
 
-    const handleDataToolSelect = useCallback((tool: DataToolType) => {
+    const handleExplorerToolSelect = useCallback((tool: string) => {
         tools.setActiveTool(null);
-        if (tool === 'csv') {
-            tools.setIsCsvModalOpen(true);
-        } else if (tool === 'markdown') {
-            panelState.setIsMarkdownPanelOpen(true);
-        } else if (tool === 'json') {
-            panelState.setIsJSONPanelOpen(true);
-        }
-    }, [tools, panelState]);
-
-    const handleExplorerToolSelect = useCallback((tool: ExplorerToolType) => {
-        if (tool === 'sunburst') {
-            panelState.setIsSunburstPanelOpen((prev: boolean) => !prev);
-            panelState.setSunburstState((prev: any) => ({ ...prev, active: true }));
-        }
-        if (tool === 'matrix') panelState.setIsMatrixPanelOpen((prev: boolean) => !prev);
-        if (tool === 'table') panelState.setIsTablePanelOpen((prev: boolean) => !prev);
         
         if (tool === 'random_walk') {
             if (!isRandomWalkOpen) {
-                 setPreWalkFocusMode(focusMode);
-                 setIsRandomWalkOpen(true);
-                 setWalkState((prev: any) => ({ 
-                     ...prev, 
-                     visitedIds: new Set(), 
-                     pathHistory: [], 
-                     historyIndex: -1, 
-                     currentNodeId: null, 
-                     isPaused: true, 
-                     direction: 'forward',
-                     speedMultiplier: 1,
-                     hideDetails: false
-                 }));
+                setPreWalkFocusMode(focusMode);
+                // If an element is selected, start from there
+                if (selectedElementId) {
+                    setWalkState((prev: any) => ({
+                        ...prev,
+                        currentNodeId: selectedElementId,
+                        pathHistory: [selectedElementId],
+                        historyIndex: 0,
+                        visitedIds: new Set([selectedElementId]),
+                        isPaused: true // Start paused so user can hit play
+                    }));
+                } else {
+                     // Reset if nothing selected
+                     setWalkState((prev: any) => ({
+                        ...prev,
+                        currentNodeId: null,
+                        visitedIds: new Set(),
+                        pathHistory: [],
+                        historyIndex: -1,
+                        isPaused: true
+                    }));
+                }
+                setIsRandomWalkOpen(true);
             } else {
-                 setIsRandomWalkOpen(false);
-                 setFocusMode(focusMode); // Reset
+                setIsRandomWalkOpen(false);
+                setFocusMode((prev: any) => prev === 'zoom' ? 'narrow' : prev); // Reset focus if needed
             }
-        }
-        tools.setActiveTool(null);
-    }, [tools, panelState, isRandomWalkOpen, focusMode, setPreWalkFocusMode, setIsRandomWalkOpen, setWalkState, setFocusMode]);
+        } else if (tool === 'sunburst') {
+             const width = Math.min(window.innerWidth * 0.8, 1000);
+             const availableHeight = window.innerHeight - 180 - 20; 
+             const height = Math.min(availableHeight, 800); 
+             
+             const defaultLayout = { 
+                w: width, 
+                h: height, 
+                x: (window.innerWidth - width) / 2, 
+                y: 180, 
+                isFloating: true 
+             };
 
-    const handleVisualiseToolSelect = useCallback((tool: VisualiseToolType) => {
-        if (tool === 'grid') {
-            panelState.setIsGridPanelOpen((prev: boolean) => !prev);
-        } else if (tool === 'treemap') {
-            if (!panelState.isTreemapPanelOpen) {
-                 openPanelAt('treemap', { w: 800, h: 600, x: Math.max(50, (window.innerWidth - 800) / 2), y: Math.max(50, (window.innerHeight - 600) / 2) });
-                 panelState.setIsTreemapPanelOpen(true);
-            } else {
-                 panelState.setIsTreemapPanelOpen(false);
-            }
-        } else if (tool === 'circle_packing') {
-            if (!panelState.isCirclePackingPanelOpen) {
-                 // Calculate dimensions to ensure the canvas area (where circle packing renders) is square.
-                 // We add estimated height for Header and Controls (~130px) to the height.
-                 const CHROME_HEIGHT = 130;
-                 const maxW = window.innerWidth * 0.9;
-                 const maxH = window.innerHeight * 0.9;
-                 
-                 const canvasSize = Math.max(300, Math.min(maxW, maxH - CHROME_HEIGHT));
-                 
-                 const width = canvasSize;
-                 const height = canvasSize + CHROME_HEIGHT;
-                 
-                 openPanelAt('circle_packing', { 
-                     w: width, 
-                     h: height, 
-                     x: (window.innerWidth - width) / 2, 
-                     y: (window.innerHeight - height) / 2 
-                 });
-                 panelState.setIsCirclePackingPanelOpen(true);
-            } else {
-                 panelState.setIsCirclePackingPanelOpen(false);
-            }
-        } else if (tool === 'mermaid') {
-            panelState.setIsMermaidPanelOpen(true);
+             if (!panelState.isSunburstPanelOpen) {
+                 openPanelAt('sunburst', defaultLayout);
+                 panelState.setSunburstState((prev: any) => ({ ...prev, active: true }));
+                 panelState.setIsSunburstPanelOpen(true);
+             }
+        } else {
+             if (tool === 'matrix') handleVisualiseToolSelect('matrix');
+             else if (tool === 'table') handleVisualiseToolSelect('table');
+             else tools.handleOpenTool('explorer', tool);
         }
-        tools.setActiveTool(null);
-    }, [tools, panelState, openPanelAt]);
+    }, [tools, isRandomWalkOpen, setIsRandomWalkOpen, setPreWalkFocusMode, focusMode, selectedElementId, setWalkState, setFocusMode, handleVisualiseToolSelect, panelState, openPanelAt]);
 
-    const handleTagCloudToolSelect = useCallback((tool: TagCloudToolType) => {
+    const handleTagCloudToolSelect = useCallback((tool: string) => {
+        tools.setActiveTool(null);
+
         const width = Math.min(window.innerWidth * 0.8, 1000);
-        const height = Math.min(window.innerHeight * 0.8, 800);
-        const defaultLayout = { w: width, h: height, x: (window.innerWidth - width) / 2, y: (window.innerHeight - height) / 2, isFloating: true };
+        const availableHeight = window.innerHeight - 180 - 20; 
+        const height = Math.min(availableHeight, 800); 
+        
+        const defaultLayout = { 
+           w: width, 
+           h: height, 
+           x: (window.innerWidth - width) / 2, 
+           y: 180, 
+           isFloating: true 
+        };
 
         if (tool === 'tags') {
-            panelState.setIsConceptCloudOpen((prev: boolean) => !prev);
             if (!panelState.isConceptCloudOpen) openPanelAt('concept-cloud', defaultLayout);
+            panelState.setIsConceptCloudOpen((prev: boolean) => !prev);
         } else if (tool === 'nodes') {
-            panelState.setIsInfluenceCloudOpen((prev: boolean) => !prev);
             if (!panelState.isInfluenceCloudOpen) openPanelAt('influence-cloud', defaultLayout);
+            panelState.setIsInfluenceCloudOpen((prev: boolean) => !prev);
         } else if (tool === 'words') {
-            panelState.setIsTextAnalysisOpen((prev: boolean) => !prev);
             if (!panelState.isTextAnalysisOpen) openPanelAt('text-cloud', defaultLayout);
+            panelState.setIsTextAnalysisOpen((prev: boolean) => !prev);
         } else if (tool === 'full_text') {
-            panelState.setIsFullTextAnalysisOpen((prev: boolean) => !prev);
-            if (!panelState.isFullTextAnalysisOpen) openPanelAt('full-text-cloud', defaultLayout);
+             if (!panelState.isFullTextAnalysisOpen) openPanelAt('full-text-cloud', defaultLayout);
+             panelState.setIsFullTextAnalysisOpen((prev: boolean) => !prev);
+        } else {
+             tools.handleOpenTool('tagcloud', tool);
         }
-        tools.setActiveTool(null);
     }, [tools, panelState, openPanelAt]);
-
-    const handleSwotToolSelect = useCallback((tool: SwotToolType) => { 
-        tools.setActiveSwotTool(tool); 
-        tools.setSwotInitialDoc(null); 
-        tools.setIsSwotModalOpen(true); 
-        tools.setActiveTool(null); 
-    }, [tools]);
-
-    const handleMermaidToolSelect = useCallback((tool: MermaidToolType) => { 
-        if (tool === 'editor') panelState.setIsMermaidPanelOpen(true); 
-        tools.setActiveTool(null); 
-    }, [tools, panelState]);
 
     const handleAiToolSelect = useCallback((toolId: string) => {
         tools.setActiveTool(null);
         
         if (toolId === 'chat') {
             panelState.setIsChatPanelOpen(true);
-        } else if (toolId === 'expand') {
-            if (selectedElementId) {
-                 const el = elements.find((e: any) => e.id === selectedElementId);
-                 if (el) {
-                    const prompt = promptStore.get('ai:expand:node', { name: el.name });
-                    setChatDraftMessage(prompt);
+        } else {
+            // summarize, expand, connect, critique
+            // Set prompt in chat panel
+            const promptKey = `ai:${toolId}`;
+            const promptTemplate = promptStore.get(promptKey);
+            
+            if (promptTemplate) {
+                 // For Expand, we might want to replace {{name}} if a node is selected
+                 let prompt = promptTemplate;
+                 if (toolId === 'expand') {
+                     if (selectedElementId) {
+                         const el = elements.find(e => e.id === selectedElementId);
+                         if (el) {
+                             prompt = promptStore.get('ai:expand:node', { name: el.name });
+                         } else {
+                             prompt = promptStore.get('ai:expand:general');
+                         }
+                     } else {
+                         prompt = promptStore.get('ai:expand:general');
+                     }
                  }
-            } else {
-                 const prompt = promptStore.get('ai:expand:general');
+                 
                  setChatDraftMessage(prompt);
+                 panelState.setIsChatPanelOpen(true);
             }
-            panelState.setIsChatPanelOpen(true);
-        } else if (toolId === 'connect') {
-            const prompt = promptStore.get('ai:connect');
-            setChatDraftMessage(prompt);
-            panelState.setIsChatPanelOpen(true);
-        } else if (toolId === 'critique') {
-            const prompt = promptStore.get('ai:critique');
-            setChatDraftMessage(prompt);
-            panelState.setIsChatPanelOpen(true);
-        } else if (toolId === 'summarise') {
-            const prompt = promptStore.get('ai:summarise');
-            setChatDraftMessage(prompt);
-            panelState.setIsChatPanelOpen(true);
         }
-    }, [tools, panelState, selectedElementId, elements, setChatDraftMessage, promptStore]);
+    }, [tools, panelState, selectedElementId, elements, promptStore, setChatDraftMessage]);
+
+    const handleAnalysisToolSelect = useCallback((tool: string) => {
+        tools.setActiveTool(null);
+        if (tool === 'network') {
+            panelState.setIsNetworkAnalysisOpen(true);
+        } else if (tool === 'tags') {
+            panelState.setIsTagDistPanelOpen(true);
+        } else if (tool === 'relationships') {
+            panelState.setIsRelDistPanelOpen(true);
+        }
+    }, [tools, panelState]);
+
+    // Simple wrappers for other tools that primarily use modals/panels managed by useTools
+    const handleTrizToolSelect = (tool: string) => tools.handleOpenTool('triz', tool);
+    const handleLssToolSelect = (tool: string) => tools.handleOpenTool('lss', tool);
+    const handleTocToolSelect = (tool: string) => tools.handleOpenTool('toc', tool);
+    const handleSsmToolSelect = (tool: string) => tools.handleOpenTool('ssm', tool);
+    const handleSwotToolSelect = (tool: string) => tools.handleOpenTool('swot', tool);
+    const handleMermaidToolSelect = (tool: string) => tools.handleOpenTool('mermaid', tool);
+    const handleDataToolSelect = (tool: string) => tools.handleOpenTool('data', tool);
 
     return {
+        handleVisualiseToolSelect,
+        handleExplorerToolSelect,
+        handleTagCloudToolSelect,
+        handleAiToolSelect,
         handleTrizToolSelect,
         handleLssToolSelect,
         handleTocToolSelect,
         handleSsmToolSelect,
-        handleAnalysisToolSelect,
-        handleExplorerToolSelect,
-        handleVisualiseToolSelect,
-        handleTagCloudToolSelect,
         handleSwotToolSelect,
         handleMermaidToolSelect,
-        handleAiToolSelect,
-        handleDataToolSelect
+        handleDataToolSelect,
+        handleAnalysisToolSelect
     };
 };

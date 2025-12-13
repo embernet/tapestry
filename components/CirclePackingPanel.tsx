@@ -1,7 +1,9 @@
 
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import * as d3 from 'd3';
+import * as d3Import from 'd3';
 import { Element, Relationship, ColorScheme } from '../types';
+
+const d3: any = d3Import;
 
 interface CirclePackingPanelProps {
     elements: Element[];

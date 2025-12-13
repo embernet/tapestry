@@ -1,7 +1,9 @@
 
 import React, { useState, useCallback } from 'react';
-import * as d3 from 'd3';
+import * as d3Import from 'd3';
 import { Element, Relationship } from '../types';
+
+const d3: any = d3Import;
 
 interface UseGraphLayoutProps {
     elementsRef: React.MutableRefObject<Element[]>;
