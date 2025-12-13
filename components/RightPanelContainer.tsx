@@ -194,7 +194,7 @@ const RightPanelContainer: React.FC<RightPanelContainerProps> = ({
     <>
       {/* --- DOCKED CONTAINER --- */}
       {dockedPanels.length > 0 && (
-        <div className={`absolute top-[80px] right-4 bottom-4 w-[600px] z-30 flex flex-col border rounded-lg shadow-2xl overflow-hidden transition-all pointer-events-auto ${containerClass}`}>
+        <div className={`absolute top-[180px] right-4 bottom-4 w-[600px] z-30 flex flex-col border rounded-lg shadow-2xl overflow-hidden transition-all pointer-events-auto ${containerClass}`}>
           
           {/* Dock Toolbar */}
           <div className={`flex items-center justify-between h-8 px-3 border-b select-none ${headerClass}`}>

@@ -87,37 +87,19 @@ const SCENARIOS = [
 ];
 
 export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true }) => {
-    // -- Window State --
-    const [windowSize, setWindowSize] = useState({ width: 1000, height: 700 });
-    const [windowPos, setWindowPos] = useState({ x: 100, y: 80 });
-    const [isMovingWindow, setIsMovingWindow] = useState(false);
-    const [isResizingWindow, setIsResizingWindow] = useState(false);
-    const [isMobile, setIsMobile] = useState(false);
-    
-    const dragStartRef = useRef({ x: 0, y: 0 });
-    const initialDimRef = useRef({ width: 0, height: 0, x: 0, y: 0 });
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
-
     const [activeTab, setActiveTab] = useState<'intro' | 'interface' | 'tools' | 'patterns' | 'scripting' | 'index'>('intro');
     const [searchQuery, setSearchQuery] = useState('');
+    const modalRef = useRef<HTMLDivElement>(null);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+    // Close on click outside
     useEffect(() => {
-        const checkMobile = () => {
-            const mobile = window.innerWidth < 768;
-            setIsMobile(mobile);
-            if (mobile) {
-                setWindowSize({ width: window.innerWidth, height: window.innerHeight });
-                setWindowPos({ x: 0, y: 0 });
-            } else {
-                setWindowSize({ width: Math.min(1000, window.innerWidth - 100), height: Math.min(700, window.innerHeight - 100) });
-                setWindowPos({ x: 50, y: 50 });
-            }
-        };
-        
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
-    }, []);
+        const handleClick = (e: MouseEvent) => { 
+           if(modalRef.current && !modalRef.current.contains(e.target as Node)) onClose(); 
+        }
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, [onClose]);
 
     // Combine items for index
     const indexItems = useMemo(() => {
@@ -166,61 +148,6 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
         }, 100);
     };
 
-    // --- Window Interaction Handlers ---
-    const handleHeaderMouseDown = (e: React.MouseEvent) => {
-        if (isMobile) return; // Disable drag on mobile
-        
-        // Prevent drag if clicking inputs/buttons in header
-        if ((e.target as HTMLElement).closest('input, button')) return;
-        
-        setIsMovingWindow(true);
-        dragStartRef.current = { x: e.clientX, y: e.clientY };
-        initialDimRef.current = { ...windowSize, ...windowPos };
-    };
-
-    const handleResizeMouseDown = (e: React.MouseEvent) => {
-        if (isMobile) return; // Disable resize on mobile
-        e.stopPropagation();
-        setIsResizingWindow(true);
-        dragStartRef.current = { x: e.clientX, y: e.clientY };
-        initialDimRef.current = { ...windowSize, ...windowPos };
-    };
-
-    useEffect(() => {
-        const handleMouseMove = (e: MouseEvent) => {
-            if (isMovingWindow) {
-                const dx = e.clientX - dragStartRef.current.x;
-                const dy = e.clientY - dragStartRef.current.y;
-                setWindowPos({
-                    x: initialDimRef.current.x + dx,
-                    y: initialDimRef.current.y + dy
-                });
-            }
-            if (isResizingWindow) {
-                const dx = e.clientX - dragStartRef.current.x;
-                const dy = e.clientY - dragStartRef.current.y;
-                setWindowSize({
-                    width: Math.max(600, initialDimRef.current.width + dx),
-                    height: Math.max(400, initialDimRef.current.height + dy)
-                });
-            }
-        };
-
-        const handleMouseUp = () => {
-            setIsMovingWindow(false);
-            setIsResizingWindow(false);
-        };
-
-        if (isMovingWindow || isResizingWindow) {
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
-        }
-        return () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-        };
-    }, [isMovingWindow, isResizingWindow]);
-
     const renderStyledText = (text: string) => {
         if (!text) return null;
         const regex = /(\*\*.*?\*\*|\[\[.*?\|.*?\]\])/g;
@@ -266,21 +193,14 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
     const codeBlockBg = isDarkMode ? 'bg-black text-green-400' : 'bg-gray-800 text-green-300';
 
     return (
-        <div className="fixed inset-0 pointer-events-none z-[1100] flex justify-center items-center">
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-start z-[1500] p-4">
             <div 
-                className={`absolute flex flex-col rounded-lg border ${bgClass} shadow-2xl pointer-events-auto overflow-hidden max-w-full max-h-full`}
-                style={{ 
-                    width: windowSize.width, 
-                    height: windowSize.height,
-                    left: isMobile ? 0 : windowPos.x,
-                    top: isMobile ? 0 : windowPos.y,
-                    position: isMobile ? 'fixed' : 'absolute'
-                }}
+                ref={modalRef}
+                className={`${bgClass} rounded-lg w-full max-w-6xl max-h-[calc(100vh-8rem)] mt-24 shadow-2xl border flex flex-col relative overflow-hidden`}
             >
                 {/* Header */}
                 <div 
-                    className={`p-4 border-b flex justify-between items-center flex-shrink-0 ${headerBg} ${!isMobile ? 'cursor-move' : ''} select-none`}
-                    onMouseDown={handleHeaderMouseDown}
+                    className={`p-4 border-b flex justify-between items-center flex-shrink-0 ${headerBg}`}
                 >
                     <div className="flex items-center gap-4 md:gap-6 flex-grow min-w-0">
                         <div className="flex-shrink-0">
@@ -693,18 +613,6 @@ markdown.open_doc(id=doc_id)`}
                         </div>
                     )}
                 </div>
-
-                {/* Resize Handle - Hidden on Mobile */}
-                {!isMobile && (
-                    <div 
-                        className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-end justify-end p-1 z-50"
-                        onMouseDown={handleResizeMouseDown}
-                    >
-                        <svg viewBox="0 0 10 10" className={`w-4 h-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                            <path d="M10 10 L10 2 L2 10 Z" fill="currentColor" />
-                        </svg>
-                    </div>
-                )}
 
             </div>
         </div>

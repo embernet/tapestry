@@ -28,8 +28,8 @@ export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true, o
     const svgHoverClass = isDarkMode ? 'group-hover:text-gray-100' : 'group-hover:text-gray-800';
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-4">
-            <div ref={ref} className={`${bgClass} rounded-lg max-w-2xl w-full max-h-[90vh] shadow-2xl border flex flex-col relative overflow-hidden`}>
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-start z-[1500] p-4">
+            <div ref={ref} className={`${bgClass} rounded-lg max-w-4xl w-full max-h-[calc(100vh-8rem)] mt-24 shadow-2xl border flex flex-col relative overflow-hidden`}>
                 
                 {/* Close X Button */}
                 <button onClick={onClose} className={`absolute top-4 right-4 ${isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-black'} z-10`}>
@@ -136,4 +136,4 @@ export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true, o
             </div>
         </div>
     );
-}
+};

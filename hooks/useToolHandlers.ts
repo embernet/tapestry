@@ -1,3 +1,4 @@
+
 import React, { useCallback } from 'react';
 
 interface UseToolHandlersProps {
@@ -228,14 +229,27 @@ export const useToolHandlers = ({
 
     const handleAnalysisToolSelect = useCallback((tool: string) => {
         tools.setActiveTool(null);
+        
+        const width = 400;
+        const height = 500;
+        const x = (window.innerWidth - width) / 2;
+        const y = 180;
+        const defaultLayout = { w: width, h: height, x, y, isFloating: true };
+
         if (tool === 'network') {
             panelState.setIsNetworkAnalysisOpen(true);
         } else if (tool === 'tags') {
-            panelState.setIsTagDistPanelOpen(true);
+            if (!panelState.isTagDistPanelOpen) {
+                openPanelAt('tag-dist', defaultLayout);
+            }
+            panelState.setIsTagDistPanelOpen((prev: boolean) => !prev);
         } else if (tool === 'relationships') {
-            panelState.setIsRelDistPanelOpen(true);
+            if (!panelState.isRelDistPanelOpen) {
+                openPanelAt('rel-dist', defaultLayout);
+            }
+            panelState.setIsRelDistPanelOpen((prev: boolean) => !prev);
         }
-    }, [tools, panelState]);
+    }, [tools, panelState, openPanelAt]);
 
     // Simple wrappers for other tools that primarily use modals/panels managed by useTools
     const handleTrizToolSelect = (tool: string) => tools.handleOpenTool('triz', tool);
