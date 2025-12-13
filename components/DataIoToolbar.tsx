@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { DataToolType } from '../types';
 
 interface DataIoToolbarProps {
@@ -15,6 +15,36 @@ const DataIoToolbar: React.FC<DataIoToolbarProps> = ({
   onToggle,
   isDarkMode
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isCollapsed) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        onToggle();
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onToggle();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isCollapsed, onToggle]);
+
+  const handleSelect = (tool: DataToolType) => {
+      onSelectTool(tool);
+      onToggle();
+  };
 
   const bgClass = isDarkMode ? 'bg-gray-800 hover:bg-gray-700 border-gray-600' : 'bg-white hover:bg-gray-50 border-gray-200';
   const dropdownBg = isDarkMode ? 'bg-gray-900 border-gray-600' : 'bg-white border-gray-200';
@@ -26,7 +56,7 @@ const DataIoToolbar: React.FC<DataIoToolbarProps> = ({
   const textDesc = isDarkMode ? 'text-gray-400 group-hover:text-gray-300' : 'text-gray-500 group-hover:text-gray-700';
 
   return (
-    <div className="relative pointer-events-auto">
+    <div className="relative pointer-events-auto" ref={containerRef}>
       {/* Collapse Toggle / Main Button */}
       <div className="relative">
         <button 
@@ -67,7 +97,7 @@ const DataIoToolbar: React.FC<DataIoToolbarProps> = ({
              
              {/* CSV Import/Export */}
              <button
-                onClick={() => onSelectTool('csv')}
+                onClick={() => handleSelect('csv')}
                 className={`flex items-start text-left p-3 border-b transition-colors group ${itemHover}`}
              >
                  <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110 text-orange-400">
@@ -85,7 +115,7 @@ const DataIoToolbar: React.FC<DataIoToolbarProps> = ({
 
              {/* Markdown */}
              <button
-                onClick={() => onSelectTool('markdown')}
+                onClick={() => handleSelect('markdown')}
                 className={`flex items-start text-left p-3 border-b transition-colors group ${itemHover}`}
              >
                  <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110 text-blue-400">
@@ -103,7 +133,7 @@ const DataIoToolbar: React.FC<DataIoToolbarProps> = ({
 
              {/* JSON */}
              <button
-                onClick={() => onSelectTool('json')}
+                onClick={() => handleSelect('json')}
                 className={`flex items-start text-left p-3 transition-colors group ${itemHover}`}
              >
                  <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110 text-yellow-400">

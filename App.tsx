@@ -313,11 +313,11 @@ export default function App() {
   const handleAddElement = useCallback((coords: { x: number; y: number }) => { 
       const now = new Date().toISOString(); 
       let initialTags = [...defaultTags];
-      if (activeView) { const { included, excluded } = activeView.filters.tags; const tagsToAdd = included.filter(t => !initialTags.includes(t)); initialTags = [...initialTags, ...tagsToAdd]; if (excluded.length > 0) { const excludedSet = new Set(excluded); initialTags = initialTags.filter(t => !excludedSet.has(t)); } }
+      // Only Schema default tags are applied.
       initialTags = initialTags.map(normalizeTag);
       const newElement: Element = { id: generateUUID(), name: 'New Element', notes: '', tags: initialTags, createdAt: now, updatedAt: now, x: coords.x, y: coords.y, fx: coords.x, fy: coords.y, }; 
       setElements(prev => [...prev, newElement]); setSelectedElementId(newElement.id); setMultiSelection(new Set([newElement.id])); setSelectedRelationshipId(null); setPanelStateUI({ view: 'details', sourceElementId: null, targetElementId: null, isNewTarget: false }); 
-  }, [defaultTags, activeView]);
+  }, [defaultTags]);
   
   const handleAddElementFromName = useCallback((name: string) => { const centerX = window.innerWidth / 2; const centerY = window.innerHeight / 2; const randomOffset = () => (Math.random() - 0.5) * 100; const now = new Date().toISOString(); const newElement: Element = { id: generateUUID(), name: name, notes: '', tags: defaultTags.map(normalizeTag), createdAt: now, updatedAt: now, x: centerX + randomOffset(), y: centerY + randomOffset(), fx: null, fy: null, }; setElements(prev => [...prev, newElement]); }, [defaultTags]);
   const handleUpdateElement = useCallback((updatedElement: Element) => { setElements(prev => prev.map(f => f.id === updatedElement.id ? { ...updatedElement, updatedAt: new Date().toISOString() } : f)); }, []);

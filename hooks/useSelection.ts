@@ -189,18 +189,9 @@ export const useSelection = ({
     const handleNodeConnectToNew = useCallback((sourceId: string, coords: { x: number; y: number }) => { 
         const now = new Date().toISOString(); 
         
-        // Determine initial tags based on Active View
         let initialTags = [...defaultTags];
-        if (activeView) {
-            const { included, excluded } = activeView.filters.tags;
-            const tagsToAdd = included.filter(t => !initialTags.includes(t));
-            initialTags = [...initialTags, ...tagsToAdd];
-            if (excluded.length > 0) {
-                const excludedSet = new Set(excluded);
-                initialTags = initialTags.filter(t => !excludedSet.has(t));
-            }
-        }
-
+        // Only default tags are applied now.
+        
         const newElement: Element = { 
             id: generateUUID(), 
             name: 'New Element', 
@@ -231,7 +222,7 @@ export const useSelection = ({
         setPanelStateUI({ view: 'addRelationship', sourceElementId: sourceId, targetElementId: newElement.id, isNewTarget: true }); 
         setSelectedElementId(null); 
         setSelectedRelationshipId(null); 
-    }, [defaultTags, activeView, colorSchemes, activeSchemeId, setElements, setRelationships, setPanelStateUI, setSelectedElementId, setSelectedRelationshipId]);
+    }, [defaultTags, activeSchemeId, colorSchemes, setElements, setRelationships, setPanelStateUI, setSelectedElementId, setSelectedRelationshipId]);
 
     const handleCompleteAddRelationship = useCallback(() => {
         if (panelStateUI.targetElementId) {

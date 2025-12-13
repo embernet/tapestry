@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import * as d3Import from 'd3';
 import { Element, Relationship, ColorScheme } from '../types';
@@ -200,7 +199,7 @@ export const CirclePackingPanel: React.FC<CirclePackingPanelProps> = ({
         let view: [number, number, number];
 
         // Color Scale for Groups (Depth based)
-        const groupColorScale = d3.scaleLinear<string>()
+        const groupColorScale = d3.scaleLinear()
             .domain([0, 5])
             .range(isDarkMode 
                 ? ["hsl(220, 20%, 20%)", "hsl(220, 40%, 40%)"] 
