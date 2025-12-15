@@ -7,41 +7,39 @@ export const useKanban = (
 ) => {
     const [notification, setNotification] = useState<{ x: number; y: number; message: string } | null>(null);
 
-    const handleAddToKanban = useCallback((ids: string[], coords: {x: number, y: number}, elements: Element[]) => {
-        const attributeKey = 'Status';
-        const defaultColumn = 'To Do';
+    const handleAddToKanban = useCallback((ids: string[], coords: { x: number, y: number }, elements: Element[], attributeKey: string = 'Status', defaultColumn: string = 'To Do') => {
         const targetIds = new Set(ids);
-  
+
         let added = 0;
         let existing = 0;
-  
-        const updates: {id: string, val: string}[] = [];
-  
+
+        const updates: { id: string, val: string }[] = [];
+
         elements.forEach(el => {
             if (targetIds.has(el.id)) {
-                if (el.attributes && el.attributes[attributeKey]) {
+                if (el.attributes && el.attributes[attributeKey] && el.attributes[attributeKey] !== 'Unassigned') {
                     existing++;
                 } else {
                     added++;
-                    updates.push({id: el.id, val: defaultColumn});
+                    updates.push({ id: el.id, val: defaultColumn });
                 }
             }
         });
-  
+
         if (added > 0) {
-             setElements(prev => prev.map(el => {
-                 const update = updates.find(u => u.id === el.id);
-                 if (update) {
-                     return {
-                         ...el,
-                         attributes: { ...el.attributes, [attributeKey]: update.val },
-                         updatedAt: new Date().toISOString()
-                     };
-                 }
-                 return el;
-             }));
+            setElements(prev => prev.map(el => {
+                const update = updates.find(u => u.id === el.id);
+                if (update) {
+                    return {
+                        ...el,
+                        attributes: { ...el.attributes, [attributeKey]: update.val },
+                        updatedAt: new Date().toISOString()
+                    };
+                }
+                return el;
+            }));
         }
-  
+
         let msg = '';
         if (added > 0) {
             msg = `Added ${added} task${added > 1 ? 's' : ''}`;
@@ -51,10 +49,10 @@ export const useKanban = (
         } else {
             msg = "No tasks added";
         }
-  
+
         setNotification({ x: coords.x, y: coords.y, message: msg });
         setTimeout(() => setNotification(null), 3000);
-  
+
     }, [setElements]);
 
     return {

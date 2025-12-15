@@ -11,8 +11,6 @@ const port = process.env.PORT || 8080;
 // Serve static files from the dist directory (Vite's build output)
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Handle Single Page Application routing: 
-// Return index.html for any unknown route so React Router can handle it
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });

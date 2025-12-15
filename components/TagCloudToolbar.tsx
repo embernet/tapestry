@@ -11,9 +11,9 @@ interface TagCloudToolbarProps {
 }
 
 const WORD_CLOUD_TOOLS = [
-  { 
-    id: 'tags' as TagCloudToolType, 
-    name: 'Tag Cloud', 
+  {
+    id: 'tags' as TagCloudToolType,
+    name: 'Tag Cloud',
     desc: 'Visualize frequency of tags/categories.',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -22,9 +22,9 @@ const WORD_CLOUD_TOOLS = [
     ),
     color: '#ec4899' // Pink
   },
-  { 
-    id: 'nodes' as TagCloudToolType, 
-    name: 'Relationship Cloud', 
+  {
+    id: 'nodes' as TagCloudToolType,
+    name: 'Relationship Cloud',
     desc: 'Visualize connectivity of nodes.',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -33,9 +33,9 @@ const WORD_CLOUD_TOOLS = [
     ),
     color: '#f472b6' // Lighter Pink
   },
-  { 
-    id: 'words' as TagCloudToolType, 
-    name: 'Node Name Analysis', 
+  {
+    id: 'words' as TagCloudToolType,
+    name: 'Node Name Analysis',
     desc: 'Visualize word frequency in node names.',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -44,9 +44,9 @@ const WORD_CLOUD_TOOLS = [
     ),
     color: '#db2777' // Pink-600
   },
-  { 
-    id: 'full_text' as TagCloudToolType, 
-    name: 'Full Text Analysis', 
+  {
+    id: 'full_text' as TagCloudToolType,
+    name: 'Full Text Analysis',
     desc: 'Visualize word frequency across name and notes (ignoring tags/attributes).',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -78,69 +78,69 @@ const TagCloudToolbar: React.FC<TagCloudToolbarProps> = ({
     <div className="relative pointer-events-auto">
       {/* Collapse Toggle / Main Button */}
       <div className="relative">
-        <button 
-            onClick={onToggle}
-            className={`h-20 w-20 border shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${bgClass} ${!isCollapsed ? 'ring-2 ring-pink-500' : ''}`}
-            title={isCollapsed ? "Expand Word Cloud" : "Close Word Cloud"}
+        <button
+          onClick={onToggle}
+          className={`h-20 w-20 border shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${bgClass} ${!isCollapsed ? 'ring-2 ring-pink-500' : ''}`}
+          title={isCollapsed ? "Expand Word Cloud" : "Close Word Cloud"}
         >
-            <div className="relative w-8 h-8 flex items-center justify-center text-pink-400">
-                {/* Zoomed out word cloud icon (various small colored lines) */}
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect x="2" y="6" width="6" height="2" rx="1" fill="currentColor" fillOpacity="0.8"/>
-                    <rect x="9" y="6" width="8" height="2" rx="1" fill="currentColor" fillOpacity="0.5"/>
-                    <rect x="18" y="6" width="4" height="2" rx="1" fill="currentColor" fillOpacity="0.9"/>
-                    
-                    <rect x="3" y="10" width="9" height="2" rx="1" fill="currentColor" fillOpacity="0.6"/>
-                    <rect x="13" y="10" width="5" height="2" rx="1" fill="currentColor" fillOpacity="0.9"/>
-                    <rect x="19" y="10" width="2" height="2" rx="1" fill="currentColor" fillOpacity="0.4"/>
-                    
-                    <rect x="2" y="14" width="4" height="2" rx="1" fill="currentColor" fillOpacity="0.9"/>
-                    <rect x="7" y="14" width="7" height="2" rx="1" fill="currentColor" fillOpacity="0.5"/>
-                    <rect x="15" y="14" width="7" height="2" rx="1" fill="currentColor" fillOpacity="0.7"/>
-                </svg>
-            </div>
-            <div className={`text-[9px] font-bold tracking-wider leading-none text-center ${textMain}`}>
-                WORD<br/>CLOUD
-            </div>
+          <div className="relative w-8 h-8 flex items-center justify-center text-pink-400">
+            {/* Zoomed out word cloud icon (various small colored lines) */}
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="2" y="6" width="6" height="2" rx="1" fill="currentColor" fillOpacity="0.8" />
+              <rect x="9" y="6" width="8" height="2" rx="1" fill="currentColor" fillOpacity="0.5" />
+              <rect x="18" y="6" width="4" height="2" rx="1" fill="currentColor" fillOpacity="0.9" />
+
+              <rect x="3" y="10" width="9" height="2" rx="1" fill="currentColor" fillOpacity="0.6" />
+              <rect x="13" y="10" width="5" height="2" rx="1" fill="currentColor" fillOpacity="0.9" />
+              <rect x="19" y="10" width="2" height="2" rx="1" fill="currentColor" fillOpacity="0.4" />
+
+              <rect x="2" y="14" width="4" height="2" rx="1" fill="currentColor" fillOpacity="0.9" />
+              <rect x="7" y="14" width="7" height="2" rx="1" fill="currentColor" fillOpacity="0.5" />
+              <rect x="15" y="14" width="7" height="2" rx="1" fill="currentColor" fillOpacity="0.7" />
+            </svg>
+          </div>
+          <div className={`text-[9px] font-bold tracking-wider leading-none text-center ${textMain}`}>
+            WORD<br />CLOUD
+          </div>
         </button>
       </div>
 
       {!isCollapsed && (
-        <div className={`absolute top-full left-0 mt-2 w-72 border rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600 ${dropdownBg}`}>
-             <div className={`p-2 border-b flex justify-between items-center sticky top-0 z-10 ${headerBg}`}>
-                 <span className={`text-[10px] font-bold uppercase tracking-wider pl-1 ${textHeader}`}>
-                     Word Cloud Tools
-                 </span>
-                 {onOpenGuidance && (
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); onOpenGuidance(); }}
-                        className={`transition-colors p-1 rounded ${isDarkMode ? 'text-yellow-500 hover:text-white hover:bg-gray-700' : 'text-yellow-600 hover:text-gray-900 hover:bg-gray-200'}`}
-                        title="Guidance & Tips"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
-                        </svg>
-                    </button>
-                 )}
-             </div>
-             
-             {WORD_CLOUD_TOOLS.map(tool => (
-                 <button
-                    key={tool.id}
-                    onClick={() => onSelectTool(tool.id)}
-                    className={`flex items-start text-left p-3 border-b last:border-0 transition-colors group ${itemHover}`}
-                 >
-                     <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110" style={{ color: tool.color }}>
-                         {tool.icon}
-                     </div>
-                     <div>
-                         <div className={`font-bold text-sm mb-0.5 ${textItem}`}>{tool.name}</div>
-                         <p className={`text-xs leading-tight ${textDesc}`}>
-                             {tool.desc}
-                         </p>
-                     </div>
-                 </button>
-             ))}
+        <div className={`absolute top-full left-0 mt-2 w-72 border rounded-lg shadow-2xl z-[950] flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600 ${dropdownBg}`}>
+          <div className={`p-2 border-b flex justify-between items-center sticky top-0 z-10 ${headerBg}`}>
+            <span className={`text-[10px] font-bold uppercase tracking-wider pl-1 ${textHeader}`}>
+              Word Cloud Tools
+            </span>
+            {onOpenGuidance && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onOpenGuidance(); }}
+                className={`transition-colors p-1 rounded ${isDarkMode ? 'text-yellow-500 hover:text-white hover:bg-gray-700' : 'text-yellow-600 hover:text-gray-900 hover:bg-gray-200'}`}
+                title="Guidance & Tips"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.464 5.05l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1h4v1a2 2 0 11-4 0zM12 14c.015-.34.208-.646.477-.859a4 4 0 10-4.954 0c.27.213.462.519.476.859h4.002z" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {WORD_CLOUD_TOOLS.map(tool => (
+            <button
+              key={tool.id}
+              onClick={() => onSelectTool(tool.id)}
+              className={`flex items-start text-left p-3 border-b last:border-0 transition-colors group ${itemHover}`}
+            >
+              <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110" style={{ color: tool.color }}>
+                {tool.icon}
+              </div>
+              <div>
+                <div className={`font-bold text-sm mb-0.5 ${textItem}`}>{tool.name}</div>
+                <p className={`text-xs leading-tight ${textDesc}`}>
+                  {tool.desc}
+                </p>
+              </div>
+            </button>
+          ))}
         </div>
       )}
     </div>

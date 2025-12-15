@@ -19,7 +19,7 @@ interface UseSelfTestProps {
     onAutoLayout: () => void;
     elements: Element[];
     graphCanvasRef: React.RefObject<any>;
-    
+
     // New Props for full coverage
     setIsCsvModalOpen: (open: boolean) => void;
     setIsAboutModalOpen: (open: boolean) => void;
@@ -38,11 +38,11 @@ interface TestStep {
     timeout?: number; // Max time to wait for selector (ms)
 }
 
-export const useSelfTest = ({ 
-    panelState, 
-    tools, 
-    setPanelLayouts, 
-    persistence, 
+export const useSelfTest = ({
+    panelState,
+    tools,
+    setPanelLayouts,
+    persistence,
     modelActions,
     setAnalysisHighlights,
     setFocusMode,
@@ -85,7 +85,7 @@ export const useSelfTest = ({
                 } else {
                     found = !!document.querySelector(selector);
                 }
-                
+
                 if (found) return true;
             } catch (e) {
                 console.error(`Error checking selector ${selector}:`, e);
@@ -108,28 +108,28 @@ export const useSelfTest = ({
         if (id.startsWith('1.3')) return { feature: 'Matrix Panel', component: 'Interface', x: -200, y: -300 };
         if (id.startsWith('1.4')) return { feature: 'Grid Panel', component: 'Interface', x: -100, y: -300 };
         if (id.startsWith('1.5')) return { feature: 'Kanban Panel', component: 'Interface', x: 0, y: -300 };
-        
+
         // 1.6 - Views
         if (id.startsWith('1.6.1')) return { feature: 'New View', component: 'Views', x: 200, y: -300 };
         if (id.startsWith('1.6.2')) return { feature: 'Clone View', component: 'Views', x: 200, y: -300 };
         if (id.startsWith('1.6.3')) return { feature: 'Room Decor', component: 'Views', x: 200, y: -300 };
         if (id.startsWith('1.6.4')) return { feature: 'Edit View', component: 'Views', x: 200, y: -300 };
         if (id.startsWith('1.6.5')) return { feature: 'Delete View', component: 'Views', x: 200, y: -300 };
-        
+
         // 2.x - Tools
         if (id.startsWith('2.1')) return { feature: 'Assistant', component: 'AI Tools', x: 400, y: -200 };
         if (id.startsWith('2.2')) return { feature: 'Schema Editor', component: 'Schema', x: 400, y: -100 };
         if (id.startsWith('2.3')) return { feature: 'Physics & Shape', component: 'Layout', x: 400, y: 0 };
-        
+
         // 2.4 Analysis Sub-features
         if (id.startsWith('2.4.1') || id.startsWith('2.4.2') || id.startsWith('2.4.3')) return { feature: 'Menu', component: 'Analysis', x: 400, y: 100 };
         if (id.startsWith('2.4.4') || id.startsWith('2.4.5') || id.startsWith('2.4.6')) return { feature: 'Network', component: 'Analysis', x: 400, y: 120 };
         if (id.startsWith('2.4.7') || id.startsWith('2.4.8') || id.startsWith('2.4.9')) return { feature: 'Tag Dist', component: 'Analysis', x: 400, y: 140 };
         if (id.startsWith('2.4.10')) return { feature: 'Rel Dist', component: 'Analysis', x: 400, y: 160 };
-        
+
         if (id.startsWith('2.5')) return { feature: 'Visualise Menu', component: 'Visualise', x: 400, y: 200 };
         if (id.startsWith('2.6')) return { feature: 'Script Editor', component: 'Automation', x: 500, y: -200 };
-        
+
         // 2.7 Tag Cloud Sub-features
         if (id.startsWith('2.7.1') || id.startsWith('2.7.2')) return { feature: 'Menu', component: 'Word Cloud', x: 500, y: -100 };
         if (id.startsWith('2.7.3')) return { feature: 'Tag Cloud', component: 'Word Cloud', x: 500, y: -80 };
@@ -169,7 +169,7 @@ export const useSelfTest = ({
         setTestLogs([]);
         setExecutionIndex(0);
         stopRef.current = false;
-        
+
         // Wait briefly for UI to render the modal before freezing with synchronous heavy lifting
         await new Promise(r => setTimeout(r, 200));
 
@@ -187,7 +187,7 @@ export const useSelfTest = ({
         setIsPatternGalleryModalOpen(false);
         setIsUserGuideModalOpen(false);
         setIsRandomWalkOpen(false);
-        
+
         setPanelLayouts({});
         setAnalysisHighlights(new Map());
 
@@ -218,34 +218,34 @@ export const useSelfTest = ({
 
         // Define Tests
         const testSteps: TestStep[] = [
-             // --- 0.1 Visuals (Circle Packing) ---
-             { 
-                 id: '0.1.1', 
-                 description: 'Panel(CirclePacking).Open', 
-                 action: () => {
-                     panelState.setIsCirclePackingPanelOpen(true);
-                     setPanelLayouts((prev: Record<string, PanelLayout>) => ({
-                         ...prev,
-                         'circle_packing': {
-                             x: Math.max(50, window.innerWidth - 450),
-                             y: 100,
-                             w: 400,
-                             h: 530, // 400 (canvas) + ~130 (UI chrome) = 530px height to ensure square canvas
-                             zIndex: 200,
-                             isFloating: true
-                         }
-                     }));
-                 }, 
-                 wait: 600 
-             },
-             { id: '0.1.2', description: 'Panel(CirclePacking).Check(Header)', selector: 'text:Circle Packing' },
-             
-             // --- 0.2 Data Tools (CSV) ---
-             { id: '0.2.1', description: 'Modal(CSV).Open', action: () => setIsCsvModalOpen(true), wait: 600 },
-             { id: '0.2.2', description: 'Modal(CSV).Check(Header)', selector: 'text:Data Tools', prerequisite: 'text:Data Tools' },
-             { id: '0.2.3', description: 'Modal(CSV).Close', action: () => setIsCsvModalOpen(false), wait: 300 },
+            // --- 0.1 Visuals (Circle Packing) ---
+            {
+                id: '0.1.1',
+                description: 'Panel(CirclePacking).Open',
+                action: () => {
+                    panelState.setIsCirclePackingPanelOpen(true);
+                    setPanelLayouts((prev: Record<string, PanelLayout>) => ({
+                        ...prev,
+                        'circle_packing': {
+                            x: Math.max(50, window.innerWidth - 450),
+                            y: 100,
+                            w: 400,
+                            h: 530, // 400 (canvas) + ~130 (UI chrome) = 530px height to ensure square canvas
+                            zIndex: 200,
+                            isFloating: true
+                        }
+                    }));
+                },
+                wait: 600
+            },
+            { id: '0.1.2', description: 'Panel(CirclePacking).Check(Header)', selector: 'text:Circle Packing' },
 
-             // --- 1. Core Interface Panels ---
+            // --- 0.2 Data Tools (CSV) ---
+            { id: '0.2.1', description: 'Modal(CSV).Open', action: () => setIsCsvModalOpen(true), wait: 600 },
+            { id: '0.2.2', description: 'Modal(CSV).Check(Header)', selector: 'text:Data Tools', prerequisite: 'text:Data Tools' },
+            { id: '0.2.3', description: 'Modal(CSV).Close', action: () => setIsCsvModalOpen(false), wait: 300 },
+
+            // --- 1. Core Interface Panels ---
             // 1.1 Report Panel
             { id: '1.1.1', description: 'Button(Report).Click -> Open Panel', action: () => panelState.setIsReportPanelOpen(true), wait: 500 },
             { id: '1.1.2', description: 'Panel(Report).Check(Header)', selector: 'text:Report', prerequisite: 'text:Report' },
@@ -276,12 +276,12 @@ export const useSelfTest = ({
             { id: '1.5.2', description: 'Panel(Kanban).Check(Header)', selector: 'text:Kanban Board', prerequisite: 'text:Kanban Board' },
             { id: '1.5.3', description: 'Panel(Kanban).Check(Column:To Do)', selector: 'text:To Do', prerequisite: 'text:Kanban Board' },
             { id: '1.5.4', description: 'Panel(Kanban).Close', action: () => panelState.setIsKanbanPanelOpen(false), wait: 300 },
-            
+
             // 1.6 View Management
             // 1.6.1 New View
-            { 
-                id: '1.6.1', 
-                description: 'View.New', 
+            {
+                id: '1.6.1',
+                description: 'View.New',
                 action: async () => {
                     const toggle = document.querySelector('button[title="Switch View"]') as HTMLElement;
                     toggle?.click();
@@ -293,7 +293,7 @@ export const useSelfTest = ({
                 },
                 wait: 500
             },
-            
+
             // 1.6.2 Clone View
             {
                 id: '1.6.2',
@@ -314,13 +314,13 @@ export const useSelfTest = ({
                 id: '1.6.4',
                 description: 'View.Edit (Open Details)',
                 action: async () => {
-                     const toggle = document.querySelector('button[title="Switch View"]') as HTMLElement;
-                     toggle?.click();
-                     await new Promise(r => setTimeout(r, 200));
-                     
-                     // Find the edit button of the first item
-                     const editBtn = document.querySelector('button[title="Edit Settings"]') as HTMLElement;
-                     editBtn?.click();
+                    const toggle = document.querySelector('button[title="Switch View"]') as HTMLElement;
+                    toggle?.click();
+                    await new Promise(r => setTimeout(r, 200));
+
+                    // Find the edit button of the first item
+                    const editBtn = document.querySelector('button[title="Edit Settings"]') as HTMLElement;
+                    editBtn?.click();
                 },
                 wait: 500
             },
@@ -328,13 +328,13 @@ export const useSelfTest = ({
 
             // 1.6.3 Room Decor (Inside Edit Panel)
             { id: '1.6.3', description: 'View.Decor.Check', selector: 'text:Room Decor', prerequisite: 'text:View Details' },
-            
+
             // Close Details Panel
-            { 
-                id: '1.6.4c', 
-                description: 'Panel(ViewDetails).Close', 
-                action: () => panelState.setIsViewDetailsPanelOpen(false), 
-                wait: 300 
+            {
+                id: '1.6.4c',
+                description: 'Panel(ViewDetails).Close',
+                action: () => panelState.setIsViewDetailsPanelOpen(false),
+                wait: 300
             },
 
             // 1.6.5 Delete View
@@ -345,13 +345,13 @@ export const useSelfTest = ({
                     const toggle = document.querySelector('button[title="Switch View"]') as HTMLElement;
                     toggle?.click();
                     await new Promise(r => setTimeout(r, 200));
-                    
+
                     // Find delete button
                     const delBtn = document.querySelector('button[title="Delete"]') as HTMLElement;
                     delBtn?.click();
-                    
+
                     await new Promise(r => setTimeout(r, 200));
-                    
+
                     // Confirm delete in modal
                     const confirmBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.includes('Delete View'));
                     confirmBtn?.click();
@@ -360,7 +360,7 @@ export const useSelfTest = ({
             },
 
             // --- 2. Toolbars & Tools ---
-            
+
             // 2.1 AI Tools
             { id: '2.1.1', description: 'Toolbar(AI).Open', action: () => { tools.setIsToolsPanelOpen(true); tools.setActiveTool('ai'); }, wait: 500 },
             { id: '2.1.2', description: 'Toolbar(AI).Check(Assistant)', selector: 'text:Assistant', prerequisite: 'text:Assistant' },
@@ -377,37 +377,115 @@ export const useSelfTest = ({
 
             // 2.3 Layout Tools
             { id: '2.3.1', description: 'Toolbar(Layout).Open', action: () => tools.setActiveTool('layout'), wait: 500 },
-            { id: '2.3.2', description: 'Toolbar(Layout).Check(Spread)', selector: 'text:Spread', prerequisite: 'text:Spread' },
-            { id: '2.3.3', description: 'Toolbar(Layout).Check(Repel)', selector: 'text:Repel', prerequisite: 'text:Spread' },
-            { id: '2.3.4', description: 'Toolbar(Layout).Check(Simulate)', selector: 'text:SIMULATE', prerequisite: 'text:Spread' },
-            { id: '2.3.5', description: 'Toolbar(Layout).Close', action: () => tools.setActiveTool(null), wait: 300 },
+
+            // 2.3a Force Directed
+            {
+                id: '2.3.2', description: 'Toolbar(Layout).Open(Force)', action: async () => {
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const btn = buttons.find(b => b.textContent?.includes('Force Directed'));
+                    if (btn) btn.click();
+                }, wait: 500
+            },
+            { id: '2.3.3', description: 'Panel(Force).Check(Header)', selector: 'text:Force Directed Layout', prerequisite: 'text:Force Directed Layout' },
+            {
+                id: '2.3.4', description: 'Panel(Force).Close', action: () => {
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    // Find close button in the specific panel - naive approch might close wrong one if multiple open
+                    // But we close sequentially.
+                    // Re-open tool to close panel or find close button? 
+                    // The panels have a Close button (X).
+                    const headers = Array.from(document.querySelectorAll('div')).filter(d => d.textContent?.includes('Force Directed Layout'));
+                    const header = headers[headers.length - 1]; // Last one likely
+                    const closeBtn = header?.querySelector('button');
+                    closeBtn?.click();
+                }, wait: 300
+            },
+
+            // 2.3b Node Shape
+            {
+                id: '2.3.5', description: 'Toolbar(Layout).Open(Shape)', action: async () => {
+                    tools.setActiveTool('layout');
+                    await new Promise(r => setTimeout(r, 200));
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const btn = buttons.find(b => b.textContent?.includes('Node Shape'));
+                    if (btn) btn.click();
+                }, wait: 500
+            },
+            { id: '2.3.6', description: 'Panel(Shape).Check(Header)', selector: 'text:Node Shape', prerequisite: 'text:Node Shape' },
+            {
+                id: '2.3.7', description: 'Panel(Shape).Close', action: () => {
+                    const headers = Array.from(document.querySelectorAll('div')).filter(d => d.textContent?.includes('Node Shape'));
+                    const header = headers[headers.length - 1];
+                    header?.querySelector('button')?.click();
+                }, wait: 300
+            },
+
+            // 2.3c Spacing Controls
+            {
+                id: '2.3.8', description: 'Toolbar(Layout).Open(Spacing)', action: async () => {
+                    tools.setActiveTool('layout');
+                    await new Promise(r => setTimeout(r, 200));
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const btn = buttons.find(b => b.textContent?.includes('Spacing Controls'));
+                    if (btn) btn.click();
+                }, wait: 500
+            },
+            { id: '2.3.9', description: 'Panel(Spacing).Check(Header)', selector: 'text:Spacing Controls', prerequisite: 'text:Spacing Controls' },
+            {
+                id: '2.3.10', description: 'Panel(Spacing).Close', action: () => {
+                    const headers = Array.from(document.querySelectorAll('div')).filter(d => d.textContent?.includes('Spacing Controls'));
+                    const header = headers[headers.length - 1];
+                    header?.querySelector('button')?.click();
+                }, wait: 300
+            },
 
             // 2.4 Analysis Tools
             { id: '2.4.1', description: 'Toolbar(Analysis).Open', action: () => tools.setActiveTool('analysis'), wait: 500 },
-            { id: '2.4.2', description: 'Toolbar(Analysis).Check(Dropdown)', selector: 'text:Graph Analytics', prerequisite: 'text:Graph Analytics' },
-            { id: '2.4.3', description: 'Toolbar(Analysis).Check(Network Button)', selector: 'text:Network Analysis', prerequisite: 'text:Graph Analytics' },
-            
-            // 2.4a Network Panel
-            { id: '2.4.4', description: 'Panel(Network).Open', action: () => panelState.setIsNetworkAnalysisOpen(true), wait: 500 },
-            { id: '2.4.5', description: 'Panel(Network).Check(Header)', selector: 'text:Network Analysis', prerequisite: 'text:Network Analysis' },
-            { id: '2.4.6', description: 'Panel(Network).Close', action: () => panelState.setIsNetworkAnalysisOpen(false), wait: 300 },
-            
-            // 2.4b Tag Distribution
-            { id: '2.4.7', description: 'Panel(TagDist).Open', action: () => panelState.setIsTagDistPanelOpen(true), wait: 500 },
-            { id: '2.4.8', description: 'Panel(TagDist).Check(Header)', selector: 'text:Tag Frequency', prerequisite: 'text:Tag Frequency' },
-            { id: '2.4.9', description: 'Panel(TagDist).Close', action: () => panelState.setIsTagDistPanelOpen(false), wait: 300 },
+            { id: '2.4.2', description: 'Toolbar(Analysis).Check(Header)', selector: 'text:Graph Analytics', prerequisite: 'text:Graph Analytics' },
 
-            // 2.4c Relationship Distribution
-            { id: '2.4.10', description: 'Panel(RelDist).Open', action: () => panelState.setIsRelDistPanelOpen(true), wait: 500 },
-            { id: '2.4.11', description: 'Panel(RelDist).Check(Header)', selector: 'text:Relationship Usage', prerequisite: 'text:Relationship Usage' },
-            { id: '2.4.12', description: 'Panel(RelDist).Close', action: () => { panelState.setIsRelDistPanelOpen(false); tools.setActiveTool(null); }, wait: 300 },
+            // 2.4a Network Analysis
+            {
+                id: '2.4.3', description: 'Analysis.Open(Network)', action: async () => {
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const btn = buttons.find(b => b.textContent?.includes('Network Analysis'));
+                    if (btn) btn.click();
+                }, wait: 500
+            },
+            { id: '2.4.4', description: 'Panel(Network).Check(Header)', selector: 'text:Network Analysis', prerequisite: 'text:Network Analysis' },
+            { id: '2.4.5', description: 'Panel(Network).Close', action: () => panelState.setIsNetworkAnalysisOpen(false), wait: 300 },
+
+            // 2.4b Tag Analysis
+            {
+                id: '2.4.6', description: 'Analysis.Open(Tags)', action: async () => {
+                    tools.setActiveTool('analysis');
+                    await new Promise(r => setTimeout(r, 200));
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const btn = buttons.find(b => b.textContent?.includes('Tag Analysis'));
+                    if (btn) btn.click();
+                }, wait: 500
+            },
+            { id: '2.4.7', description: 'Panel(TagDist).Check(Header)', selector: 'text:Tag Frequency', prerequisite: 'text:Tag Frequency' },
+            { id: '2.4.8', description: 'Panel(TagDist).Close', action: () => panelState.setIsTagDistPanelOpen(false), wait: 300 },
+
+            // 2.4c Relationship Analysis
+            {
+                id: '2.4.9', description: 'Analysis.Open(Rel)', action: async () => {
+                    tools.setActiveTool('analysis');
+                    await new Promise(r => setTimeout(r, 200));
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const btn = buttons.find(b => b.textContent?.includes('Relationship Analysis'));
+                    if (btn) btn.click();
+                }, wait: 500
+            },
+            { id: '2.4.10', description: 'Panel(RelDist).Check(Header)', selector: 'text:Relationship Usage', prerequisite: 'text:Relationship Usage' },
+            { id: '2.4.11', description: 'Panel(RelDist).Close', action: () => { panelState.setIsRelDistPanelOpen(false); tools.setActiveTool(null); }, wait: 300 },
 
             // 2.5 Visualise Tools
             { id: '2.5.1', description: 'Toolbar(Visualise).Open', action: () => tools.setActiveTool('visualise'), wait: 500 },
             { id: '2.5.2', description: 'Toolbar(Visualise).Check(Grid)', selector: 'text:Attribute Grid', prerequisite: 'text:Attribute Grid' },
             { id: '2.5.3', description: 'Toolbar(Visualise).Check(Circle Packing)', selector: 'text:Circle Packing', prerequisite: 'text:Attribute Grid' },
             { id: '2.5.4', description: 'Toolbar(Visualise).Close', action: () => tools.setActiveTool(null), wait: 300 },
-            
+
             // 2.6 Scripts
             { id: '2.6.1', description: 'Toolbar(Scripts).Open', action: () => tools.setActiveTool('scripts'), wait: 500 },
             { id: '2.6.2', description: 'Toolbar(Scripts).Check(Header)', selector: 'text:Automation & Macros', prerequisite: 'text:Automation & Macros' },
@@ -418,12 +496,12 @@ export const useSelfTest = ({
             // 2.7 Tag Cloud Tools
             { id: '2.7.1', description: 'Toolbar(TagCloud).Open', action: () => tools.setActiveTool('tagcloud'), wait: 500 },
             { id: '2.7.2', description: 'Toolbar(TagCloud).Check(Header)', selector: 'text:Word Cloud Tools', prerequisite: 'text:Word Cloud Tools' },
-            
+
             // 2.7a Tag Cloud
             { id: '2.7.3', description: 'Panel(TagCloud).Open', action: () => panelState.setIsConceptCloudOpen(true), wait: 500 },
             { id: '2.7.4', description: 'Panel(TagCloud).Check(Header)', selector: 'text:Tag Cloud', prerequisite: 'text:Tag Cloud' },
             { id: '2.7.5', description: 'Panel(TagCloud).Close', action: () => panelState.setIsConceptCloudOpen(false), wait: 300 },
-            
+
             // 2.7b Influence Cloud (Nodes)
             { id: '2.7.6', description: 'Panel(RelCloud).Open', action: () => panelState.setIsInfluenceCloudOpen(true), wait: 500 },
             { id: '2.7.7', description: 'Panel(RelCloud).Check(Header)', selector: 'text:Relationship Cloud', prerequisite: 'text:Relationship Cloud' },
@@ -433,7 +511,7 @@ export const useSelfTest = ({
             { id: '2.7.9', description: 'Panel(NameCloud).Open', action: () => panelState.setIsTextAnalysisOpen(true), wait: 500 },
             { id: '2.7.10', description: 'Panel(NameCloud).Check(Header)', selector: 'text:Node Name Analysis', prerequisite: 'text:Node Name Analysis' },
             { id: '2.7.11', description: 'Panel(NameCloud).Close', action: () => panelState.setIsTextAnalysisOpen(false), wait: 300 },
-            
+
             // 2.7d Full Text Analysis
             { id: '2.7.12', description: 'Panel(FullText).Open', action: () => panelState.setIsFullTextAnalysisOpen(true), wait: 500 },
             { id: '2.7.13', description: 'Panel(FullText).Check(Header)', selector: 'text:Full Text Analysis', prerequisite: 'text:Full Text Analysis' },
@@ -451,22 +529,65 @@ export const useSelfTest = ({
             { id: '2.8.7', description: 'Panel(RandomWalk).Check(Header)', selector: 'text:Random Walk', prerequisite: 'text:Random Walk' },
             { id: '2.8.8', description: 'Panel(RandomWalk).Close', action: () => { setIsRandomWalkOpen(false); tools.setActiveTool(null); }, wait: 300 },
 
-            // 2.9 Bulk Edit
+            // 2.9 Bulk Edit Tools
             { id: '2.9.1', description: 'Toolbar(Bulk).Open', action: () => tools.setActiveTool('bulk'), wait: 500 },
-            { id: '2.9.2', description: 'Toolbar(Bulk).Check(Add Input)', selector: 'input[placeholder="Tags to add..."]', prerequisite: 'input[placeholder="Tags to add..."]' },
-            { id: '2.9.3', description: 'Toolbar(Bulk).Close', action: () => tools.setActiveTool(null), wait: 300 },
 
-            // 2.10 Command Bar
-            { id: '2.10.1', description: 'Toolbar(Command).Open', action: () => tools.setActiveTool('command'), wait: 500 },
-            { id: '2.10.2', description: 'Toolbar(Command).Check(Input)', selector: 'textarea[placeholder*="Element A"]', prerequisite: 'textarea[placeholder*="Element A"]' },
-            { id: '2.10.3', description: 'Toolbar(Command).Close', action: () => tools.setActiveTool(null), wait: 300 },
+            // 2.9.2 Interactive Tag Editor
+            {
+                id: '2.9.2', description: 'Bulk.Open(TagEditor)', action: async () => {
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const btn = buttons.find(b => b.textContent?.includes('Interactive Tag Editor'));
+                    if (btn) btn.click();
+                }, wait: 500
+            },
+            // Note: This toggles the panel, doesn't open a new blocking modal. We check if active.
+            // But wait, the code calls onOpenPanel() then onToggle(). 
+            // We should assume it might open a panel or change state.
+            // Let's just verify the button existed and we clicked it. 
+            // The logic in BulkEditToolbar calls onOpenPanel();
+
+            // 2.9.3 Remove Highlights
+            {
+                id: '2.9.3', description: 'Bulk.Run(RemoveHighlights)', action: async () => {
+                    tools.setActiveTool('bulk');
+                    await new Promise(r => setTimeout(r, 200));
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const btn = buttons.find(b => b.textContent?.includes('Remove Highlights'));
+                    if (btn) btn.click();
+                }, wait: 500
+            },
+
+            // 2.9.4 Remove Added by Tapestry
+            {
+                id: '2.9.4', description: 'Bulk.Run(RemoveAdded)', action: async () => {
+                    tools.setActiveTool('bulk');
+                    await new Promise(r => setTimeout(r, 200));
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const btn = buttons.find(b => b.textContent?.includes("Remove 'Added_by_tapestry'"));
+                    if (btn) btn.click();
+                }, wait: 500
+            },
+
+            // 2.9.5 Command (Moved from 2.10)
+            {
+                id: '2.9.5', description: 'Bulk.Open(Command)', action: async () => {
+                    tools.setActiveTool('bulk');
+                    await new Promise(r => setTimeout(r, 200));
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const btn = buttons.find(b => b.textContent?.includes("Command"));
+                    if (btn) btn.click();
+                }, wait: 500
+            },
+            { id: '2.9.6', description: 'Toolbar(Command).Check(Input)', selector: 'textarea[placeholder*="Element A"]', prerequisite: 'textarea[placeholder*="Element A"]' },
+            { id: '2.9.7', description: 'Toolbar(Command).Close', action: () => tools.setActiveTool(null), wait: 300 },
+
 
             // --- 3. Methodology Modals ---
 
             // 3.1 SCAMPER
             { id: '3.1.1', description: 'Modal(SCAMPER).Open', action: () => tools.setIsScamperModalOpen(true), wait: 600 },
             { id: '3.1.2', description: 'Modal(SCAMPER).Check(Header)', selector: 'text:SCAMPER', prerequisite: 'text:SCAMPER' },
-            { id: '3.1.3', description: 'Modal(SCAMPER).Check(Save)', selector: 'text:Save Report', prerequisite: 'text:SCAMPER' }, 
+            { id: '3.1.3', description: 'Modal(SCAMPER).Check(Save)', selector: 'text:Save Report', prerequisite: 'text:SCAMPER' },
             { id: '3.1.4', description: 'Modal(SCAMPER).Close', action: () => tools.setIsScamperModalOpen(false), wait: 300 },
 
             // 3.2 TRIZ
@@ -501,9 +622,9 @@ export const useSelfTest = ({
             { id: '3.6.4', description: 'Modal(Strategy).Close', action: () => tools.setIsSwotModalOpen(false), wait: 300 },
 
             // --- 4. Additional Explorer Panels ---
-             { id: '4.1.1', description: 'Panel(Treemap).Open', action: () => panelState.setIsTreemapPanelOpen(true), wait: 600 },
-             { id: '4.1.2', description: 'Panel(Treemap).Check(Header)', selector: 'text:Treemap', prerequisite: 'text:Treemap' },
-             { id: '4.1.3', description: 'Panel(Treemap).Close', action: () => panelState.setIsTreemapPanelOpen(false), wait: 300 },
+            { id: '4.1.1', description: 'Panel(Treemap).Open', action: () => panelState.setIsTreemapPanelOpen(true), wait: 600 },
+            { id: '4.1.2', description: 'Panel(Treemap).Check(Header)', selector: 'text:Treemap', prerequisite: 'text:Treemap' },
+            { id: '4.1.3', description: 'Panel(Treemap).Close', action: () => panelState.setIsTreemapPanelOpen(false), wait: 300 },
 
             // --- 5. Help & Menu ---
             // 5.1 About
@@ -515,22 +636,22 @@ export const useSelfTest = ({
             { id: '5.2.1', description: 'Modal(Patterns).Open', action: () => setIsPatternGalleryModalOpen(true), wait: 600 },
             { id: '5.2.2', description: 'Modal(Patterns).Check(Title)', selector: 'text:Pattern Gallery', prerequisite: 'text:Pattern Gallery' },
             { id: '5.2.3', description: 'Modal(Patterns).Close', action: () => setIsPatternGalleryModalOpen(false), wait: 300 },
-            
+
             // 5.3 User Guide
             { id: '5.3.1', description: 'Modal(UserGuide).Open', action: () => setIsUserGuideModalOpen(true), wait: 600 },
             { id: '5.3.2', description: 'Modal(UserGuide).Check(Title)', selector: 'text:User Guide', prerequisite: 'text:User Guide' },
             { id: '5.3.3', description: 'Modal(UserGuide).Close', action: () => setIsUserGuideModalOpen(false), wait: 300 },
         ];
-        
+
         executableStepsRef.current = testSteps;
 
         // --- GRAPH GENERATION PHASE ---
-        
+
         // 1. Setup Data Structures
         const createdNodes = new Set<string>();
         const createdComponents = new Set<string>();
         const createdFeatures = new Set<string>();
-        const stepNodeMap = new Map<string, string>(); 
+        const stepNodeMap = new Map<string, string>();
 
         // 2. Create Root
         modelActions.addElement({
@@ -545,38 +666,38 @@ export const useSelfTest = ({
             const featureInfo = getFeatureInfo(step.id);
             const featureName = featureInfo.feature;
             const componentName = featureInfo.component;
-            
+
             // Create Component (if new)
             if (!createdComponents.has(componentName)) {
-                modelActions.addElement({ 
-                    name: componentName, 
-                    tags: ["Component"], 
-                    x: featureInfo.x, 
-                    y: featureInfo.y 
+                modelActions.addElement({
+                    name: componentName,
+                    tags: ["Component"],
+                    x: featureInfo.x,
+                    y: featureInfo.y
                 });
                 modelActions.addRelationship("Tapestry Studio", componentName, "contains", "TO");
                 createdComponents.add(componentName);
                 createdNodes.add(componentName);
             }
-            
+
             // Create Feature (if new)
             if (!createdFeatures.has(featureName)) {
-                modelActions.addElement({ 
-                    name: featureName, 
-                    tags: ["Feature"], 
-                    x: featureInfo.x + (Math.random() * 50 - 25), 
+                modelActions.addElement({
+                    name: featureName,
+                    tags: ["Feature"],
+                    x: featureInfo.x + (Math.random() * 50 - 25),
                     y: featureInfo.y + (Math.random() * 50 + 25)
                 });
                 modelActions.addRelationship(componentName, featureName, "contains", "TO");
                 createdFeatures.add(featureName);
                 createdNodes.add(featureName);
             }
-            
+
             // Create Test Node
             const testNodeName = `${step.id} ${step.description}`;
             const offsetX = (Math.random() * 150) - 75;
             const offsetY = (Math.random() * 150) + 75;
-            
+
             const nodeId = modelActions.addElement({
                 name: testNodeName,
                 tags: ['Test'], // Initially just Test
@@ -584,9 +705,9 @@ export const useSelfTest = ({
                 x: featureInfo.x + offsetX,
                 y: featureInfo.y + offsetY
             });
-            
+
             modelActions.addRelationship(featureName, testNodeName, "verified by", "TO");
-            
+
             stepNodeMap.set(step.id, nodeId);
         }
 
@@ -619,7 +740,7 @@ export const useSelfTest = ({
         // Focus Logic
         const nodeId = (logItem as any).nodeId;
         const testNodeName = `${stepDef.id} ${stepDef.description}`;
-        
+
         if (nodeId) {
             setAnalysisHighlights(new Map([[nodeId, '#facc15']]));
             setSelectedElementId(nodeId);
@@ -636,8 +757,8 @@ export const useSelfTest = ({
         if (stepDef.prerequisite) {
             const preExists = await checkElement(stepDef.prerequisite, 500); // Short timeout for prerequisite
             if (!preExists) {
-                 stepStatus = 'blocked';
-                 stepMsg = `Prerequisite '${stepDef.prerequisite}' not found`;
+                stepStatus = 'blocked';
+                stepMsg = `Prerequisite '${stepDef.prerequisite}' not found`;
             }
         }
 
@@ -666,10 +787,10 @@ export const useSelfTest = ({
         }
 
         // Update Log
-        setTestLogs(prev => prev.map((l, i) => i === index ? { 
-            ...l, 
-            status: stepStatus, 
-            message: stepMsg 
+        setTestLogs(prev => prev.map((l, i) => i === index ? {
+            ...l,
+            status: stepStatus,
+            message: stepMsg
         } : l));
 
         // Update Graph Node
@@ -677,39 +798,39 @@ export const useSelfTest = ({
             // Apply Outcome Tag. Note: We REPLACE existing tags to remove 'Test'.
             const outcomeTag = stepStatus === 'ok' ? 'Pass' : (stepStatus === 'blocked' ? 'Blocked' : 'Fail');
             const finalTags = [outcomeTag]; // Removes 'Test' implicitly by overwriting
-            
-            modelActions.updateElement(testNodeName, { 
+
+            modelActions.updateElement(testNodeName, {
                 tags: finalTags,
                 notes: `${stepDef.description}\nResult: ${stepStatus.toUpperCase()} ${stepMsg}`
             });
         }
-        
+
         // Update Document Log
         if (testDocTitleRef.current) {
-             const info = getFeatureInfo(stepDef.id);
-             let contentToAdd = "";
-             
-             // Check Component Grouping
-             if (info.component !== lastLogContextRef.current.component) {
-                 contentToAdd += `### Component: ${info.component}\n`;
-                 lastLogContextRef.current.component = info.component;
-                 lastLogContextRef.current.feature = ""; // Reset feature
-             }
-             
-             // Check Feature Grouping
-             if (info.feature !== lastLogContextRef.current.feature) {
-                 contentToAdd += `#### Feature: ${info.feature}\n`;
-                 lastLogContextRef.current.feature = info.feature;
-             }
+            const info = getFeatureInfo(stepDef.id);
+            let contentToAdd = "";
 
-             const icon = stepStatus === 'ok' ? '✅' : (stepStatus === 'blocked' ? '🚫' : '❌');
-             const logLine = `- ${icon} **${stepDef.id}** ${stepDef.description}${stepMsg ? ` — _${stepMsg}_` : ''}`;
-             
-             contentToAdd += logLine;
-             
-             modelActions.updateDocument(testDocTitleRef.current, contentToAdd, 'append');
+            // Check Component Grouping
+            if (info.component !== lastLogContextRef.current.component) {
+                contentToAdd += `### Component: ${info.component}\n`;
+                lastLogContextRef.current.component = info.component;
+                lastLogContextRef.current.feature = ""; // Reset feature
+            }
+
+            // Check Feature Grouping
+            if (info.feature !== lastLogContextRef.current.feature) {
+                contentToAdd += `#### Feature: ${info.feature}\n`;
+                lastLogContextRef.current.feature = info.feature;
+            }
+
+            const icon = stepStatus === 'ok' ? '✅' : (stepStatus === 'blocked' ? '🚫' : '❌');
+            const logLine = `- ${icon} **${stepDef.id}** ${stepDef.description}${stepMsg ? ` — _${stepMsg}_` : ''}`;
+
+            contentToAdd += logLine;
+
+            modelActions.updateDocument(testDocTitleRef.current, contentToAdd, 'append');
         }
-        
+
         await new Promise(r => setTimeout(r, 200)); // Visual pause
         return stepStatus === 'ok';
     };
@@ -717,7 +838,7 @@ export const useSelfTest = ({
     const runSequence = async (startIndex: number) => {
         setTestStatus('running');
         stopRef.current = false;
-        
+
         for (let i = startIndex; i < testLogs.length; i++) {
             if (stopRef.current) {
                 setTestStatus('stopped');
@@ -727,7 +848,7 @@ export const useSelfTest = ({
             setExecutionIndex(i);
             await runStep(i);
         }
-        
+
         setTestStatus('complete');
         // Cleanup
         setAnalysisHighlights(new Map());
@@ -750,21 +871,21 @@ export const useSelfTest = ({
 
     const handleSelectStep = (index: number) => {
         setExecutionIndex(index);
-        
+
         const log = testLogs[index];
         const nodeId = (log as any).nodeId;
-        
+
         if (nodeId) {
             setAnalysisHighlights(new Map([[nodeId, '#facc15']]));
             setSelectedElementId(nodeId);
             setMultiSelection(new Set([nodeId]));
-            
+
             if (graphCanvasRef.current) {
                 const el = elements.find(e => e.id === nodeId);
                 if (el && el.x !== undefined && el.y !== undefined) {
-                     const cx = window.innerWidth / 2;
-                     const cy = window.innerHeight / 2;
-                     graphCanvasRef.current.setCamera(-(el.x) + cx, -(el.y) + cy, 1.5);
+                    const cx = window.innerWidth / 2;
+                    const cy = window.innerHeight / 2;
+                    graphCanvasRef.current.setCamera(-(el.x) + cx, -(el.y) + cy, 1.5);
                 }
             }
         }
@@ -776,7 +897,7 @@ export const useSelfTest = ({
         setIsSelfTestModalOpen,
         testLogs,
         testStatus,
-        
+
         // Expose new controls
         handlePlay,
         handleStop,

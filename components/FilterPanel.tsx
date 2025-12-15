@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { usePanelDrag } from '../hooks/usePanelDrag';
 import { DateFilterState, Element, NodeFilterState } from '../types';
 import { FilterContent } from './FilterContent';
 
@@ -16,48 +17,33 @@ interface FilterPanelProps {
   onNodeFilterChange: (newFilter: NodeFilterState) => void;
   onClose: () => void;
   isDarkMode: boolean;
+  allocateZIndex: () => number;
 }
 
 const FilterPanel: React.FC<FilterPanelProps> = (props) => {
-  const { onClose, isDarkMode } = props;
+  const { onClose, isDarkMode, allocateZIndex } = props;
 
   // Window Drag State
-  const [position, setPosition] = useState({ x: 20, y: 140 }); // Positioned under standard toolbar height
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef({ x: 0, y: 0 });
+  const { position, handleMouseDown: handleDragMouseDown } = usePanelDrag({
+    initialPosition: { x: 20, y: 140 },
+    onDragStart: () => setZIndex(allocateZIndex())
+  });
+
+  const [zIndex, setZIndex] = useState(500);
+
+  useEffect(() => {
+    setZIndex(allocateZIndex());
+  }, []);
 
   // Drag Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
     // Prevent dragging if clicking buttons inside header
     if ((e.target as HTMLElement).closest('button')) return;
-    
-    setIsDragging(true);
-    dragStartRef.current = { x: e.clientX - position.x, y: e.clientY - position.y };
+
+    handleDragMouseDown(e);
   };
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-        if (isDragging) {
-            setPosition({
-                x: e.clientX - dragStartRef.current.x,
-                y: e.clientY - dragStartRef.current.y
-            });
-        }
-    };
-    
-    const handleMouseUp = () => {
-        setIsDragging(false);
-    };
 
-    if (isDragging) {
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-    }
-    return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging]);
 
   const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
   const borderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
@@ -66,11 +52,11 @@ const FilterPanel: React.FC<FilterPanelProps> = (props) => {
   const sectionBorderClass = isDarkMode ? 'border-gray-700' : 'border-gray-200';
 
   return (
-    <div 
-        className={`fixed z-[500] w-[500px] rounded-lg shadow-2xl border ${bgClass} ${borderClass} flex flex-col max-h-[calc(100vh-160px)] transition-opacity duration-200`}
-        style={{ left: position.x, top: position.y }}
+    <div
+      className={`fixed w-[500px] rounded-lg shadow-2xl border ${bgClass} ${borderClass} flex flex-col max-h-[calc(100vh-160px)] transition-opacity duration-200`}
+      style={{ left: position.x, top: position.y, zIndex: zIndex }}
     >
-      <div 
+      <div
         className={`p-4 flex-shrink-0 flex justify-between items-center border-b ${sectionBorderClass} cursor-move select-none`}
         onMouseDown={handleMouseDown}
       >
@@ -83,7 +69,7 @@ const FilterPanel: React.FC<FilterPanelProps> = (props) => {
       </div>
 
       <div className="flex-grow overflow-y-auto custom-scrollbar">
-          <FilterContent {...props} />
+        <FilterContent {...props} />
       </div>
 
       <div className={`flex-shrink-0 p-4 flex justify-end items-center border-t ${sectionBorderClass}`}>

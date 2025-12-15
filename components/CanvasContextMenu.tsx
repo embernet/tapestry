@@ -1,30 +1,32 @@
 
 import React, { useRef, useEffect } from 'react';
 
-interface CanvasContextMenuProps { 
+interface CanvasContextMenuProps {
     x: number; y: number; onClose: () => void;
     onZoomToFit: () => void; onAutoLayout: () => void;
-    onToggleReport: () => void; onToggleMarkdown: () => void; onToggleJSON: () => void; 
+    onToggleReport: () => void; onToggleMarkdown: () => void; onToggleJSON: () => void;
     onToggleFilter: () => void; onToggleMatrix: () => void; onToggleTable: () => void; onToggleGrid: () => void;
     onOpenModel: () => void; onSaveModel: () => void; onCreateModel: () => void; onSaveAs: () => void;
     onSaveAsImage: () => void;
     isReportOpen: boolean; isMarkdownOpen: boolean; isJSONOpen: boolean; isFilterOpen: boolean; isMatrixOpen: boolean; isTableOpen: boolean; isGridOpen: boolean;
     isDarkMode: boolean;
-    
+
     // New Props for Kanban
     multiSelection?: Set<string>;
-    onAddToKanban?: (ids: string[], coords: { x: number; y: number }) => void;
+    onAddToKanban?: (ids: string[], coords: { x: number; y: number }, boardId?: string) => void;
     allElementIds?: string[]; // All visible nodes
+    kanbanBoards?: any[];
+    activeKanbanBoardId?: string | null;
 }
 
 export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = (props) => {
     const ref = useRef<HTMLDivElement>(null);
     useEffect(() => {
-        const handleClick = (e: MouseEvent) => { if(ref.current && !ref.current.contains(e.target as Node)) props.onClose(); }
+        const handleClick = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) props.onClose(); }
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') props.onClose();
         }
-        
+
         // Use capture phase to catch clicks even if propagation is stopped
         document.addEventListener('mousedown', handleClick, true);
         document.addEventListener('keydown', handleKeyDown);
@@ -44,36 +46,39 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = (props) => {
     const hoverClass = props.isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100';
     const dividerClass = props.isDarkMode ? 'border-gray-700' : 'border-gray-200';
     const labelClass = props.isDarkMode ? 'text-gray-500' : 'text-gray-400';
-    
-    const handleKanbanAdd = (e: React.MouseEvent, ids: string[]) => {
+
+    const handleKanbanAdd = (e: React.MouseEvent, ids: string[], boardId?: string) => {
         if (props.onAddToKanban) {
-            props.onAddToKanban(ids, { x: e.clientX, y: e.clientY });
+            props.onAddToKanban(ids, { x: e.clientX, y: e.clientY }, boardId);
             props.onClose();
         }
     };
+
+    // Determine active board
+    const activeBoard = props.kanbanBoards?.find(b => b.id === props.activeKanbanBoardId);
 
     return (
         <div ref={ref} className={`fixed border rounded shadow-xl z-50 py-1 w-56 ${bgClass}`} style={style}>
             <div className={`px-4 py-1 text-xs font-bold uppercase ${labelClass}`}>View</div>
             <button onClick={props.onZoomToFit} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Zoom to Fit</button>
             <button onClick={props.onAutoLayout} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Auto Layout</button>
-            
+
             <div className={`border-t my-1 ${dividerClass}`}></div>
             <div className={`px-4 py-1 text-xs font-bold uppercase ${labelClass}`}>Export</div>
             <button onClick={props.onSaveAsImage} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Save as Image</button>
 
-            {props.onAddToKanban && (
+            {props.onAddToKanban && activeBoard && (
                 <>
                     <div className={`border-t my-1 ${dividerClass}`}></div>
-                    <div className={`px-4 py-1 text-xs font-bold uppercase ${labelClass}`}>Kanban</div>
+                    <div className={`px-4 py-1 text-xs font-bold uppercase ${labelClass}`}>Kanban: {activeBoard.name}</div>
                     {props.multiSelection && props.multiSelection.size > 0 && (
-                         <button onClick={(e) => handleKanbanAdd(e, Array.from(props.multiSelection!))} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>
-                            Add {props.multiSelection.size} selected nodes...
+                        <button onClick={(e) => handleKanbanAdd(e, Array.from(props.multiSelection!), activeBoard.id)} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>
+                            Add Selected to Board
                         </button>
                     )}
                     {props.allElementIds && props.allElementIds.length > 0 && (
-                        <button onClick={(e) => handleKanbanAdd(e, props.allElementIds!)} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>
-                            Add all {props.allElementIds.length} nodes...
+                        <button onClick={(e) => handleKanbanAdd(e, props.allElementIds!, activeBoard.id)} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>
+                            Add All to Board
                         </button>
                     )}
                 </>
@@ -81,7 +86,7 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = (props) => {
 
             <div className={`border-t my-1 ${dividerClass}`}></div>
             <div className={`px-4 py-1 text-xs font-bold uppercase ${labelClass}`}>Panels</div>
-            
+
             <button onClick={props.onToggleReport} className={`flex justify-between w-full text-left px-4 py-1.5 text-sm ${textClass} ${hoverClass}`}>
                 <span>Report</span> {props.isReportOpen && <span className="text-blue-400">✓</span>}
             </button>
@@ -101,12 +106,12 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = (props) => {
                 <span>JSON</span> {props.isJSONOpen && <span className="text-blue-400">✓</span>}
             </button>
 
-             <div className={`border-t my-1 ${dividerClass}`}></div>
+            <div className={`border-t my-1 ${dividerClass}`}></div>
             <div className={`px-4 py-1 text-xs font-bold uppercase ${labelClass}`}>File</div>
             <button onClick={props.onSaveModel} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Save to Disk</button>
             <button onClick={props.onSaveAs} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Save As...</button>
             <button onClick={props.onOpenModel} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Open Model...</button>
-             <button onClick={props.onCreateModel} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>New Model...</button>
+            <button onClick={props.onCreateModel} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>New Model...</button>
         </div>
     );
 }

@@ -254,7 +254,7 @@ export const SelfTestModal: React.FC<SelfTestModalProps> = ({
                                 
                                 <span className={`flex-grow break-words ${isPending ? 'opacity-60' : 'opacity-100'}`}>
                                     {log.name}
-                                    {log.message && <div className="text-red-400 ml-2 mt-0.5 font-mono opacity-100 bg-red-900/20 p-1 rounded inline-block">> {log.message}</div>}
+                                    {log.message && <div className="text-red-400 ml-2 mt-0.5 font-mono opacity-100 bg-red-900/20 p-1 rounded inline-block">{'>'} {log.message}</div>}
                                 </span>
                             </div>
                         );

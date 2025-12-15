@@ -10,9 +10,9 @@ interface ExplorerToolbarProps {
 }
 
 const EXPLORER_TOOLS = [
-  { 
-    id: 'sunburst' as ExplorerToolType, 
-    name: 'Sunburst Explorer', 
+  {
+    id: 'sunburst' as ExplorerToolType,
+    name: 'Sunburst Explorer',
     desc: 'Focus on a node and expand relationships outward by hops.',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -21,9 +21,9 @@ const EXPLORER_TOOLS = [
     ),
     color: '#fb923c' // Orange
   },
-  { 
-    id: 'random_walk' as ExplorerToolType, 
-    name: 'Random Walk', 
+  {
+    id: 'random_walk' as ExplorerToolType,
+    name: 'Random Walk',
     desc: 'Auto-navigate graph connections to discover paths.',
     icon: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -77,43 +77,43 @@ const ExplorerToolbar: React.FC<ExplorerToolbarProps> = ({
     <div className="relative pointer-events-auto">
       {/* Collapse Toggle / Main Button */}
       <div className="relative">
-        <button 
-            onClick={onToggle}
-            className={`h-20 w-20 border shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${bgClass} ${!isCollapsed ? 'ring-2 ring-yellow-500' : ''}`}
-            title={isCollapsed ? "Expand Explorer Tools" : "Close Explorer Tools"}
+        <button
+          onClick={onToggle}
+          className={`h-20 w-20 border shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${bgClass} ${!isCollapsed ? 'ring-2 ring-yellow-500' : ''}`}
+          title={isCollapsed ? "Expand Explorer Tools" : "Close Explorer Tools"}
         >
-            <div className="relative w-8 h-8 flex items-center justify-center text-yellow-400">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-            </div>
-            <span className={`text-xs font-bold tracking-wider ${textMain}`}>EXPLORE</span>
+          <div className="relative w-8 h-8 flex items-center justify-center text-yellow-400">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+            </svg>
+          </div>
+          <span className={`text-xs font-bold tracking-wider ${textMain}`}>EXPLORE</span>
         </button>
       </div>
 
       {!isCollapsed && (
-        <div className={`absolute top-full left-0 mt-2 w-72 border rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600 ${dropdownBg}`}>
-             <div className={`p-2 border-b text-[10px] font-bold uppercase tracking-wider text-center ${headerBg} ${textHeader}`}>
-                 Graph Explorer Tools
-             </div>
-             
-             {EXPLORER_TOOLS.map(tool => (
-                 <button
-                    key={tool.id}
-                    onClick={() => onSelectTool(tool.id)}
-                    className={`flex items-start text-left p-3 border-b last:border-0 transition-colors group ${itemHover}`}
-                 >
-                     <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110" style={{ color: tool.color }}>
-                         {tool.icon}
-                     </div>
-                     <div>
-                         <div className={`font-bold text-sm mb-0.5 ${textItem}`}>{tool.name}</div>
-                         <p className={`text-xs leading-tight ${textDesc}`}>
-                             {tool.desc}
-                         </p>
-                     </div>
-                 </button>
-             ))}
+        <div className={`absolute top-full left-0 mt-2 w-72 border rounded-lg shadow-2xl z-[950] flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600 ${dropdownBg}`}>
+          <div className={`p-2 border-b text-[10px] font-bold uppercase tracking-wider text-center ${headerBg} ${textHeader}`}>
+            Graph Explorer Tools
+          </div>
+
+          {EXPLORER_TOOLS.map(tool => (
+            <button
+              key={tool.id}
+              onClick={() => onSelectTool(tool.id)}
+              className={`flex items-start text-left p-3 border-b last:border-0 transition-colors group ${itemHover}`}
+            >
+              <div className="mr-3 flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110" style={{ color: tool.color }}>
+                {tool.icon}
+              </div>
+              <div>
+                <div className={`font-bold text-sm mb-0.5 ${textItem}`}>{tool.name}</div>
+                <p className={`text-xs leading-tight ${textDesc}`}>
+                  {tool.desc}
+                </p>
+              </div>
+            </button>
+          ))}
         </div>
       )}
     </div>

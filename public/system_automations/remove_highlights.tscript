@@ -1,0 +1,4 @@
+nodes = graph.get_all_nodes()
+for node in nodes:
+    graph.clear_highlight(id=node.id)
+canvas.clear_highlights()

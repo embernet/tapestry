@@ -2,69 +2,79 @@
 import { ColorScheme, SystemPromptConfig, ScriptSnippet } from './types';
 import { promptStore } from './services/PromptStore';
 
-export const APP_VERSION = '0.5.0';
+export const APP_VERSION = '0.6.0';
 export const VERSION_NAME = 'Pattern Weaver';
 
 export const AUTO_GENERATED_TAG = 'added_by_tapestry';
 
 export interface ChangelogEntry {
-    version: string;
-    date: string;
-    changes: string[];
+  version: string;
+  date: string;
+  changes: string[];
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
-    {
-        version: '0.5.0',
-        date: '2025-12-09',
-        changes: [
-            'Tapestry Script (TScript): Automate graph operations with a Python-like syntax.',
-            'Self-Test Diagnostic Tool: Automated verification of system integrity.',
-            'Enhanced User Guide: Searchable documentation and interactive tool references.',
-            'Pattern Gallery: Explore systemic patterns like "The Weave" and "The Helix".'
-        ]
-    },
-    {
-        version: '0.4.0',
-        date: '2025-11-30',
-        changes: [
-            'Explorer Tools: Sunburst visualization, Random Walk mode, and Adjacency Matrix.',
-            'Word Cloud Transformations: AI-powered linguistic shifts (Antonyms, Synonyms, Metaphors).',
-            'Visualisation Suite: Treemaps, Circle Packing, and Attribute Grid.',
-            'Story Mode: Capture and present graph views sequentially.',
-            'Advanced View Management: Save custom views with specific filters and layouts.'
-        ]
-    },
-    {
-        version: '0.3.0',
-        date: '2025-11-25',
-        changes: [
-            'AI Strategy Tools: SWOT, PESTEL, Porter’s Five Forces, and Custom Matrix builders.',
-            'Problem Solving Frameworks: TRIZ, SCAMPER, Lean Six Sigma, and Soft Systems Methodology.',
-            'Diagram Editor: Mermaid.js integration for generating flowcharts from graph data.',
-            'Kanban Board: Manage nodes as tasks with drag-and-drop columns.'
-        ]
-    },
-    {
-        version: '0.2.0',
-        date: '2025-11-23',
-        changes: [
-            'AI Assistant: Chat, Expand, Connect, and Critique modes.',
-            'Graph Analysis: Network stats, articulation points, and structural filters.',
-            'Word Clouds: Visualise Tag and Node Name frequencies.',
-            'Bulk Edit: Tools for mass tagging and property updates.'
-        ]
-    },
-    {
-        version: '0.1.0',
-        date: '2025-11-20',
-        changes: [
-            'Initial Release: Core Graph Editor with Nodes and Relationships.',
-            'Persistence: Save/Load models to local browser storage or disk.',
-            'Data Formats: Import/Export support for Markdown and JSON.',
-            'Basic Filtering: Filter nodes by tags and dates.'
-        ]
-    }
+  {
+    version: '0.6.0',
+    date: '2025-12-15',
+    changes: [
+      'Multiple Kanban Boards: Supports multiple named boards for better organization.',
+      'Task Movement: Move tasks between boards and columns easily.',
+      'Improved Context Menus: Consistent board creation from anywhere in the app.',
+      'UI Improvements: Enhanced layout, menus, and visual feedback.'
+    ]
+  },
+  {
+    version: '0.5.0',
+    date: '2025-12-09',
+    changes: [
+      'Tapestry Script (TScript): Automate graph operations with a Python-like syntax.',
+      'Self-Test Diagnostic Tool: Automated verification of system integrity.',
+      'Enhanced User Guide: Searchable documentation and interactive tool references.',
+      'Pattern Gallery: Explore systemic patterns like "The Weave" and "The Helix".'
+    ]
+  },
+  {
+    version: '0.4.0',
+    date: '2025-11-30',
+    changes: [
+      'Explorer Tools: Sunburst visualization, Random Walk mode, and Adjacency Matrix.',
+      'Word Cloud Transformations: AI-powered linguistic shifts (Antonyms, Synonyms, Metaphors).',
+      'Visualisation Suite: Treemaps, Circle Packing, and Attribute Grid.',
+      'Story Mode: Capture and present graph views sequentially.',
+      'Advanced View Management: Save custom views with specific filters and layouts.'
+    ]
+  },
+  {
+    version: '0.3.0',
+    date: '2025-11-25',
+    changes: [
+      'AI Strategy Tools: SWOT, PESTEL, Porter’s Five Forces, and Custom Matrix builders.',
+      'Problem Solving Frameworks: TRIZ, SCAMPER, Lean Six Sigma, and Soft Systems Methodology.',
+      'Diagram Editor: Mermaid.js integration for generating flowcharts from graph data.',
+      'Kanban Board: Manage nodes as tasks with drag-and-drop columns.'
+    ]
+  },
+  {
+    version: '0.2.0',
+    date: '2025-11-23',
+    changes: [
+      'AI Assistant: Chat, Expand, Connect, and Critique modes.',
+      'Graph Analysis: Network stats, articulation points, and structural filters.',
+      'Word Clouds: Visualise Tag and Node Name frequencies.',
+      'Bulk Edit: Tools for mass tagging and property updates.'
+    ]
+  },
+  {
+    version: '0.1.0',
+    date: '2025-11-20',
+    changes: [
+      'Initial Release: Core Graph Editor with Nodes and Relationships.',
+      'Persistence: Save/Load models to local browser storage or disk.',
+      'Data Formats: Import/Export support for Markdown and JSON.',
+      'Basic Filtering: Filter nodes by tags and dates.'
+    ]
+  }
 ];
 
 export const NODE_MAX_WIDTH = 160;
@@ -73,46 +83,51 @@ export const LINK_DISTANCE = 250;
 export const DEFAULT_NODE_COLOR = '#e2e8f0'; // slate-200
 
 export const AVAILABLE_AI_TOOLS = [
-    { 
-        id: 'triz', 
-        name: 'TRIZ (Problem Solving)', 
-        description: 'Theory of Inventive Problem Solving. Uses algorithmic methods (40 Principles, Contradiction Matrix) to overcome technical and physical contradictions without compromise.'
-    },
-    { 
-        id: 'lss', 
-        name: 'Lean Six Sigma (Process)', 
-        description: 'Focuses on improving performance by removing waste (Lean) and reducing variation (Six Sigma). Includes DMAIC, 5 Whys, and Fishbone diagrams.'
-    },
-    { 
-        id: 'toc', 
-        name: 'Theory of Constraints', 
-        description: 'Identifies the single most important limiting factor (bottleneck) that stands in the way of achieving a goal and systematically improves it.'
-    },
-    { 
-        id: 'ssm', 
-        name: 'Soft Systems Methodology', 
-        description: 'An approach for tackling complex, messy, and ill-defined problem situations (like human systems) using Rich Pictures and Root Definitions (CATWOE).'
-    },
-    { 
-        id: 'scamper', 
-        name: 'SCAMPER (Ideation)', 
-        description: 'A lateral thinking technique that challenges the status quo by suggesting specific changes: Substitute, Combine, Adapt, Modify, Put to another use, Eliminate, Reverse.'
-    },
-    {
-        id: 'swot',
-        name: 'Strategic Analysis (SWOT++)',
-        description: 'Strategic planning frameworks including SWOT, PESTEL, Porter’s Five Forces, and CAGE to analyze internal/external factors and competitive landscapes.'
-    },
-    { 
-        id: 'explorer', 
-        name: 'Graph Explorer', 
-        description: 'Visualizes graph structure and data distributions using Treemaps, Tag charts, and Relationship analysis.'
-    },
-    { 
-        id: 'tagcloud', 
-        name: 'Tag Cloud', 
-        description: 'Visualizes the frequency of tags and node connectivity to highlight dominant themes and key elements in the model.'
-    }
+  {
+    id: 'triz',
+    name: 'TRIZ (Problem Solving)',
+    description: 'Theory of Inventive Problem Solving. Uses algorithmic methods (40 Principles, Contradiction Matrix) to overcome technical and physical contradictions without compromise.'
+  },
+  {
+    id: 'lss',
+    name: 'Lean Six Sigma (Process)',
+    description: 'Focuses on improving performance by removing waste (Lean) and reducing variation (Six Sigma). Includes DMAIC, 5 Whys, and Fishbone diagrams.'
+  },
+  {
+    id: 'toc',
+    name: 'Theory of Constraints',
+    description: 'Identifies the single most important limiting factor (bottleneck) that stands in the way of achieving a goal and systematically improves it.'
+  },
+  {
+    id: 'ssm',
+    name: 'Soft Systems Methodology',
+    description: 'An approach for tackling complex, messy, and ill-defined problem situations (like human systems) using Rich Pictures and Root Definitions (CATWOE).'
+  },
+  {
+    id: 'scamper',
+    name: 'SCAMPER (Ideation)',
+    description: 'A lateral thinking technique that challenges the status quo by suggesting specific changes: Substitute, Combine, Adapt, Modify, Put to another use, Eliminate, Reverse.'
+  },
+  {
+    id: 'swot',
+    name: 'Strategic Analysis (SWOT++)',
+    description: 'Strategic planning frameworks including SWOT, PESTEL, Porter’s Five Forces, and CAGE to analyze internal/external factors and competitive landscapes.'
+  },
+  {
+    id: 'explorer',
+    name: 'Graph Explorer',
+    description: 'Visualizes graph structure and data distributions using Treemaps, Tag charts, and Relationship analysis.'
+  },
+  {
+    id: 'kanban',
+    name: 'Kanban Manager',
+    description: 'Manage tasks and workflows using Kanban boards. Create boards, move tasks between columns, and organize work.'
+  },
+  {
+    id: 'tagcloud',
+    name: 'Tag Cloud',
+    description: 'Visualizes the frequency of tags and node connectivity to highlight dominant themes and key elements in the model.'
+  }
 ];
 
 export const DEFAULT_TOOL_PROMPTS: Record<string, string> = promptStore.getAll();
@@ -197,12 +212,12 @@ Available Tools (Libraries):
 `;
 
 export const DEFAULT_SNIPPETS: ScriptSnippet[] = [
-    {
-        id: 'sys-walk',
-        name: 'Walk & Highlight',
-        description: 'Walks through all nodes with a specific tag, highlighting them and panning the camera.',
-        isSystem: true,
-        code: `target_tag = "Risk"
+  {
+    id: 'sys-walk',
+    name: 'Walk & Highlight',
+    description: 'Walks through all nodes with a specific tag, highlighting them and panning the camera.',
+    isSystem: true,
+    code: `target_tag = "Risk"
 nodes = graph.query_nodes(tag=target_tag)
 print("Found " + nodes.length + " nodes.")
 
@@ -212,13 +227,13 @@ for node in nodes:
     sleep(0.8)
 
 canvas.clear_highlights()`
-    },
-    {
-        id: 'sys-report',
-        name: 'Generate Report Doc',
-        description: 'Creates a simple report iterating all nodes and their properties.',
-        isSystem: true,
-        code: `report = "# System Report\\n\\n"
+  },
+  {
+    id: 'sys-report',
+    name: 'Generate Report Doc',
+    description: 'Creates a simple report iterating all nodes and their properties.',
+    isSystem: true,
+    code: `report = "# System Report\\n\\n"
 nodes = graph.get_all_nodes()
 print("Generating report for " + nodes.length + " nodes...")
 
@@ -255,22 +270,22 @@ for n in nodes:
 doc_id = markdown.create_doc(title="Node Report", content=report)
 markdown.open_doc(id=doc_id)
 print("Report generated.")`
-    },
-    {
-        id: 'sys-reset',
-        name: 'Reset View',
-        description: 'Clears all selections and highlights.',
-        isSystem: true,
-        code: `canvas.clear_selection()
+  },
+  {
+    id: 'sys-reset',
+    name: 'Reset View',
+    description: 'Clears all selections and highlights.',
+    isSystem: true,
+    code: `canvas.clear_selection()
 canvas.clear_highlights()
 print("View reset.")`
-    },
-    {
-        id: 'sys-audit',
-        name: 'Attribute Audit',
-        description: 'Finds nodes missing a critical attribute and highlights them persistently.',
-        isSystem: true,
-        code: `required_key = "Owner"
+  },
+  {
+    id: 'sys-audit',
+    name: 'Attribute Audit',
+    description: 'Finds nodes missing a critical attribute and highlights them persistently.',
+    isSystem: true,
+    code: `required_key = "Owner"
 all_nodes = graph.get_all_nodes()
 count = 0
 
@@ -285,26 +300,26 @@ for node in all_nodes:
         count = count + 1
 
 print("Total found: " + count)`
-    },
-    {
-        id: 'sys-cleanup',
-        name: 'Cleanup Tagged',
-        description: 'Deletes all nodes with a specific tag (Use with caution).',
-        isSystem: true,
-        code: `tag_to_delete = "Temporary"
+  },
+  {
+    id: 'sys-cleanup',
+    name: 'Cleanup Tagged',
+    description: 'Deletes all nodes with a specific tag (Use with caution).',
+    isSystem: true,
+    code: `tag_to_delete = "Temporary"
 nodes = graph.query_nodes(tag=tag_to_delete)
 
 for n in nodes:
     graph.delete_node(id=n.id)
     print("Deleted " + n.name)`
-    }
+  }
 ];
 
 export const EXAMPLE_SCRIPTS = [
-    {
-        id: 'rep-doc',
-        name: 'Generate Report Doc',
-        code: `date = graph.get_date()
+  {
+    id: 'rep-doc',
+    name: 'Generate Report Doc',
+    code: `date = graph.get_date()
 report = "# Graph Report\\n"
 report += "**Generated:** " + date + "\\n\\n"
 
@@ -392,7 +407,7 @@ doc_id = markdown.create_doc(title="Graph Report " + date, content=report)
 markdown.open_doc(id=doc_id)
 print("Report generated and opened.")
 `
-    }
+  }
 ];
 
 export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
@@ -529,18 +544,18 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
       'Coverage': '#84cc16' // lime-500
     },
     tagDescriptions: {
-        'Test': 'A specific set of steps to verify functionality.',
-        'Bug': 'An error, flaw, or fault in the system.',
-        'Requirement': 'A condition or capability needed by a user.',
-        'Feature': 'A distinct piece of functionality or system capability.',
-        'Component': 'A modular part of the system architecture.',
-        'Pass': 'Execution was successful.',
-        'Fail': 'Execution failed or produced unexpected results.',
-        'Blocked': 'Cannot be executed due to external factors.',
-        'Flaky': 'Inconsistent results (sometimes pass, sometimes fail).',
-        'Environment': 'The hardware/software context (e.g., Staging, Prod).',
-        'Data': 'Input values or database state required for testing.',
-        'Coverage': 'Measure of code or requirements tested.'
+      'Test': 'A specific set of steps to verify functionality.',
+      'Bug': 'An error, flaw, or fault in the system.',
+      'Requirement': 'A condition or capability needed by a user.',
+      'Feature': 'A distinct piece of functionality or system capability.',
+      'Component': 'A modular part of the system architecture.',
+      'Pass': 'Execution was successful.',
+      'Fail': 'Execution failed or produced unexpected results.',
+      'Blocked': 'Cannot be executed due to external factors.',
+      'Flaky': 'Inconsistent results (sometimes pass, sometimes fail).',
+      'Environment': 'The hardware/software context (e.g., Staging, Prod).',
+      'Data': 'Input values or database state required for testing.',
+      'Coverage': 'Measure of code or requirements tested.'
     },
     relationshipDefinitions: [
       { label: 'verifies', description: 'Confirms that a requirement or feature works as expected.' },
@@ -556,14 +571,14 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
     ],
     defaultRelationshipLabel: 'verifies',
     customLists: {
-        'Severity': ['Critical', 'High', 'Medium', 'Low'],
-        'Priority': ['P0', 'P1', 'P2', 'P3'],
-        'Status': ['Draft', 'Active', 'Deprecated']
+      'Severity': ['Critical', 'High', 'Medium', 'Low'],
+      'Priority': ['P0', 'P1', 'P2', 'P3'],
+      'Status': ['Draft', 'Active', 'Deprecated']
     },
     customListDescriptions: {
-        'Severity': 'Impact on the system.',
-        'Priority': 'Order of resolution.',
-        'Status': 'Lifecycle state of the test or requirement.'
+      'Severity': 'Impact on the system.',
+      'Priority': 'Order of resolution.',
+      'Status': 'Lifecycle state of the test or requirement.'
     }
   },
   {
@@ -913,12 +928,13 @@ export const DEFAULT_COLOR_SCHEMES: ColorScheme[] = [
 ];
 
 export const TAGLINES = [
-    "Visual Knowledge Weaver",
-    "Complex Problem Solver",
-    "Emerging Trend Explorer",
-    "Creative Solution Mapper",
-    "Strategic Insight Generator",
-    "Dynamic Connection Builder",
-    "Structured Chaos Organizer",
-    "Future Scenario Planner"
+  "Visual Knowledge Weaver",
+  "Complex Problem Solver",
+  "Emerging Trend Explorer",
+  "Creative Solution Mapper",
+  "Strategic Insight Generator",
+  "Dynamic Connection Builder",
+  "Structured Chaos Organizer",
+  "Vibe Innovation Facilitator",
+  "Future Scenario Planner"
 ];

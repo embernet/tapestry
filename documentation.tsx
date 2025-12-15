@@ -15,15 +15,15 @@ export interface ToolDocumentationItem {
     icon: React.ReactNode;
     subItems?: { name: string; desc: string; icon: React.ReactNode }[];
     hideInGuide?: boolean; // If true, hides from the User Guide list but keeps available for Guidance Panel lookup
-    
+
     // The detailed content for the Guidance Panel (Lightbulb)
     guidance: GuidanceContent;
 }
 
 // Full 40 Principles Data for use in Tool and Documentation
 export const TRIZ_PRINCIPLES_FULL = [
-    { 
-        id: 1, name: "1. Segmentation", 
+    {
+        id: 1, name: "1. Segmentation",
         general: "Break the system into smaller, independent, or distinct parts.",
         engineering: "Divide an object into independent parts. Make an object easy to disassemble. Example: Modular furniture allows easier transport and assembly.",
         business: "Segment market audiences into niches. Break a large project into agile sprints. Example: Franchise business models where local branches operate independently.",
@@ -35,8 +35,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Divide a story into chapters or episodes. Example: A TV series telling a long narrative in distinct hourly segments.",
         culinary: "Slice ingredients to speed up cooking or enable sharing. Example: Slicing vegetables finely (julienne) to ensure they cook instantly in a wok, or cutting a pizza into slices for distribution."
     },
-    { 
-        id: 2, name: "2. Taking Out", 
+    {
+        id: 2, name: "2. Taking Out",
         general: "Extract the useful part or remove the harmful part.",
         engineering: "Separate an interfering part or property from an object. Example: Using a fibre optic cable to separate the light source from the area of illumination.",
         business: "Outsourcing non-core functions. Example: A company outsourcing its payroll to a specialist firm to focus on product development.",
@@ -48,8 +48,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Editing a film to remove scenes that drag the pace. Example: Minimalism in design, removing all non-essential elements.",
         culinary: "Remove inedible or unpleasant parts. Example: Deboning a chicken or peeling vegetables to remove tough skins, or skimming fat off a stock."
     },
-    { 
-        id: 3, name: "3. Local Quality", 
+    {
+        id: 3, name: "3. Local Quality",
         general: "Optimise each part of the system for its specific function or environment.",
         engineering: "Change the shape of an object from symmetrical to asymmetrical. Example: Mixing vessels with asymmetrical baffles to improve mixing efficiency.",
         business: "Regional pricing strategies or personalised marketing. Example: A supermarket placing high-margin items at eye level.",
@@ -61,8 +61,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Varying the texture of a painting in specific areas. Example: Using impasto for light highlights while keeping shadows smooth.",
         culinary: "Treat different ingredients in a dish differently. Example: Sealing a steak for a crust while keeping the inside rare, or seasoning only the meat and not the sauce until the end."
     },
-    { 
-        id: 4, name: "4. Asymmetry", 
+    {
+        id: 4, name: "4. Asymmetry",
         general: "Replace symmetrical forms or processes with asymmetrical ones to solve the problem.",
         engineering: "Change the shape of an object from symmetrical to asymmetrical. Example: Mixing vessels with asymmetrical baffles to improve mixing efficiency.",
         business: "Niche marketing or uneven resource allocation. Example: The 80/20 rule (Pareto principle) focusing 80% of effort on the top 20% of clients.",
@@ -74,8 +74,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Asymmetrical composition to create visual interest. Example: The rule of thirds in photography.",
         culinary: "Plating food off-centre for visual appeal. Example: Placing the main protein to the side with a swoop of sauce, rather than centrally, or using a knife with a chisel grind (asymmetric edge) for precise sushi cuts."
     },
-    { 
-        id: 5, name: "5. Merging", 
+    {
+        id: 5, name: "5. Merging",
         general: "Combine identical or similar objects/operations in space or time.",
         engineering: "Assemble identical or similar parts to perform parallel operations. Example: A catamaran hull combining two hulls for stability.",
         business: "Mergers and Acquisitions. Example: Airline alliances sharing codes and lounges to offer broader service.",
@@ -87,8 +87,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Mixed media art. Example: A collage combining photography, painting, and text.",
         culinary: "Combine ingredients into a single mixture. Example: Making a soup or stew where flavours merge over time, or blending spices to create a curry powder."
     },
-    { 
-        id: 6, name: "6. Universality", 
+    {
+        id: 6, name: "6. Universality",
         general: "Make one part perform multiple functions, removing the need for other parts.",
         engineering: "Eliminate the need for other parts. Example: A sofa-bed serves as both seating and sleeping furniture.",
         business: "Cross-trained employees. Example: A store manager who can also handle checkout and stock replenishment.",
@@ -100,8 +100,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "A prop that serves multiple purposes in a play. Example: A wooden box acting as a table, a seat, and a podium in theatre.",
         culinary: "Use a single tool for many tasks. Example: A chef's knife used for crushing garlic, chopping herbs, and slicing meat, removing the need for a garlic press."
     },
-    { 
-        id: 7, name: "7. Nested Doll", 
+    {
+        id: 7, name: "7. Nested Doll",
         general: "Place one object inside another, or pass one object through the cavity of another.",
         engineering: "Place one object inside another. Example: A telescopic antenna or camera lens.",
         business: "Franchise within a store. Example: A Starbucks coffee shop located inside a Sainsbury's supermarket.",
@@ -113,8 +113,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "A play within a play. Example: The 'Mousetrap' scene in Hamlet.",
         culinary: "Stuffing one food item inside another. Example: A Turducken (chicken in a duck in a turkey) or stuffed olives."
     },
-    { 
-        id: 8, name: "8. Anti-Weight", 
+    {
+        id: 8, name: "8. Anti-Weight",
         general: "Compensate for a negative factor by combining it with something that provides an opposing force.",
         engineering: "Compensate for weight by merging with objects that provide lift. Example: A boat's hydrofoils lifting the hull out of the water to reduce drag.",
         business: "Subsidies or strategic partnerships. Example: Government grants lifting the financial burden of R&D for startups.",
@@ -126,8 +126,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Comic relief. Example: Inserting a funny scene after a tragic one to lift the mood.",
         culinary: "Use lightness to counteract heaviness. Example: Using yeast or bicarbonate of soda to make dough rise against gravity, or cutting a rich fatty dish with acidic lemon juice."
     },
-    { 
-        id: 9, name: "9. Preliminary Anti-Action", 
+    {
+        id: 9, name: "9. Preliminary Anti-Action",
         general: "Prepare for a known harm by creating a counter-action in advance.",
         engineering: "Pre-stressing materials. Example: Rebar in concrete is pulled tight before pouring to counteract future loads.",
         business: "Hedging or insurance. Example: Taking out liability insurance before launching a risky product.",
@@ -139,8 +139,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Foreshadowing. Example: Hinting at a twist early in the story to make it believable later.",
         culinary: "Preventing adverse reactions. Example: Marinating meat to tenderise it before cooking, or chilling dough to prevent it shrinking in the oven."
     },
-    { 
-        id: 10, name: "10. Preliminary Action", 
+    {
+        id: 10, name: "10. Preliminary Action",
         general: "Perform required changes before they are needed.",
         engineering: "Pre-glued wallpaper. Example: Surgical instruments sterilised and packed before the operation starts.",
         business: "Mise en place. Example: Chefs chopping and preparing all ingredients before service begins.",
@@ -152,8 +152,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Priming a canvas. Example: Applying a base coat to a canvas before painting.",
         culinary: "Mise en place. Example: Chopping, measuring, and preparing all ingredients into bowls before turning on the heat."
     },
-    { 
-        id: 11, name: "11. Beforehand Cushioning", 
+    {
+        id: 11, name: "11. Beforehand Cushioning",
         general: "Prepare emergency measures in advance to compensate for low reliability.",
         engineering: "Airbags or emergency chutes. Example: A run-flat tyre that works even after a puncture.",
         business: "Emergency funds. Example: Keeping a cash reserve to cover operational costs during a downturn.",
@@ -165,8 +165,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Understudies. Example: Rehearsing a second actor to take over if the lead falls ill.",
         culinary: "Preventing sticking or burning. Example: Greasing a tin and lining it with parchment paper before adding cake batter, or keeping a frozen pizza as a backup dinner."
     },
-    { 
-        id: 12, name: "12. Equipotentiality", 
+    {
+        id: 12, name: "12. Equipotentiality",
         general: "Change conditions so that an object doesn't have to be raised or lowered (worked against).",
         engineering: "Limit position changes in a potential field. Example: Using a mechanic's pit to work under a car without lifting it.",
         business: "Flat organisational structure. Example: Allowing employees to switch teams without a change in rank or pay grade.",
@@ -178,8 +178,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Tracking shots. Example: Moving the camera on rails to keep the subject in frame without refocussing.",
         culinary: "Optimising workflow. Example: Sliding chopped vegetables directly from the chopping board into a pan held at the same level, rather than lifting them."
     },
-    { 
-        id: 13, name: "13. The Other Way Round", 
+    {
+        id: 13, name: "13. The Other Way Round",
         general: "Invert the action to solve the problem.",
         engineering: "Invert the action(s) used to solve the problem. Example: Running on a treadmill (floor moves, you stay still).",
         business: "Reverse auctions. Example: Suppliers bidding to sell to a buyer, driving prices down.",
@@ -191,8 +191,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Negative space drawing. Example: Drawing the spaces around an object rather than the object itself.",
         culinary: "Inverting the process. Example: Making an Upside-Down Cake (fruit at bottom, batter on top, then flipped), or searing meat *after* sous-vide cooking (reverse sear)."
     },
-    { 
-        id: 14, name: "14. Spheroidality", 
+    {
+        id: 14, name: "14. Spheroidality",
         general: "Move from linear/flat parts to curved/spherical parts or movements.",
         engineering: "Replace rectilinear parts with curvilinear ones. Example: Using ball bearings to reduce friction instead of flat sliding surfaces.",
         business: "Circular economy. Example: Designing products to be recycled back into raw materials rather than a linear 'take-make-waste' model.",
@@ -204,8 +204,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Dome architecture. Example: Using geodesic domes for strength and space.",
         culinary: "Using curved shapes. Example: Using a Wok for stir-frying to allow even heat distribution and tossing, or scooping melon balls for presentation."
     },
-    { 
-        id: 15, name: "15. Dynamics", 
+    {
+        id: 15, name: "15. Dynamics",
         general: "Make parts movable or adaptive to change operating characteristics.",
         engineering: "Allow characteristics to change for optimal operation. Example: A Formula 1 car with an adjustable rear wing (DRS).",
         business: "Dynamic pricing. Example: Uber surge pricing adjusting to demand in real-time.",
@@ -217,8 +217,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Improv theatre. Example: A play with no script, adapting to audience suggestions.",
         culinary: "Adaptive tools or states. Example: Using an immersion blender that can be moved around the pot, or folding dough to develop gluten."
     },
-    { 
-        id: 16, name: "16. Partial or Excessive Actions", 
+    {
+        id: 16, name: "16. Partial or Excessive Actions",
         general: "If exactness is hard, go for slightly less or slightly more.",
         engineering: "Rough machining followed by precision. Example: Spray painting a stencil (excessive paint) to get a sharp image.",
         business: "MVP (Minimum Viable Product). Example: Launching a product with just enough features (partial) to test the market.",
@@ -230,8 +230,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Caricature. Example: Exaggerating features in a drawing to capture the essence of a person.",
         culinary: "Approximations. Example: Reducing a sauce until it 'coats the back of a spoon' rather than measuring exact viscosity, or salting 'to taste' (incremental excess)."
     },
-    { 
-        id: 17, name: "17. Another Dimension", 
+    {
+        id: 17, name: "17. Another Dimension",
         general: "Move to a new dimension (e.g. from line to plane, plane to space).",
         engineering: "Move an object in 2D or 3D space. Example: A spiral staircase uses vertical space to save floor area.",
         business: "Vertical integration. Example: A manufacturer buying its supplier to control the supply chain.",
@@ -243,8 +243,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Holography. Example: Creating 3D images on a 2D surface.",
         culinary: "Using vertical space. Example: Stacking layers in a cake or lasagne, or using a skewer (kebab) to cook ingredients in a line."
     },
-    { 
-        id: 18, name: "18. Mechanical Vibration", 
+    {
+        id: 18, name: "18. Mechanical Vibration",
         general: "Use oscillation or vibration.",
         engineering: "Cause an object to oscillate. Example: An ultrasonic bath cleaning jewellery with sound waves.",
         business: "Market disruption. Example: Launching a controversial campaign to 'shake up' the market.",
@@ -256,8 +256,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Vibrato. Example: Oscillating pitch in singing to add warmth to a note.",
         culinary: "Agitation. Example: Whisking egg whites to aerate them, or shaking a cocktail to chill and mix it simultaneously."
     },
-    { 
-        id: 19, name: "19. Periodic Action", 
+    {
+        id: 19, name: "19. Periodic Action",
         general: "Use periodic or pulsed actions instead of continuous ones.",
         engineering: "Use pulsed actions. Example: An impact driver uses pulses of torque to turn a stuck screw.",
         business: "Sprints. Example: Working in 2-week cycles rather than a continuous flow.",
@@ -269,8 +269,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Stroboscope. Example: Using flashing lights to create a slow-motion effect on a dance floor.",
         culinary: "Pulsing. Example: Pulsing a food processor to chop chunks without turning them into paste, or basting a turkey every 30 minutes."
     },
-    { 
-        id: 20, name: "20. Continuity of Useful Action", 
+    {
+        id: 20, name: "20. Continuity of Useful Action",
         general: "Make all parts of an object work at full load, all the time.",
         engineering: "Carry on work continuously. Example: A flywheel stores energy to keep a machine running smoothly between power pulses.",
         business: "24/7 Operations. Example: A global team handing over work across time zones to keep a project moving continuously.",
@@ -282,8 +282,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Long take. Example: Filming a scene in one continuous shot without cuts.",
         culinary: "Constant motion. Example: Constantly stirring a risotto to release starch, or using a rotisserie to cook meat evenly without stopping."
     },
-    { 
-        id: 21, name: "21. Skipping", 
+    {
+        id: 21, name: "21. Skipping",
         general: "Conduct harmful or hazardous operations at very high speed.",
         engineering: "Conduct a process at high speed. Example: Cutting plastic very fast to avoid melting it with heat build-up.",
         business: "Fail fast. Example: Rapidly prototyping and testing to identify bad ideas before investing too much.",
@@ -295,8 +295,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Time-lapse. Example: Speeding up a long process (like a flower opening) to make it visible.",
         culinary: "High heat speed. Example: Flash-frying (stir fry) vegetables to keep them crunchy, or flambéing to burn off alcohol quickly."
     },
-    { 
-        id: 22, name: "22. Blessing in Disguise", 
+    {
+        id: 22, name: "22. Blessing in Disguise",
         general: "Convert harm into benefit.",
         engineering: "Use harmful factors to achieve a positive effect. Example: Using waste heat from an engine to warm the car cabin.",
         business: "Crisis PR. Example: Using a product recall as an opportunity to demonstrate excellent customer service.",
@@ -308,8 +308,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Wabi-sabi. Example: Embracing cracks or imperfections in pottery as aesthetic features (Kintsugi).",
         culinary: "Controlled spoilage. Example: Fermentation turning 'rotting' cabbage into Sauerkraut, or mould on blue cheese adding flavour."
     },
-    { 
-        id: 23, name: "23. Feedback", 
+    {
+        id: 23, name: "23. Feedback",
         general: "Introduce feedback to improve a process or action.",
         engineering: "Refer back or cross-check. Example: A thermostat turning the heating off when the temperature is reached.",
         business: "NPS Scores. Example: Surveying customers after a purchase to improve service.",
@@ -321,8 +321,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Audience reaction. Example: Comedians adjusting their set based on laughter.",
         culinary: "Tasting. Example: Continually tasting the dish as you cook and adjusting seasoning (salt/acid) based on the sensory feedback."
     },
-    { 
-        id: 24, name: "24. Intermediary", 
+    {
+        id: 24, name: "24. Intermediary",
         general: "Use an intermediary object or process.",
         engineering: "Use an intermediary carrier article. Example: Using a plectrum to play guitar to protect fingers and change sound.",
         business: "Brokerage. Example: Using a mortgage broker to find the best deal from banks.",
@@ -334,8 +334,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Maquette. Example: Building a small clay model before making a large statue.",
         culinary: "Using a buffer. Example: Cooking in a Bain-marie (water bath) to gently melt chocolate, or using baking parchment to prevent sticking."
     },
-    { 
-        id: 25, name: "25. Self-Service", 
+    {
+        id: 25, name: "25. Self-Service",
         general: "Make an object serve itself.",
         engineering: "Make an object perform auxiliary helpful functions. Example: Self-cleaning glass coated with a material that breaks down dirt.",
         business: "Self-checkout. Example: Supermarkets allowing customers to scan and bag their own goods.",
@@ -347,8 +347,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Auto-generative art. Example: Writing code that generates music or visuals on its own.",
         culinary: "Internal reactions. Example: A self-saucing pudding creating its own sauce during baking, or sourdough starter maintaining its own yeast culture."
     },
-    { 
-        id: 26, name: "26. Copying", 
+    {
+        id: 26, name: "26. Copying",
         general: "Use simple, inexpensive copies instead of fragile or expensive originals.",
         engineering: "Use simpler and inexpensive copies. Example: Crash testing cars with dummies instead of humans.",
         business: "Franchising. Example: Replicating a business model (McDonald's) rather than expanding one huge store.",
@@ -360,8 +360,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Prints. Example: Selling lithograph copies of a painting to reach a wider audience.",
         culinary: "Substitutes. Example: Using margarine instead of butter for cost, or using vegetarian 'meat' analogues."
     },
-    { 
-        id: 27, name: "27. Cheap Short-Living Objects", 
+    {
+        id: 27, name: "27. Cheap Short-Living Objects",
         general: "Replace an expensive object with multiple inexpensive, short-lived ones.",
         engineering: "Replace an expensive object with multiples. Example: Using disposable paper cups instead of ceramic mugs at a large event.",
         business: "Pop-up shops. Example: Renting a temporary space for a month rather than a 5-year lease.",
@@ -373,8 +373,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Street art. Example: Chalk drawings on pavement that wash away with rain.",
         culinary: "Edible/Disposable containers. Example: Serving tacos in a shell (eaten), or using paper plates at a picnic."
     },
-    { 
-        id: 28, name: "28. Mechanics Substitution", 
+    {
+        id: 28, name: "28. Mechanics Substitution",
         general: "Replace a mechanical system with a sensory or field-based system.",
         engineering: "Replace a mechanical method with a sensory method. Example: Using a laser distance measurer instead of a tape measure.",
         business: "Digital signatures. Example: Signing a PDF electronically instead of posting a paper contract.",
@@ -386,8 +386,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Digital art. Example: Painting on an iPad instead of using canvas and oils.",
         culinary: "Chemical cooking. Example: Cooking fish with acid (Ceviche) instead of heat, or using molecular gastronomy spheres instead of chopped fruit."
     },
-    { 
-        id: 29, name: "29. Pneumatics and Hydraulics", 
+    {
+        id: 29, name: "29. Pneumatics and Hydraulics",
         general: "Use intangible parts (air, fluid, information) instead of solid parts.",
         engineering: "Use gas and liquid parts. Example: Hydraulic brakes using fluid pressure to stop a car.",
         business: "Cash flow liquidity. Example: Ensuring assets are 'liquid' (cash) to move quickly.",
@@ -399,8 +399,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Inflatables. Example: Art installations made of air-filled plastic.",
         culinary: "Aeration and fluids. Example: Mousses, foams, and soufflés which rely on trapped air for structure, or serving a Jus instead of a thick gravy."
     },
-    { 
-        id: 30, name: "30. Flexible Shells and Thin Films", 
+    {
+        id: 30, name: "30. Flexible Shells and Thin Films",
         general: "Use flexible shells and thin films to isolate the object.",
         engineering: "Use flexible shells instead of 3D structures. Example: Bubble wrap protecting fragile items.",
         business: "Drop-shipping. Example: A business that is just a 'thin shell' marketing front, with no inventory.",
@@ -412,8 +412,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Gold leaf. Example: Applying a microscopically thin layer of gold for decoration.",
         culinary: "Edible barriers. Example: Sausage casings, pastry shells (vol-au-vents), or using cling film to poach eggs."
     },
-    { 
-        id: 31, name: "31. Porous Materials", 
+    {
+        id: 31, name: "31. Porous Materials",
         general: "Make an object porous or add porous elements.",
         engineering: "Make an object porous. Example: Sintered metal filters allowing gas through but stopping particles.",
         business: "Transparency. Example: Open-book management where all employees see the financials.",
@@ -425,8 +425,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Negative space sculpture. Example: Sculptures (like Henry Moore's) with holes as key features.",
         culinary: "Spongy textures. Example: Sponge cake absorbing syrup, or aerated bread (ciabatta) holding pockets of flavour."
     },
-    { 
-        id: 32, name: "32. Colour Changes", 
+    {
+        id: 32, name: "32. Colour Changes",
         general: "Change the colour or transparency of an object or its environment.",
         engineering: "Change the colour of an object. Example: UV-sensitive sunglasses that turn dark in sunlight.",
         business: "Rebranding. Example: Changing a logo to green to emphasise eco-friendliness.",
@@ -438,8 +438,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Mood lighting. Example: Changing stage lights to red to signify danger.",
         culinary: "Visual cues. Example: Cooking steak until it turns brown (Maillard reaction), or using food colouring to make a dish look more appealing."
     },
-    { 
-        id: 33, name: "33. Homogeneity", 
+    {
+        id: 33, name: "33. Homogeneity",
         general: "Make interacting objects out of the same material.",
         engineering: "Make objects interacting of the same material. Example: Welding plastic with a plastic rod of the same type.",
         business: "Cultural fit. Example: Hiring employees who share the same values as the company.",
@@ -451,8 +451,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Monochrome. Example: Painting using only shades of a single colour.",
         culinary: "Matching flavours. Example: Cooking beef in beef stock, or pairing wine with food from the same region (Terroir)."
     },
-    { 
-        id: 34, name: "34. Discarding and Recovering", 
+    {
+        id: 34, name: "34. Discarding and Recovering",
         general: "Discard parts that have fulfilled their function or recover used parts.",
         engineering: "Make portions go away. Example: Dissolvable stitches that disappear once the wound heals.",
         business: "Pop-up teams. Example: A task force assembled for a project and disbanded afterwards.",
@@ -464,8 +464,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Ephemeral art. Example: Ice sculptures meant to melt away.",
         culinary: "Consumable vessels. Example: Eating the bread bowl after finishing the soup, or sugar cages that dissolve in sauce."
     },
-    { 
-        id: 35, name: "35. Parameter Changes", 
+    {
+        id: 35, name: "35. Parameter Changes",
         general: "Change the physical state, concentration, or degree of flexibility.",
         engineering: "Change an object's physical state. Example: Freezing food to preserve it.",
         business: "Pivot. Example: A company changing from selling products to selling subscriptions (SaaS).",
@@ -477,8 +477,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Remixing. Example: Changing the tempo and style of a song.",
         culinary: "Changing state. Example: Freezing fruit to make sorbet, or melting chocolate to mould it."
     },
-    { 
-        id: 36, name: "36. Phase Transitions", 
+    {
+        id: 36, name: "36. Phase Transitions",
         general: "Use phenomena occurring during phase transitions.",
         engineering: "Use volume changes or heat loss. Example: Steam engines using the expansion of water into steam.",
         business: "Tipping points. Example: A product going viral after reaching a critical mass of users.",
@@ -490,8 +490,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "The drop in music. Example: The transition from build-up to the main beat in electronic music.",
         culinary: "Latent heat. Example: Using 'carry-over cooking' where meat continues to cook after being removed from the oven due to retained heat."
     },
-    { 
-        id: 37, name: "37. Thermal Expansion", 
+    {
+        id: 37, name: "37. Thermal Expansion",
         general: "Use thermal expansion (or contraction) of materials.",
         engineering: "Use expansion of materials. Example: Bimetallic strips in thermostats bending as they heat up.",
         business: "Economic boom/bust. Example: Expanding the workforce during a boom and contracting during a recession.",
@@ -503,8 +503,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Crescendo. Example: Music getting louder and 'larger' to build tension.",
         culinary: "Rising. Example: Soufflés or puff pastry expanding in the oven due to hot air and steam."
     },
-    { 
-        id: 38, name: "38. Strong Oxidants", 
+    {
+        id: 38, name: "38. Strong Oxidants",
         general: "Replace normal environment with an enriched one.",
         engineering: "Replace common air with oxygen-enriched air. Example: Using Nitrous Oxide in cars to boost speed.",
         business: "Accelerators. Example: Joining a startup accelerator to boost growth with funding and mentorship.",
@@ -516,8 +516,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "Saturation. Example: Boosting the colours in a photo to make them more vivid.",
         culinary: "Enrichment. Example: Whipping extra air into cream to make it fluffy, or using a smoking gun to infuse intense smoky flavour."
     },
-    { 
-        id: 39, name: "39. Inert Atmosphere", 
+    {
+        id: 39, name: "39. Inert Atmosphere",
         general: "Replace a normal environment with an inert or neutral one.",
         engineering: "Replace normal environment with inert one. Example: Argon gas in double glazing or light bulbs to prevent reactions.",
         business: "Stealth mode. Example: Developing a product in secret to avoid competitor attention.",
@@ -529,8 +529,8 @@ export const TRIZ_PRINCIPLES_FULL = [
         arts: "White cube gallery. Example: Displaying art on white walls with no distractions.",
         culinary: "Vacuum packing. Example: Sous-vide cooking in a vacuum bag to prevent oxidation and flavour loss."
     },
-    { 
-        id: 40, name: "40. Composite Materials", 
+    {
+        id: 40, name: "40. Composite Materials",
         general: "Change from uniform to composite (multiple) materials.",
         engineering: "Change from uniform to composite. Example: Carbon fibre (fabric + resin) is stronger and lighter than steel.",
         business: "Cross-functional teams. Example: A squad containing a designer, developer, and tester.",
@@ -1219,6 +1219,32 @@ export const TOOL_DOCUMENTATION: ToolDocumentationItem[] = [
                         "**Expand:** Select a node and use 'Expand' to generate 5-10 related concepts that grow your graph.",
                         "**Connect:** Analyze the current nodes to find logical relationships that haven't been drawn yet.",
                         "**Critique:** A 'Red Team' mode where the AI looks for contradictions, missing evidence, or weak arguments in your model."
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        id: 'kanban',
+        name: "Kanban",
+        color: "text-blue-500",
+        desc: "Task Management.",
+        summary: "A flexible project management tool integrated directly into your knowledge graph. Organize nodes as tasks across multiple boards. Use this to track progress (To Do, Doing, Done) or categorize ideas. Now supports multiple boards and moving items between them.",
+        icon: <path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 00-2-2h-2a2 2 0 00-2 2" />,
+        subItems: [
+            { name: "Multiple Boards", desc: "Create separate boards for different projects.", icon: <path d="M4 6h16M4 10h16M4 14h16M4 18h16" /> },
+            { name: "Move Items", desc: "Right-click to move cards between boards.", icon: <path d="M8 7h12m0 0l-4-4m4 4l-4 4" /> }
+        ],
+        guidance: {
+            title: "Kanban Workflow",
+            sections: [
+                {
+                    title: "Managing Tasks",
+                    items: [
+                        "**Create Board:** Use the toolbar + button or right-click to create a new board.",
+                        "**Add Tasks:** Drag nodes from the graph onto a board, or use the right-click menu 'Add to Kanban'.",
+                        "**Move Tasks:** Right-click a card to move it to another board.",
+                        "**Columns:** Default columns are 'To Do', 'Doing', 'Done'. Drag cards to update status."
                     ]
                 }
             ]

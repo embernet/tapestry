@@ -30,7 +30,7 @@ export const useModelActions = ({
     setOpenDocIds,
     onDeleteElement
 }: UseModelActionsProps): ModelActions => {
-    
+
     return useMemo(() => {
         const findElementByName = (name: string): Element | undefined => {
             return elementsRef.current.find(e => e.name.toLowerCase() === name.toLowerCase());
@@ -40,10 +40,11 @@ export const useModelActions = ({
         };
 
         return {
+            hasElement: (name: string) => !!findElementByName(name),
             addElement: (data) => {
                 const now = new Date().toISOString();
                 const id = generateUUID();
-                
+
                 let x = data.x;
                 let y = data.y;
 
@@ -57,19 +58,19 @@ export const useModelActions = ({
                     y = centerY + radius * Math.sin(angle);
                 }
 
-                const newElement: Element = { 
-                    id, 
-                    name: data.name, 
-                    notes: data.notes || '', 
-                    tags: (data.tags || []).map(normalizeTag), 
-                    attributes: data.attributes || {}, 
+                const newElement: Element = {
+                    id,
+                    name: data.name,
+                    notes: data.notes || '',
+                    tags: (data.tags || []).map(normalizeTag),
+                    attributes: data.attributes || {},
                     customLists: data.customLists || {},
-                    createdAt: now, 
-                    updatedAt: now, 
-                    x, 
-                    y, 
-                    fx: x, 
-                    fy: y 
+                    createdAt: now,
+                    updatedAt: now,
+                    x,
+                    y,
+                    fx: x,
+                    fy: y
                 };
                 elementsRef.current = [...elementsRef.current, newElement];
                 setElements(prev => [...prev, newElement]);
@@ -78,14 +79,14 @@ export const useModelActions = ({
             updateElement: (name, data) => {
                 const element = findElementByName(name);
                 if (!element) return false;
-                
+
                 const updatedElement = { ...element, ...data, updatedAt: new Date().toISOString() };
-                
+
                 // Explicitly replace tags if provided to allow reordering or removal
-                if (data.tags) { 
-                    updatedElement.tags = data.tags.map(normalizeTag); 
+                if (data.tags) {
+                    updatedElement.tags = data.tags.map(normalizeTag);
                 }
-                
+
                 elementsRef.current = elementsRef.current.map(e => e.id === element.id ? updatedElement : e);
                 setElements(prev => prev.map(e => e.id === element.id ? updatedElement : e));
                 return true;
@@ -170,33 +171,33 @@ export const useModelActions = ({
                 return true;
             },
             readDocument: (title) => { const doc = findDocumentByTitle(title); return doc ? doc.content : null; },
-            createDocument: (title, content = '', type = 'text', data = null) => { 
-                const now = new Date().toISOString(); 
-                const newDoc: TapestryDocument = { id: generateUUID(), title, content: content || '', folderId: null, createdAt: now, updatedAt: now, type, data }; 
-                documentsRef.current = [...documentsRef.current, newDoc]; 
-                setDocuments(prev => [...prev, newDoc]); 
-                if (!openDocIds.includes(newDoc.id)) { setOpenDocIds(prev => [...prev, newDoc.id]); } 
-                return newDoc.id; 
+            createDocument: (title, content = '', type = 'text', data = null) => {
+                const now = new Date().toISOString();
+                const newDoc: TapestryDocument = { id: generateUUID(), title, content: content || '', folderId: null, createdAt: now, updatedAt: now, type, data };
+                documentsRef.current = [...documentsRef.current, newDoc];
+                setDocuments(prev => [...prev, newDoc]);
+                if (!openDocIds.includes(newDoc.id)) { setOpenDocIds(prev => [...prev, newDoc.id]); }
+                return newDoc.id;
             },
-            updateDocument: (title, content, mode) => { 
-                const doc = findDocumentByTitle(title); 
-                if (!doc) return false; 
-                
+            updateDocument: (title, content, mode) => {
+                const doc = findDocumentByTitle(title);
+                if (!doc) return false;
+
                 const safeContent = content || '';
                 let newContent = safeContent;
-                
+
                 // If replacing, we just use safeContent.
                 // If appending/prepending, we need to be careful about empty existing content.
-                if (mode === 'append') { 
-                    newContent = doc.content ? `${doc.content}\n\n${safeContent}` : safeContent; 
+                if (mode === 'append') {
+                    newContent = doc.content ? `${doc.content}\n\n${safeContent}` : safeContent;
                 } else if (mode === 'prepend') {
                     newContent = doc.content ? `${safeContent}\n\n${doc.content}` : safeContent;
                 }
-                
-                const updatedDoc = { ...doc, content: newContent, updatedAt: new Date().toISOString() }; 
-                documentsRef.current = documentsRef.current.map(d => d.id === doc.id ? updatedDoc : d); 
-                setDocuments(prev => prev.map(d => d.id === doc.id ? updatedDoc : d)); 
-                return true; 
+
+                const updatedDoc = { ...doc, content: newContent, updatedAt: new Date().toISOString() };
+                documentsRef.current = documentsRef.current.map(d => d.id === doc.id ? updatedDoc : d);
+                setDocuments(prev => prev.map(d => d.id === doc.id ? updatedDoc : d));
+                return true;
             },
             createFolder: (name, parentId) => {
                 const id = generateUUID();

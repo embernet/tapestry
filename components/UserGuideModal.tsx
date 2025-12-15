@@ -4,8 +4,8 @@ import { TOOL_DOCUMENTATION } from '../documentation';
 import { PatternGalleryView } from './PatternGalleryModal';
 
 interface ModalProps {
-  onClose: () => void;
-  isDarkMode?: boolean;
+    onClose: () => void;
+    isDarkMode?: boolean;
 }
 
 // Interface Items Data
@@ -20,13 +20,13 @@ const INTERFACE_ITEMS = [
     { id: 'interface-focus', name: "Focus Mode", desc: "Toggle between Narrow (Selection only), Wide (Neighbors), and Zoom focus.", icon: <circle cx="12" cy="12" r="3" /> },
     { id: 'interface-diagrams', name: "Diagrams", desc: "Open the Mermaid.js diagram editor.", icon: <path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" /> },
     { id: 'interface-docs', name: "Documents", desc: "Manage text documents and analysis reports.", icon: <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /> },
-    { id: 'interface-kanban', name: "Kanban", desc: "View nodes as cards in a Kanban board.", icon: <path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 00-2-2h-2a2 2 0 00-2 2" /> },
+    { id: 'interface-kanban', name: "Kanban", desc: "View nodes as cards across multiple Kanban boards.", icon: <path d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 00-2-2h-2a2 2 0 00-2 2" /> },
     { id: 'interface-story', name: "Story Mode", desc: "Create presentations by capturing graph views.", icon: <path d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /> },
     { id: 'interface-table', name: "Table", desc: "Edit nodes and properties in a spreadsheet view.", icon: <path d="M3 10h18M3 14h18m-9-4v8m-7-4h14M4 6h16a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" /> },
     { id: 'interface-matrix', name: "Matrix", desc: "View relationships as an adjacency matrix.", icon: <path d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z M12 3v18 M3 12h18" /> },
     { id: 'interface-grid', name: "Grid", desc: "Plot nodes on an X/Y axis based on attributes.", icon: <path d="M4 4h7v7H4V4z M13 4h7v7h-7V4z M4 13h7v7H4v-7z M13 13h7v7h-7v-7z" /> },
     { id: 'interface-md', name: "Markdown", desc: "Edit the graph using text-based markdown.", icon: <path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /> },
-    { id: 'interface-json', name: "JSON", desc: "View/Edit raw JSON data.", icon: <path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /> },
+    { id: 'interface-json', name: "JSON", desc: "View/Edit raw JSON data.", icon: <><path d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /><path strokeLinecap="round" strokeLinejoin="round" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></> },
     { id: 'interface-report', name: "Report", desc: "Generate a readable text report of the model.", icon: <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /> },
     { id: 'interface-history', name: "History", desc: "View log of AI interactions.", icon: <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /> },
     { id: 'interface-chat', name: "AI Chat", desc: "Chat with the graph using AI.", icon: <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /> },
@@ -94,8 +94,8 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
 
     // Close on click outside
     useEffect(() => {
-        const handleClick = (e: MouseEvent) => { 
-           if(modalRef.current && !modalRef.current.contains(e.target as Node)) onClose(); 
+        const handleClick = (e: MouseEvent) => {
+            if (modalRef.current && !modalRef.current.contains(e.target as Node)) onClose();
         }
         document.addEventListener('mousedown', handleClick);
         return () => document.removeEventListener('mousedown', handleClick);
@@ -105,13 +105,13 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
     const indexItems = useMemo(() => {
         const interfaceEntries = INTERFACE_ITEMS.map(i => ({ ...i, type: 'interface' }));
         const toolEntries = TOOL_DOCUMENTATION.map(t => ({ id: t.id, name: t.name, desc: t.desc, type: 'tools' }));
-        
+
         const combined = [...interfaceEntries, ...toolEntries].sort((a, b) => a.name.localeCompare(b.name));
-        
+
         if (!searchQuery) return combined;
-        
-        return combined.filter(item => 
-            item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+
+        return combined.filter(item =>
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             item.desc.toLowerCase().includes(searchQuery.toLowerCase())
         );
     }, [searchQuery]);
@@ -194,12 +194,12 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex justify-center items-start z-[1500] p-4">
-            <div 
+            <div
                 ref={modalRef}
                 className={`${bgClass} rounded-lg w-full max-w-6xl max-h-[calc(100vh-8rem)] mt-24 shadow-2xl border flex flex-col relative overflow-hidden`}
             >
                 {/* Header */}
-                <div 
+                <div
                     className={`p-4 border-b flex justify-between items-center flex-shrink-0 ${headerBg}`}
                 >
                     <div className="flex items-center gap-4 md:gap-6 flex-grow min-w-0">
@@ -212,15 +212,15 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                             <svg xmlns="http://www.w3.org/2000/svg" className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${textDesc}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
-                            <input 
-                                type="text" 
+                            <input
+                                type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Search..."
                                 className={`w-full pl-9 pr-8 py-1.5 rounded-full text-sm outline-none border focus:ring-2 focus:ring-blue-500 focus:border-transparent ${searchBg}`}
                             />
                             {searchQuery && (
-                                <button 
+                                <button
                                     onClick={() => setSearchQuery('')}
                                     className={`absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors`}
                                 >
@@ -240,37 +240,37 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
 
                 {/* Tabs - Scrollable on Mobile */}
                 <div className={`flex overflow-x-auto border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}`}>
-                     <button 
+                    <button
                         onClick={() => setActiveTab('intro')}
                         className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'intro' ? tabActive : tabInactive}`}
                     >
                         Introduction
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('patterns')}
                         className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'patterns' ? tabActive : tabInactive}`}
                     >
                         Patterns
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('index')}
                         className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'index' ? tabActive : tabInactive}`}
                     >
                         Index
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('interface')}
                         className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'interface' ? tabActive : tabInactive}`}
                     >
                         Interface
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('tools')}
                         className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'tools' ? tabActive : tabInactive}`}
                     >
                         Tools
                     </button>
-                    <button 
+                    <button
                         onClick={() => setActiveTab('scripting')}
                         className={`px-4 md:px-6 py-3 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'scripting' ? tabActive : tabInactive}`}
                     >
@@ -280,19 +280,19 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
 
                 {/* Content */}
                 <div ref={scrollContainerRef} className={`flex-grow overflow-y-auto min-h-0 p-4 md:p-8 custom-scrollbar ${scrollBg}`}>
-                    
+
                     {activeTab === 'intro' && (
                         <div className="max-w-4xl mx-auto space-y-10">
                             {/* Introduction Hero */}
                             <div className="space-y-4 border-b pb-8 border-gray-700/50">
                                 <h3 className={`text-3xl font-bold ${textHeader}`}>Welcome to Tapestry Studio</h3>
                                 <p className={`text-lg leading-relaxed ${highlightText}`}>
-                                    Tapestry Studio is an AI-powered knowledge graph environment designed for systems thinking. 
+                                    Tapestry Studio is an AI-powered knowledge graph environment designed for systems thinking.
                                     It combines a flexible node-link canvas with structured analytical frameworks.
                                 </p>
                                 <div className={`p-4 rounded-lg text-sm leading-relaxed border ${isDarkMode ? 'bg-blue-900/20 border-blue-800 text-blue-200' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
-                                    <strong>Motivation:</strong> Linear documents and static diagrams often fail to capture the complexity of real-world systems. 
-                                    Tapestry was created to bridge this gap, allowing users to model causal relationships and leverage AI to analyze structure, 
+                                    <strong>Motivation:</strong> Linear documents and static diagrams often fail to capture the complexity of real-world systems.
+                                    Tapestry was created to bridge this gap, allowing users to model causal relationships and leverage AI to analyze structure,
                                     detect contradictions, and generate solutions.
                                 </div>
                             </div>
@@ -315,7 +315,7 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                                 <h4 className={`text-xl font-bold ${textHeader}`}>Toolbox Summary</h4>
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                                     {TOOL_DOCUMENTATION.filter(t => !t.hideInGuide).map(tool => (
-                                        <button 
+                                        <button
                                             key={tool.id}
                                             onClick={() => handleNavigate('tools', tool.id)}
                                             className={`p-3 text-left rounded border transition-all group flex flex-col gap-2 ${cardBg} ${isDarkMode ? 'border-gray-700 hover:border-gray-500' : 'border-gray-200 hover:border-blue-300'}`}
@@ -335,43 +335,43 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                             </div>
                         </div>
                     )}
-                    
+
                     {activeTab === 'patterns' && (
                         <PatternGalleryView isDarkMode={isDarkMode} />
                     )}
 
                     {activeTab === 'index' && (
-                         <div className="columns-1 md:columns-2 lg:columns-3 gap-8 space-y-8">
-                             {Object.keys(groupedIndex).sort().map(letter => (
-                                 <div key={letter} className="break-inside-avoid mb-6">
-                                     <h3 className={`text-2xl font-bold mb-4 border-b ${isDarkMode ? 'border-gray-700 text-blue-500' : 'border-gray-200 text-blue-600'}`}>{letter}</h3>
-                                     <div className="flex flex-col gap-2">
-                                         {groupedIndex[letter].map(item => (
-                                             <button
+                        <div className="columns-1 md:columns-2 lg:columns-3 gap-8 space-y-8">
+                            {Object.keys(groupedIndex).sort().map(letter => (
+                                <div key={letter} className="break-inside-avoid mb-6">
+                                    <h3 className={`text-2xl font-bold mb-4 border-b ${isDarkMode ? 'border-gray-700 text-blue-500' : 'border-gray-200 text-blue-600'}`}>{letter}</h3>
+                                    <div className="flex flex-col gap-2">
+                                        {groupedIndex[letter].map(item => (
+                                            <button
                                                 key={item.id}
                                                 onClick={() => handleNavigate(item.type as 'interface' | 'tools', item.id)}
                                                 className={`text-left p-2 rounded hover:bg-opacity-50 transition-colors group flex items-start gap-2 ${isDarkMode ? 'hover:bg-gray-800' : 'hover:bg-white'}`}
-                                             >
-                                                 <div className="mt-0.5 shrink-0 text-gray-500">
+                                            >
+                                                <div className="mt-0.5 shrink-0 text-gray-500">
                                                     {item.type === 'interface' ? (
                                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" /></svg>
                                                     ) : (
                                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /></svg>
                                                     )}
-                                                 </div>
-                                                 <div>
-                                                     <div className={`font-semibold text-sm group-hover:text-blue-400 transition-colors ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{item.name}</div>
-                                                     <div className={`text-xs line-clamp-1 ${textDesc}`}>{item.desc}</div>
-                                                 </div>
-                                             </button>
-                                         ))}
-                                     </div>
-                                 </div>
-                             ))}
-                             {indexItems.length === 0 && (
-                                 <div className={`text-center py-10 ${textDesc}`}>No results found for "{searchQuery}".</div>
-                             )}
-                         </div>
+                                                </div>
+                                                <div>
+                                                    <div className={`font-semibold text-sm group-hover:text-blue-400 transition-colors ${isDarkMode ? 'text-gray-300' : 'text-gray-800'}`}>{item.name}</div>
+                                                    <div className={`text-xs line-clamp-1 ${textDesc}`}>{item.desc}</div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                            {indexItems.length === 0 && (
+                                <div className={`text-center py-10 ${textDesc}`}>No results found for "{searchQuery}".</div>
+                            )}
+                        </div>
                     )}
 
                     {activeTab === 'interface' && (
@@ -414,7 +414,7 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                                             </p>
                                         )}
                                     </div>
-                                    
+
                                     {/* Detailed Guidance Rendered Here */}
                                     <div className={`p-4 ${isDarkMode ? 'bg-gray-800/20' : 'bg-gray-50/20'} border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
                                         <h4 className={`text-xs font-bold uppercase tracking-wider mb-3 opacity-70 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Detailed Guidance</h4>
@@ -459,14 +459,14 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
 
                     {activeTab === 'scripting' && (
                         <div className="max-w-4xl mx-auto space-y-8">
-                             {/* Intro */}
+                            {/* Intro */}
                             <div className="border-b border-gray-700/50 pb-6">
                                 <h3 className={`text-2xl font-bold mb-4 ${textHeader}`}>Tapestry Script (TScript)</h3>
                                 <p className={`text-base leading-relaxed mb-4 ${textDesc}`}>
                                     Tapestry Script (TScript) is a domain-specific language based on a strict subset of Python. It allows you to programmatically automate graph operations, analyze connectivity, and build custom workflows. It uses Python-style indentation for blocks (if/else/for) and standard assignment syntax.
                                 </p>
                             </div>
-                            
+
                             {/* Syntax Reference */}
                             <div className="space-y-4">
                                 <h4 className={`text-xl font-bold ${sectionTitle}`}>Language Syntax</h4>
@@ -474,7 +474,7 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                                     <div className={`p-4 rounded border ${itemBg}`}>
                                         <h5 className="font-bold text-sm mb-2 text-green-400">Variables & Assignment</h5>
                                         <pre className={`text-xs font-mono p-2 rounded mb-2 ${codeBlockBg}`}>
-{`name = "My Node"
+                                            {`name = "My Node"
 count = 10
 count += 5`}
                                         </pre>
@@ -483,7 +483,7 @@ count += 5`}
                                     <div className={`p-4 rounded border ${itemBg}`}>
                                         <h5 className="font-bold text-sm mb-2 text-purple-400">Loops</h5>
                                         <pre className={`text-xs font-mono p-2 rounded mb-2 ${codeBlockBg}`}>
-{`for node in nodes:
+                                            {`for node in nodes:
     print(node.name)`}
                                         </pre>
                                         <p className={`text-xs ${textDesc}`}>Iterate over collections. Blocks are defined by indentation.</p>
@@ -491,7 +491,7 @@ count += 5`}
                                     <div className={`p-4 rounded border ${itemBg}`}>
                                         <h5 className="font-bold text-sm mb-2 text-orange-400">Control Flow</h5>
                                         <pre className={`text-xs font-mono p-2 rounded mb-2 ${codeBlockBg}`}>
-{`if count > 5:
+                                            {`if count > 5:
     print("Many")
 else:
     print("Few")`}
@@ -501,7 +501,7 @@ else:
                                     <div className={`p-4 rounded border ${itemBg}`}>
                                         <h5 className="font-bold text-sm mb-2 text-blue-400">Standard Methods</h5>
                                         <pre className={`text-xs font-mono p-2 rounded mb-2 ${codeBlockBg}`}>
-{`list.append(item)
+                                            {`list.append(item)
 str.split(",")
 print("Log")
 sleep(0.5)`}
@@ -514,7 +514,7 @@ sleep(0.5)`}
                             {/* API Reference */}
                             <div className="space-y-4">
                                 <h4 className={`text-xl font-bold ${sectionTitle}`}>API Reference</h4>
-                                
+
                                 <div className={`border rounded-lg overflow-hidden ${groupBg}`}>
                                     <div className={`p-3 font-bold text-sm border-b ${groupHeaderBg} ${textHeader}`}>Graph Operations (graph.*)</div>
                                     <table className={`w-full text-xs text-left ${textDesc}`}>
@@ -559,11 +559,11 @@ sleep(0.5)`}
                             {/* Examples */}
                             <div>
                                 <h4 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Examples</h4>
-                                
+
                                 <div className={`p-4 rounded border mb-4 ${itemBg}`}>
                                     <h5 className={`font-bold text-sm mb-2 ${textHeader}`}>Walk & Highlight</h5>
                                     <pre className={`text-xs font-mono p-3 rounded overflow-x-auto ${codeBlockBg}`}>
-{`target_tag = "Risk"
+                                        {`target_tag = "Risk"
 nodes = graph.query_nodes(tag=target_tag)
 print("Found " + nodes.length + " nodes.")
 
@@ -579,7 +579,7 @@ canvas.clear_highlights()`}
                                 <div className={`p-4 rounded border ${itemBg}`}>
                                     <h5 className={`font-bold text-sm mb-2 ${textHeader}`}>Attribute Audit</h5>
                                     <pre className={`text-xs font-mono p-3 rounded overflow-x-auto ${codeBlockBg}`}>
-{`required_key = "Owner"
+                                        {`required_key = "Owner"
 all_nodes = graph.get_all_nodes()
 count = 0
 
@@ -592,11 +592,11 @@ for node in all_nodes:
 print("Total found: " + count)`}
                                     </pre>
                                 </div>
-                                
+
                                 <div className={`p-4 rounded border mt-4 ${itemBg}`}>
                                     <h5 className={`font-bold text-sm mb-2 ${textHeader}`}>Generate Report</h5>
                                     <pre className={`text-xs font-mono p-3 rounded overflow-x-auto ${codeBlockBg}`}>
-{`report = "# System Analysis Report\\n\\n"
+                                        {`report = "# System Analysis Report\\n\\n"
 nodes = graph.get_all_nodes()
 
 for n in nodes:

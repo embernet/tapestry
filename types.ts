@@ -8,7 +8,7 @@ export enum RelationshipDirection {
   Both = 'BOTH', // Source <-> Target
 }
 
-export type NodeShape = 'rectangle' | 'oval' | 'circle' | 'point';
+export type NodeShape = 'rectangle' | 'oval' | 'circle' | 'point' | 'diamond';
 
 export interface Relationship {
   id: string;
@@ -25,7 +25,7 @@ export interface Relationship {
 }
 
 export interface Element {
-  id:string;
+  id: string;
   name: string;
   notes: string;
   tags: string[];
@@ -114,6 +114,7 @@ export interface ColorScheme {
   relationshipDefinitions?: RelationshipDefinition[];
   relationshipLabels?: string[]; // Legacy support
   defaultRelationshipLabel?: string;
+  defaultTags?: string[];
   customLists?: Record<string, string[]>;
   customListDescriptions?: Record<string, string>;
 }
@@ -160,11 +161,11 @@ export interface AIConnection {
 }
 
 export interface AIConfig {
-    provider: string;
-    apiKey: string;
-    modelId: string;
-    baseUrl?: string;
-    language?: string;
+  provider: string;
+  apiKey: string;
+  modelId: string;
+  baseUrl?: string;
+  language?: string;
 }
 
 export interface CustomStrategyCategory {
@@ -206,11 +207,11 @@ export interface Script {
 }
 
 export interface ScriptSnippet {
-    id: string;
-    name: string;
-    description: string;
-    code: string;
-    isSystem: boolean;
+  id: string;
+  name: string;
+  description: string;
+  code: string;
+  isSystem: boolean;
 }
 
 export interface ActionDescriptor {
@@ -242,8 +243,8 @@ export interface ToolActionEvent {
 // --- Views ---
 
 export interface TagFilterState {
-    included: string[]; 
-    excluded: string[];
+  included: string[];
+  excluded: string[];
 }
 
 export interface GraphView {
@@ -251,18 +252,18 @@ export interface GraphView {
   name: string;
   description?: string;
   // Visual Identity
-  tapestryPrompt?: string; 
-  tapestrySvg?: string;    
+  tapestryPrompt?: string;
+  tapestrySvg?: string;
   tapestryVisible: boolean;
   // Configuration
   filters: {
-     tags: TagFilterState;
-     date: DateFilterState;
-     nodeFilter: NodeFilterState;
+    tags: TagFilterState;
+    date: DateFilterState;
+    nodeFilter: NodeFilterState;
   };
   // Curated Content
-  explicitInclusions: string[]; 
-  explicitExclusions: string[]; 
+  explicitInclusions: string[];
+  explicitExclusions: string[];
   // Camera State
   camera?: { x: number, y: number, k: number };
   // Node Positions Override
@@ -301,6 +302,7 @@ export interface NodeFilterState {
 }
 
 export interface ModelActions {
+  hasElement: (name: string) => boolean;
   addElement: (data: { name: string; notes?: string; tags?: string[]; attributes?: Record<string, string>; customLists?: Record<string, string[]>; x?: number; y?: number }) => string;
   updateElement: (name: string, data: Partial<Element>) => boolean;
   deleteElement: (name: string) => boolean;
@@ -310,7 +312,7 @@ export interface ModelActions {
   deleteElementAttribute: (elementName: string, key: string) => boolean;
   setRelationshipAttribute: (sourceName: string, targetName: string, key: string, value: string) => boolean;
   deleteRelationshipAttribute: (sourceName: string, targetName: string, key: string) => boolean;
-  
+
   // Document Actions
   readDocument: (title: string) => string | null;
   createDocument: (title: string, content?: string, type?: string, data?: any) => string;
@@ -364,19 +366,19 @@ export interface GuidanceContent {
 export type CsvColumnMappingType = 'ignore' | 'id' | 'name' | 'notes' | 'tags' | 'attribute' | 'list' | 'relationship' | 'source' | 'target' | 'label' | 'x' | 'y' | 'created' | 'updated';
 
 export interface CsvColumnConfig {
-    index: number;
-    header: string;
-    mappingType: CsvColumnMappingType;
-    separator?: string; // For lists and relationship targets
-    attributeKey?: string; // For attributes and relationships (the rel label)
+  index: number;
+  header: string;
+  mappingType: CsvColumnMappingType;
+  separator?: string; // For lists and relationship targets
+  attributeKey?: string; // For attributes and relationships (the rel label)
 }
 
 export interface CsvImportStats {
-    nodesCreated: number;
-    nodesUpdated: number;
-    relationshipsCreated: number;
-    relationshipsUpdated: number;
-    errors: string[];
+  nodesCreated: number;
+  nodesUpdated: number;
+  relationshipsCreated: number;
+  relationshipsUpdated: number;
+  errors: string[];
 }
 
 // ---
@@ -391,4 +393,13 @@ export type TagCloudToolType = 'tags' | 'nodes' | 'words' | 'full_text' | null;
 export type DataToolType = 'csv' | 'markdown' | 'json' | null;
 export type MiningToolType = 'dashboard' | null;
 export type MermaidToolType = 'editor' | null;
-export type VisualiseToolType = 'grid' | 'mermaid' | 'circle_packing' | 'treemap' | null;
+export interface KanbanBoard {
+  id: string;
+  name: string;
+  columns: string[];
+  attributeKey: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type VisualiseToolType = 'kanban' | 'timeline' | 'grid' | 'priority' | 'calendar' | null;

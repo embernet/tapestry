@@ -2,10 +2,10 @@
 import React from 'react';
 
 interface AiToolbarProps {
-  onSelectTool: (toolId: string) => void;
-  isCollapsed: boolean;
-  onToggle: () => void;
-  isDarkMode: boolean;
+    onSelectTool: (toolId: string) => void;
+    isCollapsed: boolean;
+    onToggle: () => void;
+    isDarkMode: boolean;
 }
 
 const AI_TOOLS = [
@@ -80,7 +80,7 @@ const AiToolbar: React.FC<AiToolbarProps> = ({
 
     return (
         <div className="relative pointer-events-auto">
-            <button 
+            <button
                 onClick={onToggle}
                 className={`h-20 w-20 border shadow-lg rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${bgClass} ${!isCollapsed ? 'ring-2 ring-purple-500' : ''}`}
                 title={isCollapsed ? "Open AI Tools" : "Close AI Tools"}
@@ -101,7 +101,7 @@ const AiToolbar: React.FC<AiToolbarProps> = ({
             </button>
 
             {!isCollapsed && (
-                <div className={`absolute top-full left-0 mt-2 w-64 border rounded-lg shadow-2xl z-50 flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600 ${dropdownBg}`}>
+                <div className={`absolute top-full left-0 mt-2 w-72 border rounded-lg shadow-2xl z-[950] flex flex-col max-h-[60vh] overflow-y-auto animate-fade-in-down scrollbar-thin scrollbar-thumb-gray-600 ${dropdownBg}`}>
                     <div className={`p-3 border-b border-gray-700 ${isDarkMode ? 'bg-gray-800' : 'bg-gray-100'}`}>
                         <span className={`text-[10px] font-bold uppercase tracking-wider ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>AI Tools</span>
                     </div>

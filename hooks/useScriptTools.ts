@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { toolRegistry } from '../services/ToolRegistry';
 import { ToolClient, ActionDescriptor, Element, Relationship, TapestryDocument } from '../types';
-import { generateUUID } from '../utils';
+import { generateUUID, normalizeTag } from '../utils';
 
 export interface UseScriptToolsProps {
     elementsRef: React.MutableRefObject<Element[]>;
@@ -66,7 +66,7 @@ export const useScriptTools = ({
                         for (const [key, value] of Object.entries(args)) {
                             if (!value) continue;
                             const term = String(value).toLowerCase();
-                            
+
                             if (key === 'tag') {
                                 results = results.filter(e => e.tags.some(t => t.toLowerCase() === term));
                             } else if (key === 'name') {
@@ -77,14 +77,14 @@ export const useScriptTools = ({
                             }
                         }
                         return results;
-                    
+
                     case 'add_node':
                         const name = args.name as string;
                         if (!name) throw new Error("Name is required");
                         // Check exist
                         const existing = elements.find(e => e.name.toLowerCase() === name.toLowerCase());
                         if (existing) return existing;
-                        
+
                         const id = generateUUID();
                         const newNode: Element = {
                             id,
@@ -101,13 +101,13 @@ export const useScriptTools = ({
                         };
                         setElements(prev => [...prev, newNode]);
                         return newNode;
-                    
+
                     case 'delete_node':
-                         const targetId = args.id;
-                         if (!targetId) return false;
-                         setElements(prev => prev.filter(e => e.id !== targetId));
-                         setRelationships(prev => prev.filter(r => r.source !== targetId && r.target !== targetId));
-                         return true;
+                        const targetId = args.id;
+                        if (!targetId) return false;
+                        setElements(prev => prev.filter(e => e.id !== targetId));
+                        setRelationships(prev => prev.filter(r => r.source !== targetId && r.target !== targetId));
+                        return true;
 
                     case 'add_edge':
                         const src = args.source; // ID
@@ -123,7 +123,7 @@ export const useScriptTools = ({
                         };
                         setRelationships(prev => [...prev, newRel]);
                         return newRel;
-                    
+
                     case 'get_neighbors':
                         const nodeId = args.id;
                         const connected = relationships.filter(r => r.source === nodeId || r.target === nodeId);
@@ -143,12 +143,12 @@ export const useScriptTools = ({
                             const otherNode = elements.find(e => e.id === otherId);
                             // Ensure we return a safe object if the node is missing (zombie link)
                             const safeNeighbor = otherNode || { id: otherId, name: "Unknown", tags: [], notes: "", attributes: {} };
-                            
+
                             let arrow = "---";
                             if (r.direction === "TO") arrow = isSource ? "-->" : "<--";
                             if (r.direction === "FROM") arrow = isSource ? "<--" : "-->";
                             if (r.direction === "BOTH") arrow = "<-->";
-                            
+
                             return {
                                 id: r.id,
                                 neighbor: safeNeighbor,
@@ -172,13 +172,15 @@ export const useScriptTools = ({
                         }));
                         return true;
 
+
                     case 'add_tag':
                         if (!args.id || !args.tag) throw new Error("ID and Tag required");
+                        const tagToAdd = normalizeTag(args.tag);
                         setElements(prev => prev.map(e => {
-                            if (e.id === args.id && !e.tags.includes(args.tag)) {
+                            if (e.id === args.id && !e.tags.includes(tagToAdd)) {
                                 return {
                                     ...e,
-                                    tags: [...e.tags, args.tag],
+                                    tags: [...e.tags, tagToAdd],
                                     updatedAt: new Date().toISOString()
                                 };
                             }
@@ -188,11 +190,12 @@ export const useScriptTools = ({
 
                     case 'remove_tag':
                         if (!args.id || !args.tag) throw new Error("ID and Tag required");
+                        const tagToRemove = normalizeTag(args.tag);
                         setElements(prev => prev.map(e => {
                             if (e.id === args.id) {
                                 return {
                                     ...e,
-                                    tags: e.tags.filter(t => t !== args.tag),
+                                    tags: e.tags.filter(t => t !== tagToRemove),
                                     updatedAt: new Date().toISOString()
                                 };
                             }
@@ -229,16 +232,16 @@ export const useScriptTools = ({
                             return e;
                         }));
                         return true;
-                        
+
                     case 'get_date':
                         return new Date().toLocaleDateString();
-                        
+
                     case 'get_formatted_attributes': {
                         const n = elements.find(e => e.id === args.id);
                         if (!n || !n.attributes) return [];
                         return Object.entries(n.attributes).map(([k, v]) => `${k}: ${v}`);
                     }
-                    
+
                     case 'get_formatted_lists': {
                         const n = elements.find(e => e.id === args.id);
                         if (!n || !n.customLists) return [];
@@ -268,14 +271,14 @@ export const useScriptTools = ({
                         setMultiSelection(new Set([args.id]));
                         return true;
                     case 'pan_to_node':
-                         const el = elementsRef.current.find(e => e.id === args.id);
-                         if (el && graphCanvasRef.current) {
-                             const cx = window.innerWidth / 2;
-                             const cy = window.innerHeight / 2;
-                             // Assuming standard zoom 1.5 for focus
-                             graphCanvasRef.current.setCamera(-(el.x || 0) + cx, -(el.y || 0) + cy, 1.5);
-                         }
-                         return !!el;
+                        const el = elementsRef.current.find(e => e.id === args.id);
+                        if (el && graphCanvasRef.current) {
+                            const cx = window.innerWidth / 2;
+                            const cy = window.innerHeight / 2;
+                            // Assuming standard zoom 1.5 for focus
+                            graphCanvasRef.current.setCamera(-(el.x || 0) + cx, -(el.y || 0) + cy, 1.5);
+                        }
+                        return !!el;
                     case 'highlight_node':
                         setAnalysisHighlights(prev => {
                             const next = new Map(prev);
@@ -291,7 +294,7 @@ export const useScriptTools = ({
                         setMultiSelection(new Set());
                         return true;
                     default:
-                         throw new Error(`Unknown action: ${action}`);
+                        throw new Error(`Unknown action: ${action}`);
                 }
             }
         };
@@ -307,19 +310,19 @@ export const useScriptTools = ({
             invoke: async (action, args) => {
                 switch (action) {
                     case 'create_doc':
-                         const newId = generateUUID();
-                         const now = new Date().toISOString();
-                         const doc: TapestryDocument = {
-                             id: newId,
-                             title: args.title || 'Script Report',
-                             content: args.content || '',
-                             folderId: null,
-                             createdAt: now,
-                             updatedAt: now,
-                             type: 'text'
-                         };
-                         setDocuments(prev => [...prev, doc]);
-                         return newId;
+                        const newId = generateUUID();
+                        const now = new Date().toISOString();
+                        const doc: TapestryDocument = {
+                            id: newId,
+                            title: args.title || 'Script Report',
+                            content: args.content || '',
+                            folderId: null,
+                            createdAt: now,
+                            updatedAt: now,
+                            type: 'text'
+                        };
+                        setDocuments(prev => [...prev, doc]);
+                        return newId;
                     case 'append_text':
                         const query = args.doc; // Title or ID
                         const text = args.text;
