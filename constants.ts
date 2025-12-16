@@ -2,7 +2,7 @@
 import { ColorScheme, SystemPromptConfig, ScriptSnippet } from './types';
 import { promptStore } from './services/PromptStore';
 
-export const APP_VERSION = '0.6.0';
+export const APP_VERSION = '0.6.1';
 export const VERSION_NAME = 'Pattern Weaver';
 
 export const AUTO_GENERATED_TAG = 'added_by_tapestry';
@@ -14,6 +14,15 @@ export interface ChangelogEntry {
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.6.1',
+    date: '2025-12-15',
+    changes: [
+      'Added Light/Dark mode toggle to toolbar',
+      'Fixed Added_by_tapestry text color issue',
+      'Self-test updates'
+    ]
+  },
   {
     version: '0.6.0',
     date: '2025-12-15',
