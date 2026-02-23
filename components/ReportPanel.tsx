@@ -1,0 +1,556 @@
+
+import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { Element, Relationship, RelationshipDirection, TapestryDocument, TapestryFolder, ColorScheme } from '../types';
+import { generateElementMarkdown, formatTag } from '../utils';
+
+interface ReportPanelProps {
+  elements: Element[];
+  relationships: Relationship[];
+  documents?: TapestryDocument[];
+  folders?: TapestryFolder[];
+  onClose: () => void;
+  onNodeClick: (elementId: string) => void;
+  onOpenDocument?: (docId: string) => void;
+  isDarkMode: boolean;
+  activeColorScheme?: ColorScheme;
+}
+
+// Sub-component for a clickable element link
+const ElementLink: React.FC<{ element: Element; onNodeClick: (elementId: string) => void; isIndex?: boolean; relCount?: number; isDarkMode: boolean }> = ({ element, onNodeClick, isIndex = false, relCount, isDarkMode }) => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    onNodeClick(element.id);
+    if (isIndex) {
+      document.getElementById(`element-report-${element.id}`)?.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const linkText = (isIndex && relCount !== undefined) ? `${element.name} (${relCount})` : element.name;
+  const badgeClass = isDarkMode ? 'bg-gray-700 text-blue-300' : 'bg-gray-200 text-blue-700';
+
+  return (
+    <a href={`#element-report-${element.id}`} onClick={handleClick} className="text-blue-500 hover:underline hover:text-blue-400">
+      {isIndex ? linkText : <code className={`${badgeClass} px-2 py-0.5 rounded-md text-sm`}>{element.name}</code>}
+    </a>
+  );
+};
+
+// Sub-component for a single relationship line in the report
+const RelationshipItem: React.FC<{ rel: Relationship; elementMap: Map<string, Element>; onNodeClick: (elementId: string) => void; isDarkMode: boolean }> = ({ rel, elementMap, onNodeClick, isDarkMode }) => {
+  const sourceElement = elementMap.get(rel.source as string);
+  const targetElement = elementMap.get(rel.target as string);
+  if (!sourceElement || !targetElement) return null;
+
+  let arrow = '';
+  switch (rel.direction) {
+    case RelationshipDirection.From: arrow = `<--[${rel.label}]--`; break;
+    case RelationshipDirection.Both: arrow = `<--[${rel.label}]-->`; break;
+    case RelationshipDirection.None: arrow = `---[${rel.label}]---`; break;
+    default: arrow = `--[${rel.label}]-->`; break;
+  }
+
+  return (
+    <li className="flex items-center space-x-2 ml-4">
+      <ElementLink element={sourceElement} onNodeClick={onNodeClick} isDarkMode={isDarkMode} />
+      <span className={`${isDarkMode ? 'text-gray-500' : 'text-gray-400'} text-xs font-mono`}>{arrow}</span>
+      <ElementLink element={targetElement} onNodeClick={onNodeClick} isDarkMode={isDarkMode} />
+    </li>
+  );
+};
+
+// Sub-component for a element's detailed report section
+const ElementReportSection: React.FC<{
+  element: Element;
+  elementRels: Relationship[];
+  elementMap: Map<string, Element>;
+  onNodeClick: (elementId: string) => void;
+  isDarkMode: boolean;
+  activeColorScheme?: ColorScheme;
+}> = ({ element, elementRels, elementMap, onNodeClick, isDarkMode, activeColorScheme }) => {
+  const headingClass = isDarkMode ? 'text-white border-gray-700' : 'text-gray-900 border-gray-200';
+  const textClass = isDarkMode ? 'text-gray-300' : 'text-gray-700';
+  const labelClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+
+  // Merge custom lists from schema
+  const mergedCustomLists: Record<string, string[]> = { ...element.customLists };
+  if (activeColorScheme?.customLists) {
+      Object.entries(activeColorScheme.customLists).forEach(([key, defaultItems]) => {
+          if (!mergedCustomLists[key]) {
+               // Cast to avoid TS errors if defaultItems is inferred loosely
+               mergedCustomLists[key] = [...(defaultItems as string[])]; 
+          }
+      });
+  }
+
+  return (
+    <div id={`element-report-${element.id}`} className="py-4 scroll-mt-4">
+      <h2 className={`text-xl font-bold mb-2 border-b pb-1 ${headingClass}`}>{element.name}</h2>
+      <div className={`pl-2 space-y-2 ${textClass}`}>
+        {element.tags.length > 0 && <p><strong className={`font-semibold w-20 inline-block ${labelClass}`}>Tags:</strong> {element.tags.map(formatTag).join(', ')}</p>}
+        
+        {element.attributes && Object.keys(element.attributes).length > 0 && (
+             <div className="mb-2">
+                <strong className={`font-semibold block ${labelClass} mb-1`}>Attributes:</strong>
+                <ul className="list-disc list-inside pl-4 text-sm">
+                     {Object.entries(element.attributes).map(([k, v]) => (
+                         <li key={k}><span className="font-medium opacity-90">{k}:</span> {v}</li>
+                     ))}
+                </ul>
+             </div>
+        )}
+
+        {Object.keys(mergedCustomLists).length > 0 && (
+             <div className="mb-2">
+                {Object.entries(mergedCustomLists).map(([name, items]) => {
+                    const listItems = items as string[];
+                    return (
+                        listItems && listItems.length > 0 ? (
+                            <div key={name} className="mb-2">
+                                <strong className={`font-semibold block ${labelClass} mb-1`}>{name}:</strong>
+                                <ul className="list-disc list-inside pl-4 text-sm">
+                                    {listItems.map((item, idx) => (
+                                        <li key={idx}>{item}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ) : null
+                    );
+                })}
+             </div>
+        )}
+
+        {element.notes && (
+          <div>
+            <strong className={`font-semibold w-20 inline-block align-top ${labelClass}`}>Notes:</strong>
+            <p className="whitespace-pre-wrap inline-block w-[calc(100%-5rem)]">{element.notes}</p>
+          </div>
+        )}
+        {elementRels.length > 0 && (
+          <div className="pt-2">
+            <strong className={`font-semibold block mb-1 ${labelClass}`}>Relationships:</strong>
+            <ul className="space-y-1">
+              {elementRels.map(rel => <RelationshipItem key={rel.id} rel={rel} elementMap={elementMap} onNodeClick={onNodeClick} isDarkMode={isDarkMode} />)}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Documents Section
+const DocumentsSection: React.FC<{ 
+    documents: TapestryDocument[], 
+    folders: TapestryFolder[], 
+    onOpenDocument: (id: string) => void;
+    isDarkMode: boolean;
+}> = ({ documents, folders, onOpenDocument, isDarkMode }) => {
+    if (!documents || documents.length === 0) return null;
+
+    const bgHoverClass = isDarkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-100';
+    const bgClass = isDarkMode ? 'bg-gray-700' : 'bg-gray-50';
+    const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+    const subTextClass = isDarkMode ? 'text-gray-400' : 'text-gray-500';
+
+    return (
+        <div className={`py-6 border-t ${isDarkMode ? 'border-gray-600' : 'border-gray-200'}`}>
+            <h2 className={`text-xl font-bold mb-3 ${textClass}`}>Documents</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                {documents.map(doc => {
+                    const folder = doc.folderId ? folders.find(f => f.id === doc.folderId) : null;
+                    return (
+                        <div 
+                            key={doc.id} 
+                            onClick={() => onOpenDocument(doc.id)}
+                            className={`${bgClass} ${bgHoverClass} p-2 rounded cursor-pointer flex items-center gap-2 transition-colors`}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                            </svg>
+                            <div>
+                                <span className="text-blue-500 font-semibold">{doc.title}</span>
+                                {folder && <span className={`${subTextClass} text-xs ml-2`}>in {folder.name}</span>}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+// Main WYSIWYG view component
+const WysiwigReport: React.FC<{
+  elements: Element[];
+  relationships: Relationship[];
+  elementMap: Map<string, Element>;
+  relStats: Map<string, number>;
+  tagStats: Map<string, number>;
+  onNodeClick: (elementId: string) => void;
+  elementRelCounts: Map<string, number>;
+  documents?: TapestryDocument[];
+  folders?: TapestryFolder[];
+  onOpenDocument?: (id: string) => void;
+  isDarkMode: boolean;
+  activeColorScheme?: ColorScheme;
+}> = ({ elements, relationships, elementMap, relStats, tagStats, onNodeClick, elementRelCounts, documents, folders, onOpenDocument, isDarkMode, activeColorScheme }) => {
+  if (elements.length === 0) {
+    return <p className="text-gray-500 p-4">No elements to display based on the current filter.</p>;
+  }
+
+  const headingClass = isDarkMode ? 'text-white border-gray-700' : 'text-gray-900 border-gray-200';
+  const textClass = isDarkMode ? 'text-gray-300' : 'text-gray-700';
+  const subHeadingClass = isDarkMode ? 'text-gray-300' : 'text-gray-800';
+
+  return (
+    <div>
+      {/* Index */}
+      <div className={`py-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+        <h2 className={`text-xl font-bold mb-2 ${headingClass.split(' ')[0]}`}>Element Index</h2>
+        <ul className={`list-disc list-inside columns-2 ${textClass}`}>
+          {elements.map(element => (
+            <li key={`index-${element.id}`}>
+                <ElementLink 
+                    element={element} 
+                    onNodeClick={onNodeClick} 
+                    isIndex 
+                    relCount={elementRelCounts.get(element.id) || 0}
+                    isDarkMode={isDarkMode}
+                />
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Documents */}
+      {documents && documents.length > 0 && onOpenDocument && folders && (
+          <DocumentsSection documents={documents} folders={folders} onOpenDocument={onOpenDocument} isDarkMode={isDarkMode} />
+      )}
+
+      {/* Details */}
+      <div className={`divide-y ${isDarkMode ? 'divide-gray-700 border-gray-600' : 'divide-gray-200 border-gray-200'} border-t mt-4`}>
+        {elements.map(element => {
+          const elementRels = relationships.filter(r => r.source === element.id || r.target === element.id);
+          return <ElementReportSection key={element.id} element={element} elementRels={elementRels} elementMap={elementMap} onNodeClick={onNodeClick} isDarkMode={isDarkMode} activeColorScheme={activeColorScheme} />;
+        })}
+      </div>
+      
+      {/* Appendix */}
+      <div className={`py-4 mt-4 border-t ${isDarkMode ? 'border-gray-600' : 'border-gray-200'} ${textClass}`}>
+        <h2 className={`text-xl font-bold mb-3 ${headingClass.split(' ')[0]}`}>Appendix</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div>
+                <h3 className={`text-lg font-semibold mb-2 ${subHeadingClass}`}>Relationship Types</h3>
+                {relStats.size > 0 ? (
+                    <ul className="list-disc list-inside">
+                        {Array.from(relStats.entries()).map(([label, count]) => <li key={label}>{label}: {count}</li>)}
+                    </ul>
+                ) : <p className="text-gray-500">No relationships.</p>}
+            </div>
+            <div>
+                <h3 className={`text-lg font-semibold mb-2 ${subHeadingClass}`}>Tag Usage</h3>
+                {tagStats.size > 0 ? (
+                    <ul className="list-disc list-inside">
+                        {Array.from(tagStats.entries()).map(([tag, count]) => <li key={tag}>{formatTag(tag)}: {count}</li>)}
+                    </ul>
+                ) : <p className="text-gray-500">No tags used.</p>}
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const generateMarkdownReport = (
+  elements: Element[],
+  relationships: Relationship[],
+  elementMap: Map<string, Element>,
+  relStats: Map<string, number>,
+  tagStats: Map<string, number>,
+  elementRelCounts: Map<string, number>,
+  activeColorScheme?: ColorScheme
+): string => {
+  if (elements.length === 0) {
+    return "No elements to display based on the current filter.";
+  }
+
+  const sections: string[] = [];
+
+  // Index
+  const indexLines = ["# Element Index", ...elements.map(e => `- ${e.name} (${elementRelCounts.get(e.id) || 0})`)];
+  sections.push(indexLines.join('\n'));
+
+  // Details
+  const detailLines: string[] = ["# Element Details"];
+  elements.forEach(element => {
+    // Use shared helper for consistency
+    const elementMarkdown = generateElementMarkdown(element, relationships, elements, activeColorScheme);
+    detailLines.push(elementMarkdown);
+  });
+  sections.push(detailLines.join('\n\n---\n\n'));
+
+  // Appendix
+  const appendixLines = ["# Appendix"];
+  appendixLines.push("## Relationship Types");
+  if (relStats.size > 0) {
+      Array.from(relStats.entries()).forEach(([label, count]) => appendixLines.push(`- ${label}: ${count}`));
+  } else {
+      appendixLines.push("No relationships.");
+  }
+
+  appendixLines.push("\n## Tag Usage");
+  if (tagStats.size > 0) {
+      Array.from(tagStats.entries()).forEach(([tag, count]) => appendixLines.push(`- ${formatTag(tag)}: ${count}`));
+  } else {
+      appendixLines.push("No tags used.");
+  }
+  sections.push(appendixLines.join('\n'));
+
+  return sections.join('\n\n====================\n\n');
+};
+
+
+export const ReportPanel: React.FC<ReportPanelProps> = ({ elements, relationships, onClose, onNodeClick, documents, folders, onOpenDocument, isDarkMode, activeColorScheme }) => {
+  const [isCopied, setIsCopied] = useState(false);
+  const [viewMode, setViewMode] = useState<'wysiwig' | 'markdown'>('wysiwig');
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [matches, setMatches] = useState<HTMLElement[]>([]);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const reportContentRef = useRef<HTMLDivElement>(null);
+  
+  const { sortedElements, elementMap, relStats, tagStats, elementRelCounts } = useMemo(() => {
+    const sortedElements = [...elements].sort((a, b) => a.name.localeCompare(b.name));
+    const elementMap = new Map(elements.map(f => [f.id, f]));
+    
+    const relStats = new Map<string, number>();
+    relationships.forEach(rel => {
+      relStats.set(rel.label, (relStats.get(rel.label) || 0) + 1);
+    });
+
+    const tagStats = new Map<string, number>();
+    elements.forEach(element => {
+      element.tags.forEach(tag => {
+        tagStats.set(tag, (tagStats.get(tag) || 0) + 1);
+      });
+    });
+    
+    const elementRelCounts = new Map<string, number>();
+    elements.forEach(f => elementRelCounts.set(f.id, 0));
+    relationships.forEach(rel => {
+        const sourceId = rel.source as string;
+        const targetId = rel.target as string;
+        elementRelCounts.set(sourceId, (elementRelCounts.get(sourceId) || 0) + 1);
+        elementRelCounts.set(targetId, (elementRelCounts.get(targetId) || 0) + 1);
+    });
+
+    return { sortedElements, elementMap, relStats, tagStats, elementRelCounts };
+  }, [elements, relationships]);
+
+  const reportText = useMemo(() => {
+    return generateMarkdownReport(sortedElements, relationships, elementMap, relStats, tagStats, elementRelCounts, activeColorScheme);
+  }, [sortedElements, relationships, elementMap, relStats, tagStats, elementRelCounts, activeColorScheme]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(reportText).then(() => {
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    });
+  };
+
+  const handleNextMatch = () => {
+    if (matches.length > 0) {
+      setCurrentMatchIndex((prev) => (prev + 1) % matches.length);
+    }
+  };
+
+  const handlePreviousMatch = () => {
+    if (matches.length > 0) {
+      setCurrentMatchIndex((prev) => (prev - 1 + matches.length) % matches.length);
+    }
+  };
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Escape') {
+      setSearchTerm('');
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        handlePreviousMatch();
+      } else {
+        handleNextMatch();
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!reportContentRef.current) return;
+    const content = reportContentRef.current;
+
+    const unwrapHighlights = () => {
+        const highlights = content.querySelectorAll('span.search-highlight, span.current-search-highlight');
+        highlights.forEach(el => {
+            const parent = el.parentNode;
+            if (parent) {
+                while (el.firstChild) {
+                    parent.insertBefore(el.firstChild, el);
+                }
+                parent.removeChild(el);
+            }
+        });
+        content.normalize();
+    };
+    
+    unwrapHighlights();
+
+    if (searchTerm.length < 3) {
+      setMatches([]);
+      setCurrentMatchIndex(0);
+      return;
+    }
+
+    const regex = new RegExp(searchTerm.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'gi');
+    const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, null);
+    const textNodes: Text[] = [];
+    let currentNode = walker.nextNode();
+    while (currentNode) {
+        textNodes.push(currentNode as Text);
+        currentNode = walker.nextNode();
+    }
+
+    textNodes.reverse().forEach(node => {
+        if (node.textContent && regex.test(node.textContent)) {
+            const text = node.textContent;
+            const fragment = document.createDocumentFragment();
+            let lastIndex = 0;
+            let match;
+            regex.lastIndex = 0;
+            
+            while ((match = regex.exec(text)) !== null) {
+                if (match.index > lastIndex) {
+                    fragment.appendChild(document.createTextNode(text.substring(lastIndex, match.index)));
+                }
+                const span = document.createElement('span');
+                span.className = 'search-highlight bg-yellow-500 bg-opacity-50';
+                span.textContent = match[0];
+                fragment.appendChild(span);
+                lastIndex = regex.lastIndex;
+            }
+            if (lastIndex < text.length) {
+                fragment.appendChild(document.createTextNode(text.substring(lastIndex)));
+            }
+            node.parentNode?.replaceChild(fragment, node);
+        }
+    });
+    setMatches(Array.from(content.querySelectorAll<HTMLElement>('span.search-highlight')));
+    setCurrentMatchIndex(0);
+
+  }, [searchTerm, reportText, viewMode]);
+
+  useEffect(() => {
+    matches.forEach((match, index) => {
+        match.className = index === currentMatchIndex ? 'current-search-highlight bg-orange-500 rounded' : 'search-highlight bg-yellow-500 bg-opacity-50 rounded';
+    });
+    if (matches[currentMatchIndex]) {
+        matches[currentMatchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [currentMatchIndex, matches]);
+
+  const bgClass = isDarkMode ? 'bg-gray-800' : 'bg-white';
+  const headerClass = isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50';
+  const textClass = isDarkMode ? 'text-white' : 'text-gray-900';
+  const inputBgClass = isDarkMode ? 'bg-gray-700 text-white border-gray-600' : 'bg-white text-gray-900 border-gray-300';
+  const iconClass = isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-900';
+
+  return (
+    <div className={`w-full h-full flex flex-col ${bgClass}`}>
+      <div className={`p-4 flex-shrink-0 flex justify-between items-center border-b ${headerClass}`}>
+        <h2 className={`text-xl font-bold ${textClass}`}>Report</h2>
+        <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1">
+                <input
+                    type="text"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    onKeyDown={handleSearchKeyDown}
+                    className={`${inputBgClass} border rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 w-32 transition-all focus:w-40`}
+                />
+                <button onClick={handlePreviousMatch} disabled={matches.length === 0} title="Previous (Shift+Enter)" className={`p-2 rounded-md ${iconClass} hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" /></svg>
+                </button>
+                <button onClick={handleNextMatch} disabled={matches.length === 0} title="Next (Enter)" className={`p-2 rounded-md ${iconClass} hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+                {searchTerm.length >= 3 && (
+                  <span className="text-xs text-gray-500 w-16 text-center">
+                      {matches.length > 0 ? `${currentMatchIndex + 1} / ${matches.length}` : '0 results'}
+                  </span>
+                )}
+            </div>
+            <div className={`border-l h-6 mx-2 ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}></div>
+            <button
+                onClick={() => setViewMode(prev => prev === 'wysiwig' ? 'markdown' : 'wysiwig')}
+                title={viewMode === 'wysiwig' ? "Switch to Markdown View" : "Switch to Rendered View"}
+                className={`p-2 rounded-md ${iconClass} hover:bg-gray-100 dark:hover:bg-gray-700 transition`}
+            >
+                {viewMode === 'wysiwig' ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                )}
+            </button>
+            <button
+                onClick={handleCopy}
+                title={isCopied ? "Copied!" : "Copy Report"}
+                className={`p-2 rounded-md ${iconClass} hover:bg-gray-100 dark:hover:bg-gray-700 transition disabled:opacity-50`}
+                disabled={isCopied}
+            >
+                {isCopied ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                )}
+            </button>
+            <button onClick={onClose} className={`p-2 rounded-md ${iconClass} hover:bg-gray-100 dark:hover:bg-gray-700 transition`}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+      </div>
+      <div ref={reportContentRef} className="flex-grow p-6 overflow-y-auto">
+        {viewMode === 'wysiwig' ? (
+          <WysiwigReport
+            elements={sortedElements}
+            relationships={relationships}
+            elementMap={elementMap}
+            relStats={relStats}
+            tagStats={tagStats}
+            onNodeClick={onNodeClick}
+            elementRelCounts={elementRelCounts}
+            documents={documents}
+            folders={folders}
+            onOpenDocument={onOpenDocument}
+            isDarkMode={isDarkMode}
+            activeColorScheme={activeColorScheme}
+          />
+        ) : (
+          <textarea
+            readOnly
+            value={reportText}
+            className={`w-full h-full flex-grow ${isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'} border rounded-md p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500`}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
