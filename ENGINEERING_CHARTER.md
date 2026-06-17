@@ -78,3 +78,24 @@ repos too. The pipeline:
 Promote sparingly and only when reuse is real — a premature shared component costs
 more than the duplication it removes. When in doubt, brief Forge rather than
 publishing unilaterally.
+
+## 8. Port reservations
+
+Every long-running service binds a port, and a clash silently breaks whichever
+service starts second. To keep Forge, Lab, Tapestry, and every team out of each
+other's way, ports are allocated from reserved blocks. A service never binds a
+port outside its team's block, and never hard-codes a port — it reads `PORT` (or
+the service's documented env var) so the reserved value is set at deploy time, not
+baked into code.
+
+| Block | Owner | Use |
+|-------|-------|-----|
+| **3000–3099** | Apex / Forge | Core ecosystem services (Apex Portal 3010, Forge Portal 3020). Forge allocates within. |
+| **4000–4099** | All teams | Team portals — one per team (Innovation 4001, Writing 4005, Personal 4010, Test 4020, Void 4025, Random 4030, Cooking 4040, Photography 4050, Signal 4060). |
+| **4100–4199** | Tapestry | Tapestry team services — Studio pre-prod (4100) and any future tapestry service. |
+| **4200–4299** | Lab | Pre-prod / preview services for Lab's standalone apps. |
+
+**Authority:** Forge maintains the master allocation (in `data/inventory.json`
+via Janus). A team picks the next free port *within its own block* and tells
+Forge so the inventory stays the single source of truth. Need a new block?
+Ask Forge — don't squat an unreserved range.
