@@ -12,7 +12,7 @@
 // Settings (environment):
 //   SERVER_AI_KEY_FILE   file holding the API key (one line). Missing/empty = feature off.
 //   SERVER_AI_BASE_URL   default https://api.openai.com/v1
-//   SERVER_AI_MODEL      default model, default gpt-4o
+//   SERVER_AI_MODEL      default model, default gpt-5.6
 //   SERVER_AI_MODELS     optional comma list users may pick from (always includes SERVER_AI_MODEL)
 //   SERVER_AI_LABEL      name shown in Settings, default "OpenAI"
 //   SERVER_AI_RPM        requests per user per minute, default 30
@@ -35,7 +35,7 @@ function loadAiConfig(env = process.env) {
       if (e.code !== 'ENOENT') throw new Error(`SERVER_AI_KEY_FILE: ${e.code || e.message}`);
     }
   }
-  const model = (env.SERVER_AI_MODEL || 'gpt-4o').trim();
+  const model = (env.SERVER_AI_MODEL || 'gpt-5.6').trim();
   const models = [...new Set([model, ...String(env.SERVER_AI_MODELS || '').split(',').map((s) => s.trim()).filter(Boolean)])];
   const rpm = Number(env.SERVER_AI_RPM || 30);
   if (!(Number.isInteger(rpm) && rpm > 0 && rpm <= 1000)) throw new Error('SERVER_AI_RPM must be 1-1000');

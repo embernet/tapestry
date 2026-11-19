@@ -34,7 +34,7 @@ services:
       # Shared AI for all users (server/ai.js): the key file is mounted below; without one, it's off.
       SERVER_AI_KEY_FILE: /run/secrets/server-ai-key
       SERVER_AI_BASE_URL: "${SERVER_AI_BASE_URL:-https://api.openai.com/v1}"
-      SERVER_AI_MODEL: "${SERVER_AI_MODEL:-gpt-4o}"
+      SERVER_AI_MODEL: "${SERVER_AI_MODEL:-gpt-5.6}"
       SERVER_AI_MODELS: "${SERVER_AI_MODELS:-}"
       SERVER_AI_LABEL: "${SERVER_AI_LABEL:-OpenAI}"
       SERVER_AI_RPM: "${SERVER_AI_RPM:-30}"

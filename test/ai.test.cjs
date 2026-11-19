@@ -49,7 +49,7 @@ test('session advertises shared AI but never the key', async () => {
   const cookie = await login();
   const text = await (await fetch(base + '/api/session', { headers: { cookie } })).text();
   assert.ok(!text.includes(KEY) && !text.includes('SECRET'));
-  assert.deepEqual(JSON.parse(text).ai, { available: true, label: 'OpenAI', model: 'gpt-4o', models: ['gpt-4o', 'gpt-4o-mini'] });
+  assert.deepEqual(JSON.parse(text).ai, { available: true, label: 'OpenAI', model: 'gpt-5.6', models: ['gpt-5.6', 'gpt-4o-mini'] });
 });
 
 test('forwards a cleaned request with the server key and records usage', async () => {
@@ -62,7 +62,7 @@ test('forwards a cleaned request with the server key and records usage', async (
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, 'https://api.openai.com/v1/chat/completions');
   assert.equal(calls[0].init.headers.Authorization, `Bearer ${KEY}`);
-  assert.deepEqual(calls[0].body, { model: 'gpt-4o', messages: [{ role: 'system', content: 's' }, { role: 'user', content: 'hi' }], response_format: { type: 'json_object' } });
+  assert.deepEqual(calls[0].body, { model: 'gpt-5.6', messages: [{ role: 'system', content: 's' }, { role: 'user', content: 'hi' }], response_format: { type: 'json_object' } });
   const row = db.prepare('SELECT requests, prompt_tokens, completion_tokens FROM ai_usage WHERE username = ?').get(`u${seq}`);
   assert.deepEqual({ ...row }, { requests: 1, prompt_tokens: 7, completion_tokens: 3 });
 
