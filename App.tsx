@@ -23,6 +23,7 @@ import { usePanelState } from './hooks/usePanelState';
 import { useTools } from './hooks/useTools';
 import { useClickOutside } from './hooks/useClickOutside';
 import AppHeader from './components/AppHeader';
+import SessionBar from './components/SessionBar';
 import { useSelfTest } from './hooks/useSelfTest';
 import { usePersistence } from './hooks/usePersistence';
 import { GuidancePanel } from './components/GuidancePanel';
@@ -779,6 +780,7 @@ export default function App() {
     return (
         <div className="w-screen h-screen overflow-hidden flex flex-col relative">
             <input type="file" ref={importFileRef} onChange={handleImportInputChangeWrapper} accept=".json" className="hidden" />
+            <SessionBar isDarkMode={isDarkMode} hidden={isPresenting} />
             {isPresenting && (
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[3000] bg-gray-900/90 border border-gray-600 rounded-lg px-6 py-3 shadow-2xl flex items-center gap-4 text-white animate-fade-in-down">
                     <button onClick={() => { if (currentSlideIndex !== null && currentSlideIndex > 0) setCurrentSlideIndex(currentSlideIndex - 1); }} disabled={currentSlideIndex === 0} className="text-gray-400 hover:text-white disabled:opacity-30"><svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>

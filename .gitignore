@@ -28,3 +28,7 @@ dist-ssr
 
 # Vendored Google Cloud SDK — must never be committed (purged from history 2026-06-17)
 gcloud-sdk/
+
+# Deployment settings and local data (dev data starts empty; prod data lives outside the repo)
+.env
+data/

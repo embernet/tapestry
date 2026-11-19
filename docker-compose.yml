@@ -1,0 +1,38 @@
+# Tapestry Studio: host deployment (dev or prod, chosen by .env).
+#
+#   cp .env.example .env        # dev defaults
+#   docker compose up -d --build
+#
+# Defaults are the DEV instance (project tapestry-dev, port 8205, ./data), so a
+# fresh clone can never collide with prod. Prod's .env sets
+# COMPOSE_PROJECT_NAME=tapestry, TAPESTRY_PORT=8200, TAPESTRY_DATA_DIR=/data/apps/tapestry.
+name: ${COMPOSE_PROJECT_NAME:-tapestry-dev}
+
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    user: "${APP_UID:-1000}:${APP_GID:-1000}"   # host user, so the data dir stays theirs
+    ports:
+      - "${TAPESTRY_PORT:-8205}:${TAPESTRY_PORT:-8205}"
+    environment:
+      PORT: "${TAPESTRY_PORT:-8205}"
+      DATA_DIR: /data
+      PUBLIC_URL: "${PUBLIC_URL:-}"
+      PORTAL_URL: "${PORTAL_URL:-}"
+      PORTAL_NAME: "${PORTAL_NAME:-}"
+      TRUST_PROXY: "${TRUST_PROXY:-}"
+      # Login standard (shared auth module, server/auth/README.md)
+      AUTH_LOCAL: "${AUTH_LOCAL:-on}"
+      AUTH_SSO: "${AUTH_SSO:-off}"
+      SSO_ISSUER: "${SSO_ISSUER:-https://tig-sso.grlab.co.uk/realms/tig}"
+      SSO_CLIENT_ID: "${SSO_CLIENT_ID:-}"
+      SSO_CLIENT_SECRET_FILE: "${SSO_CLIENT_SECRET_FILE:-}"
+      LOCAL_ADMIN_USERS: "${LOCAL_ADMIN_USERS:-}"
+      SSO_ADMIN_GROUP: "${SSO_ADMIN_GROUP:-}"
+      SESSION_DAYS: "${SESSION_DAYS:-7}"
+      # trust the host's certificate store (e.g. newer roots an SSO issuer may chain to)
+      NODE_USE_SYSTEM_CA: "1"
+    volumes:
+      - ${TAPESTRY_DATA_DIR:-./data}:/data
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
