@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { MermaidDiagram, Element, Relationship } from '../types';
 import { generateMarkdownFromGraph, callAI, AIConfig } from '../utils';
 import { promptStore } from '../services/PromptStore';
+import { notify, confirmDialog } from '../services/dialogs';
 
 interface UseDiagramsProps {
     elements: Element[];
@@ -27,8 +28,8 @@ export const useDiagrams = ({ elements, relationships, aiConfig }: UseDiagramsPr
         });
     }, []);
 
-    const handleDeleteMermaidDiagram = useCallback((id: string) => {
-        if (confirm("Delete this diagram?")) {
+    const handleDeleteMermaidDiagram = useCallback(async (id: string) => {
+        if (await confirmDialog({ title: 'Delete diagram', message: 'Delete this diagram?', confirmLabel: 'Delete', danger: true })) {
             setMermaidDiagrams(prev => prev.filter(d => d.id !== id));
         }
     }, []);
@@ -42,7 +43,7 @@ export const useDiagrams = ({ elements, relationships, aiConfig }: UseDiagramsPr
             return response.text || "";
         } catch (e) {
             console.error("Mermaid Gen Error", e);
-            alert("Failed to generate diagram.");
+            notify("Failed to generate diagram.", 'error');
             return "";
         } finally {
             setIsMermaidGenerating(false);

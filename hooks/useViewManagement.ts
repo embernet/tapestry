@@ -2,6 +2,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { GraphView, DateFilterState, NodeFilterState, AIConfig } from '../types';
 import { generateUUID, createDefaultView, callAI } from '../utils';
+import { notify } from '../services/dialogs';
 
 interface UseViewManagementProps {
     aiConfig: AIConfig;
@@ -76,7 +77,7 @@ export const useViewManagement = ({ aiConfig, isDarkMode }: UseViewManagementPro
 
     const handleDeleteView = useCallback((id: string) => {
         if (views.length <= 1) {
-            alert("Cannot delete the last view.");
+            notify("Cannot delete the last view.", 'warning');
             return;
         }
 
@@ -164,7 +165,7 @@ export const useViewManagement = ({ aiConfig, isDarkMode }: UseViewManagementPro
             });
         } catch (e) {
             console.error("Tapestry Generation Error", e);
-            alert("Failed to generate tapestry.");
+            notify("Failed to generate tapestry.", 'error');
         } finally {
             setIsGeneratingTapestry(false);
         }

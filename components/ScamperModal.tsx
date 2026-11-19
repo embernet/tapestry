@@ -5,6 +5,7 @@ import { generateUUID, callAI } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
 import { promptStore } from '../services/PromptStore';
+import { notify } from '../services/dialogs';
 
 interface ScamperModalProps {
   isOpen: boolean;
@@ -189,7 +190,7 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
 
       } catch (e) { 
           console.error("SCAMPER generation failed", e); 
-          alert("Failed to generate ideas. Please try again."); 
+          notify("Failed to generate ideas. Please try again.", 'error'); 
       } finally { 
           setIsLoading(false); 
       }
@@ -258,7 +259,7 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
           if (sourceEl) {
               handleScamperGenerate(operator.name, operator.letter, sourceEl, false);
           } else {
-              alert("Original source node not found in current model. Cannot regenerate.");
+              notify("Original source node not found in current model. Cannot regenerate.", 'error');
           }
       }
   };
@@ -269,7 +270,7 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
           if (sourceEl) {
               handleScamperGenerate(operator.name, operator.letter, sourceEl, true);
           } else {
-              alert("Original source node not found. Cannot generate more.");
+              notify("Original source node not found. Cannot generate more.", 'error');
           }
       }
   };
@@ -319,7 +320,7 @@ const ScamperModal: React.FC<ScamperModalProps> = ({
           modelActions.moveDocument(newId, folderId!);
           setGeneratedDocId(newId);
       }
-      alert('Saved to Documents!');
+      notify('Saved to Documents!', 'success');
   };
 
   if (!isOpen) return null;

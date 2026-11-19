@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Element, ModelActions, KanbanBoard } from '../types';
+import { notify, confirmDialog } from '../services/dialogs';
 
 interface KanbanPanelProps {
     elements: Element[];
@@ -46,7 +47,7 @@ export const KanbanPanel: React.FC<KanbanPanelProps> = ({
         }
 
         if (board.columns.includes(newName)) {
-            alert(`Column "${newName}" already exists.`);
+            notify(`Column "${newName}" already exists.`, 'warning');
             setEditingColumn(null);
             return;
         }
@@ -440,8 +441,8 @@ export const KanbanPanel: React.FC<KanbanPanelProps> = ({
         }
     };
 
-    const handleDeleteColumn = (colName: string) => {
-        if (confirm(`Delete column "${colName}"? Items will return to Unassigned.`)) {
+    const handleDeleteColumn = async (colName: string) => {
+        if (await confirmDialog({ title: 'Delete column', message: `Delete column "${colName}"? Items will return to Unassigned.`, confirmLabel: 'Delete', danger: true })) {
             // Move items to unassigned
             (groupedData[colName] || []).forEach(el => {
                 modelActions.deleteElementAttribute(el.name, board.attributeKey);

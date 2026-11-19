@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SystemPromptConfig } from '../types';
 import { DEFAULT_SYSTEM_PROMPT_CONFIG } from '../constants';
+import { confirmDialog } from '../services/dialogs';
 
 interface PromptEditorModalProps {
   config: SystemPromptConfig;
@@ -24,8 +25,8 @@ const PromptEditorModal: React.FC<PromptEditorModalProps> = ({ config, onSave, o
     return () => document.removeEventListener('mousedown', listener);
   }, [onClose]);
 
-  const handleResetDefault = () => {
-    if (confirm("Are you sure you want to reset the Default Prompt to its original state?")) {
+  const handleResetDefault = async () => {
+    if (await confirmDialog({ title: 'Reset prompt', message: 'Reset the default prompt to its original text?', confirmLabel: 'Reset' })) {
         setDefaultPrompt(DEFAULT_SYSTEM_PROMPT_CONFIG.defaultPrompt);
     }
   };

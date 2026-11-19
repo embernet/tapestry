@@ -6,6 +6,7 @@ import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
 import { TRIZ_PRINCIPLES_FULL } from '../documentation';
 import { promptStore } from '../services/PromptStore';
+import { notify } from '../services/dialogs';
 
 interface TrizModalProps {
   isOpen: boolean;
@@ -107,7 +108,7 @@ const PrinciplesPanel: React.FC<{ elements: Element[], onGenerate: (principleDat
 
     const handleAutoFillCustom = async () => {
         if (!customName.trim()) {
-            alert("Please enter a name for your custom domain (e.g. 'Culinary', 'Military').");
+            notify("Please enter a name for your custom domain (e.g. 'Culinary', 'Military').", 'warning');
             return;
         }
         setIsAutoFilling(true);
@@ -121,7 +122,7 @@ const PrinciplesPanel: React.FC<{ elements: Element[], onGenerate: (principleDat
             }
         } catch (e) {
             console.error("Auto-fill failed", e);
-            alert("Failed to generate description.");
+            notify("Failed to generate description.", 'error');
         } finally {
             setIsAutoFilling(false);
         }
@@ -516,7 +517,7 @@ const TrizModal: React.FC<TrizModalProps> = ({
             
             setSuggestions(prev => prev.map((s, i) => i === index ? { ...s, status: 'applied' } : s));
         } catch (e) {
-            alert("Failed to apply action. Ensure referenced nodes exist.");
+            notify("Failed to apply action. Ensure referenced nodes exist.", 'error');
         }
     };
 

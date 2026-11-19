@@ -4,6 +4,7 @@ import { SystemPromptConfig, GlobalSettings, AIProvider } from '../types';
 import { AVAILABLE_AI_TOOLS, DEFAULT_SYSTEM_PROMPT_CONFIG, DEFAULT_TOOL_PROMPTS } from '../constants';
 import { useServerSession } from '../services/serverSession';
 import { ServerAiFields } from './ServerAiFields';
+import { confirmDialog } from '../services/dialogs';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -156,8 +157,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       handleModelSettingChange('enabledTools', next);
   };
 
-  const handleResetDefaultPrompt = () => {
-      if (confirm("Reset the core System Prompt to default?")) {
+  const handleResetDefaultPrompt = async () => {
+      if (await confirmDialog({ title: 'Reset prompt', message: 'Reset the core system prompt to its default?', confirmLabel: 'Reset' })) {
           handleModelSettingChange('defaultPrompt', DEFAULT_SYSTEM_PROMPT_CONFIG.defaultPrompt);
       }
   };
@@ -167,8 +168,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       handleModelSettingChange('toolPrompts', { ...currentPrompts, [key]: value });
   };
 
-  const handleResetToolPrompt = (key: string) => {
-      if (confirm(`Reset this prompt to default?`)) {
+  const handleResetToolPrompt = async (key: string) => {
+      if (await confirmDialog({ title: 'Reset prompt', message: 'Reset this prompt to its default?', confirmLabel: 'Reset' })) {
           const currentPrompts = { ...(modelSettings.toolPrompts || DEFAULT_TOOL_PROMPTS) };
           
           // If it is a category base prompt, revert to default constant

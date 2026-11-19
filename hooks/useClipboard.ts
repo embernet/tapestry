@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { Element, Relationship } from '../types';
 import { generateSelectionReport, generateUUID } from '../utils';
+import { notify } from '../services/dialogs';
 
 export const useClipboard = (
     elements: Element[],
@@ -28,15 +29,15 @@ export const useClipboard = (
         
         try { 
             await navigator.clipboard.writeText(textReport); 
-            alert(`Copied ${selectedEls.length} items to clipboard (Text Report). App-data ready for paste.`); 
+            notify(`Copied ${selectedEls.length} items to clipboard (Text Report). App-data ready for paste.`, 'success'); 
         } catch (err) { 
             console.warn("Copy failed", err); 
-            alert("Failed to copy text to system clipboard."); 
+            notify("Failed to copy text to system clipboard.", 'error'); 
         }
     };
   
     const handlePaste = () => {
-        if (!internalClipboard) { alert("Internal clipboard is empty."); return; }
+        if (!internalClipboard) { notify("Internal clipboard is empty.", 'warning'); return; }
         const { elements: pastedElements, relationships: pastedRelationships } = internalClipboard;
         if (pastedElements.length === 0) return;
         

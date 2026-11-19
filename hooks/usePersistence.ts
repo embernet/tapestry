@@ -3,6 +3,11 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { ModelMetadata, ColorScheme, SystemPromptConfig, Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, DateFilterState, PanelLayout, Script, GraphView, KanbanBoard } from '../types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, DEFAULT_TOOL_PROMPTS, CORE_TOOL_IDS } from '../constants';
 import { generateUUID, computeContentHash, isInIframe, createDefaultView } from '../utils';
+import { notify, confirmDialog } from '../services/dialogs';
+
+// File System Access pickers failing at once (blocked or unavailable) are not used again this session.
+const PICKER_MIN_MS = 500;
+let fileSystemPickerBlocked = false;
 
 // Keys
 const MODELS_INDEX_KEY = 'tapestry_models_index';
@@ -384,9 +389,9 @@ export const usePersistence = ({
     }, [handleLoadModel, currentFileHandleRef, safeSetItem]);
 
     const handleDiskSave = useCallback(async () => {
-        if (!currentModelId) { alert("No active model to save."); return; }
+        if (!currentModelId) { notify("No active model to save.", 'warning'); return; }
         const modelMetadata = modelsIndex.find(m => m.id === currentModelId);
-        if (!modelMetadata) { alert("Could not find model metadata to save."); return; }
+        if (!modelMetadata) { notify("Could not find model metadata to save.", 'error'); return; }
         const now = new Date().toISOString();
         const modelData = {
             elements: elementsRef.current,
@@ -413,41 +418,54 @@ export const usePersistence = ({
                 const writable = await currentFileHandleRef.current.createWritable();
                 await writable.write(jsonString);
                 await writable.close();
-            } else if (!isInIframe() && 'showSaveFilePicker' in window) {
-                const options = { suggestedName: updatedMetadata.filename, types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] }, }], };
-                const fileHandle = await (window as any).showSaveFilePicker(options);
-                currentFileHandleRef.current = fileHandle;
-                const writable = await fileHandle.createWritable();
-                await writable.write(jsonString);
-                await writable.close();
             } else {
-                const blob = new Blob([jsonString], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = updatedMetadata.filename!;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+                let saved = false;
+                if (!isInIframe() && 'showSaveFilePicker' in window && !fileSystemPickerBlocked) {
+                    const started = Date.now();
+                    try {
+                        const options = { suggestedName: updatedMetadata.filename, types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] }, }], };
+                        const fileHandle = await (window as any).showSaveFilePicker(options);
+                        currentFileHandleRef.current = fileHandle;
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(jsonString);
+                        await writable.close();
+                        saved = true;
+                    } catch (err: any) {
+                        if (err?.name === 'AbortError' && Date.now() - started >= PICKER_MIN_MS) throw err;   // user cancelled
+                        console.warn("Save picker unavailable; downloading the file instead.", err);
+                        fileSystemPickerBlocked = true;
+                    }
+                }
+                if (!saved) {
+                    const blob = new Blob([jsonString], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = updatedMetadata.filename!;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    notify(`Downloaded ${updatedMetadata.filename}. Your browser saves it in its downloads folder.`, 'info');
+                }
             }
             setModelsIndex(prev => prev.map(m => m.id === currentModelId ? updatedMetadata : m));
             safeSetItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
         } catch (err: any) {
             if (err.name !== 'AbortError') {
                 console.error("Save failed:", err);
-                alert("Failed to save file.");
+                notify("Failed to save file.", 'error');
             }
         }
     }, [currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, kanbanBoards, views, activeViewId, currentFileHandleRef, safeSetItem]);
 
     const handleSaveToGist = useCallback(async () => {
         if (!githubToken) {
-            alert("Please configure your GitHub Token in Settings > General first.");
+            notify("Please configure your GitHub Token in Settings > General first.", 'warning');
             return;
         }
         if (!currentModelId) {
-            alert("No active model to save.");
+            notify("No active model to save.", 'warning');
             return;
         }
 
@@ -516,7 +534,7 @@ export const usePersistence = ({
 
             // Open the new gist
             window.open(gistUrl, '_blank');
-            alert("Successfully saved to GitHub Gist!");
+            notify("Successfully saved to GitHub Gist!", 'success');
 
             // Sync local index
             setModelsIndex(prev => prev.map(m => m.id === currentModelId ? updatedMetadata : m));
@@ -524,7 +542,7 @@ export const usePersistence = ({
 
         } catch (e: any) {
             console.error("Gist Save Error", e);
-            alert(`Failed to save to GitHub: ${e.message}`);
+            notify(`Failed to save to GitHub: ${e.message}`, 'error');
         }
     }, [githubToken, currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, kanbanBoards, views, activeViewId, safeSetItem]);
 
@@ -559,7 +577,7 @@ export const usePersistence = ({
             currentFileHandleRef.current = null;
         } catch (e) {
             console.error("Save As failed", e);
-            alert("Failed to save copy. Local storage might be full.");
+            notify("Failed to save copy. Local storage might be full.", 'error');
         }
     }, [currentModelId, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, kanbanBoards, views, activeViewId, currentFileHandleRef, safeSetItem]);
 
@@ -654,13 +672,24 @@ export const usePersistence = ({
             loadModelData(newModelData, newModelId, newMetadata);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-            alert(`Failed to import file: ${message}`);
+            notify(`Failed to import file: ${message}`, 'error');
             console.error("Import failed:", error);
         }
     }, [modelsIndex, loadModelData]);
 
     const handleImportClick = useCallback(async (fileInputRef: any) => {
-        if (!isInIframe() && 'showOpenFilePicker' in window) {
+        const openFileInput = () => {
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+                fileInputRef.current.click();
+            }
+        };
+        // The File System Access picker is preferred (Save can then write back to the same
+        // file), but a browser may block it: by policy, inside a preview pane, or under
+        // automation. It then fails at once, often with the same AbortError as a user's
+        // Cancel. A real Cancel takes the user longer than PICKER_MIN_MS.
+        if (!isInIframe() && 'showOpenFilePicker' in window && !fileSystemPickerBlocked) {
+            const started = Date.now();
             try {
                 const pickerOptions = { types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }], };
                 const [fileHandle] = await (window as any).showOpenFilePicker(pickerOptions);
@@ -670,17 +699,18 @@ export const usePersistence = ({
                 processImportedData(text, file.name);
                 return;
             } catch (err: any) {
-                if (err.name !== 'AbortError') {
-                    console.warn("File System Access API failed, falling back to input.", err);
-                } else {
-                    return;
+                if (err?.name === 'AbortError' && Date.now() - started >= PICKER_MIN_MS) return;   // user cancelled
+                console.warn("File picker unavailable; using the browser's file chooser instead.", err);
+                fileSystemPickerBlocked = true;
+                // The failed picker used up this click's permission to open a file chooser,
+                // so ask for one more click, which opens it.
+                if (await confirmDialog({ title: 'Open a model', message: "Choose a Tapestry model file (.json) from your computer.", confirmLabel: 'Choose file…' })) {
+                    openFileInput();
                 }
+                return;
             }
         }
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-            fileInputRef.current.click();
-        }
+        openFileInput();
     }, [processImportedData, currentFileHandleRef]);
 
     const handleImportInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -772,18 +802,9 @@ export const usePersistence = ({
         return currentMeta.contentHash !== currentMeta.lastDiskHash;
     }, [modelsIndex, currentModelId]);
 
-    // Warn on window close if unsaved
-    useEffect(() => {
-        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-            if (hasUnsavedChanges) {
-                e.preventDefault();
-                e.returnValue = ''; // Required for Chrome
-            }
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-    }, [hasUnsavedChanges]);
+    // No "Leave site?" prompt on close (app rule: no browser dialogs). The model is
+    // kept in local storage as it changes; the header's save icon shows when it
+    // differs from the file on disk.
 
     const handleExitRequest = useCallback(() => {
         if (hasUnsavedChanges) {

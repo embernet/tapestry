@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ScriptEngine, ScriptParser, RuntimeContext } from '../services/ScriptEngine';
 import { toolRegistry } from '../services/ToolRegistry';
+import { notify } from '../services/dialogs';
 
 interface BulkEditToolbarProps {
     onOpenPanel: () => void;
@@ -34,7 +35,7 @@ const BulkEditToolbar: React.FC<BulkEditToolbarProps> = ({
 
             if (parser.error) {
                 console.error("Script Syntax Error:", parser.error);
-                alert(`Script Error: ${parser.error}`);
+                notify(`Script Error: ${parser.error}`, 'error');
                 return;
             }
 
@@ -50,12 +51,12 @@ const BulkEditToolbar: React.FC<BulkEditToolbarProps> = ({
             }
 
             if (ctx.status === 'error') {
-                alert('Script execution failed. Check console for details.');
+                notify('Script execution failed. Check console for details.', 'error');
             }
 
         } catch (e: any) {
             console.error("Execution Error:", e);
-            alert(`Error: ${e.message}`);
+            notify(`Error: ${e.message}`, 'error');
         } finally {
             setLoadingScript(null);
             // Close menu after run

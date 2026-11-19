@@ -1,5 +1,6 @@
 
 import React from 'react';
+import { notify } from '../services/dialogs';
 
 interface ScamperToolbarProps {
     selectedElementId: string | null;
@@ -31,7 +32,7 @@ const ScamperToolbar: React.FC<ScamperToolbarProps> = ({
 
     const handleOpClick = (op: typeof SCAMPER_OPS[0]) => {
         if (!selectedElementId) {
-            alert("Please select a node first to apply SCAMPER.");
+            notify("Please select a node first to apply SCAMPER.", 'warning');
             return;
         }
         onScamper(op.name, op.letter);

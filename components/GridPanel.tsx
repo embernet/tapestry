@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import * as d3Import from 'd3';
 import { Element, ColorScheme } from '../types';
 import { DEFAULT_NODE_COLOR } from '../constants';
+import { notify } from '../services/dialogs';
 
 const d3: any = d3Import;
 
@@ -89,10 +90,10 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
       
       const csvContent = [headers.join(','), ...rows].join('\n');
       navigator.clipboard.writeText(csvContent).then(() => {
-          alert("CSV data copied to clipboard!");
+          notify("CSV data copied to clipboard!", 'success');
       }).catch(err => {
           console.error("Failed to copy CSV", err);
-          alert("Failed to copy to clipboard.");
+          notify("Failed to copy to clipboard.", 'error');
       });
   };
 
@@ -136,7 +137,7 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
                           navigator.clipboard.write([
                               new ClipboardItem({ "image/png": blob })
                           ]).then(() => {
-                              alert("Image copied to clipboard!");
+                              notify("Image copied to clipboard!", 'success');
                           }).catch((e) => {
                               // Fallback for browsers that don't support clipboard write
                               const a = document.createElement('a');
@@ -153,7 +154,7 @@ const GridPanel: React.FC<GridPanelProps> = ({ elements, activeColorScheme, onCl
 
       } catch (e) {
           console.error("Error exporting image", e);
-          alert("Failed to create image.");
+          notify("Failed to create image.", 'error');
       }
   };
 

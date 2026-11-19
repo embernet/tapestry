@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { isInIframe } from '../utils';
+import { notify } from '../services/dialogs';
 
 interface MarkdownPanelProps {
   initialText: string;
@@ -150,7 +151,7 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
             }
         } catch (error) {
             console.error("Markdown import failed:", error);
-            alert(`Failed to import file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            notify(`Failed to import file: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
         } finally {
             if (importFileRef.current) {
                 importFileRef.current.value = '';

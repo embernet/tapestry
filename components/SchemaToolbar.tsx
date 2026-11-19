@@ -4,6 +4,7 @@ import { ColorScheme, Element, RelationshipDefinition } from '../types';
 import { generateUUID } from '../utils';
 import { DEFAULT_COLOR_SCHEMES } from '../constants';
 import ListEditor from './ListEditor';
+import { notify, confirmDialog } from '../services/dialogs';
 
 interface SchemaToolbarProps {
     schemes: ColorScheme[];
@@ -176,12 +177,12 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
         setIsQuickDefaultsOpen(false);
     };
 
-    const handleDeleteScheme = () => {
+    const handleDeleteScheme = async () => {
         if (schemes.length <= 1) {
-            alert("Cannot delete the last schema.");
+            notify("Cannot delete the last schema.", 'warning');
             return;
         }
-        if (editingSchemeId && confirm("Are you sure you want to delete this schema?")) {
+        if (editingSchemeId && await confirmDialog({ title: 'Delete schema', message: 'Delete this schema?', confirmLabel: 'Delete', danger: true })) {
             const remaining = schemes.filter(s => s.id !== editingSchemeId);
             onUpdateSchemes(remaining);
             setEditingSchemeId(remaining[0].id);
@@ -209,7 +210,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const json = JSON.parse(e.target?.result as string) as ColorScheme;
                 if (!json.name || !json.tagColors) {
@@ -220,7 +221,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                 const existing = schemes.find(s => s.name === json.name);
 
                 if (existing) {
-                    if (confirm(`A schema named "${json.name}" already exists. Update it?`)) {
+                    if (await confirmDialog({ title: 'Schema exists', message: `A schema named "${json.name}" already exists. Update it?`, confirmLabel: 'Update' })) {
                         // Update existing
                         const updatedSchemes = schemes.map(s => s.id === existing.id ? { ...json, id: existing.id } : s);
                         onUpdateSchemes(updatedSchemes);
@@ -237,7 +238,7 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
                 }
             } catch (error) {
                 console.error("Import failed", error);
-                alert("Failed to import schema. Please ensure the file is a valid JSON schema export.");
+                notify("Failed to import schema. Please ensure the file is a valid JSON schema export.", 'error');
             } finally {
                 if (fileInputRef.current) fileInputRef.current.value = '';
             }
@@ -251,12 +252,12 @@ const SchemaToolbar: React.FC<SchemaToolbarProps> = ({
         );
 
         if (missing.length === 0) {
-            alert("All standard schemas are already present.");
+            notify("All standard schemas are already present.", 'warning');
             return;
         }
 
         onUpdateSchemes([...schemes, ...missing]);
-        alert(`Added ${missing.length} standard schemas.`);
+        notify(`Added ${missing.length} standard schemas.`, 'success');
     };
 
     // Tag Operations

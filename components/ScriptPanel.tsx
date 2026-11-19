@@ -7,6 +7,7 @@ import { toolEventBus } from '../services/ToolEventBus';
 import { DEFAULT_SNIPPETS, TSCRIPT_DOCS } from '../constants';
 import { generateUUID, callAI, AIConfig } from '../utils';
 import { Type } from '@google/genai';
+import { confirmDialog, promptDialog } from '../services/dialogs';
 
 interface ScriptPanelProps {
     isOpen: boolean;
@@ -153,10 +154,10 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
     }, [activeScriptId, scripts]);
 
     // Manual Save Handler
-    const handleManualSave = () => {
+    const handleManualSave = async () => {
         if (!activeScriptId) {
             // New Script
-            const name = prompt("Enter script name:");
+            const name = await promptDialog({ title: 'Save script', message: 'Script name', confirmLabel: 'Save' });
             if (!name) return;
             const newId = onCreateScript(name, code);
             if (typeof newId === 'string') {
@@ -386,8 +387,8 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
     };
 
 
-    const handleDelete = () => {
-        if (activeScriptId && confirm("Delete this script?")) {
+    const handleDelete = async () => {
+        if (activeScriptId && await confirmDialog({ title: 'Delete script', message: 'Delete this script?', confirmLabel: 'Delete', danger: true })) {
             onDeleteScript(activeScriptId);
             setActiveScriptId(null);
             setCode('');
@@ -418,7 +419,7 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
         }, 0);
     };
 
-    const handleAddSnippet = () => {
+    const handleAddSnippet = async () => {
         let snippetCode = '';
 
         // Use selected text if available
@@ -426,14 +427,14 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
             snippetCode = code.substring(textAreaRef.current.selectionStart, textAreaRef.current.selectionEnd);
         }
 
-        const name = prompt("Enter snippet name:");
+        const name = await promptDialog({ title: 'New snippet', message: 'Snippet name', confirmLabel: 'Next' });
         if (!name) return;
 
-        const desc = prompt("Enter description (optional):") || "";
+        const desc = (await promptDialog({ title: 'New snippet', message: 'Description (optional)', confirmLabel: 'Next' })) || "";
         if (!snippetCode) {
             // If no selection, check clipboard or prompt
             // Simple prompt for now
-            const userCode = prompt("Enter snippet code (or paste):");
+            const userCode = await promptDialog({ title: 'New snippet', message: 'Snippet code (type or paste)', multiline: true, confirmLabel: 'Add snippet' });
             if (userCode) snippetCode = userCode;
             else return;
         }
@@ -449,8 +450,8 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
         setSnippets(prev => [...prev, newSnippet]);
     };
 
-    const handleDeleteSnippet = (id: string) => {
-        if (confirm("Delete this snippet?")) {
+    const handleDeleteSnippet = async (id: string) => {
+        if (await confirmDialog({ title: 'Delete snippet', message: 'Delete this snippet?', confirmLabel: 'Delete', danger: true })) {
             setSnippets(prev => prev.filter(s => s.id !== id));
         }
     };

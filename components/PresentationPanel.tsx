@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { StorySlide } from '../types';
 import { generateUUID } from '../utils';
+import { confirmDialog } from '../services/dialogs';
 
 interface PresentationPanelProps {
   slides: StorySlide[];
@@ -31,8 +32,8 @@ const PresentationPanel: React.FC<PresentationPanelProps> = ({ slides, onSlidesC
       }
   };
 
-  const handleDelete = (id: string) => {
-      if (confirm("Delete this slide?")) {
+  const handleDelete = async (id: string) => {
+      if (await confirmDialog({ title: 'Delete slide', message: 'Delete this slide?', confirmLabel: 'Delete', danger: true })) {
           onSlidesChange(slides.filter(s => s.id !== id));
       }
   };

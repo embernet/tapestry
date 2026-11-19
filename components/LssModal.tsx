@@ -6,6 +6,7 @@ import { generateMarkdownFromGraph, AIConfig, callAI } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
+import { notify } from '../services/dialogs';
 
 interface LssModalProps {
   isOpen: boolean;
@@ -534,7 +535,7 @@ const LssModal: React.FC<LssModalProps> = ({ isOpen, activeTool, elements, relat
           
           setSuggestions(prev => prev.map((s, i) => i === index ? { ...s, status: 'applied' } : s));
       } catch (e) {
-          alert("Failed to apply action. Ensure referenced nodes exist.");
+          notify("Failed to apply action. Ensure referenced nodes exist.", 'error');
       }
   };
 

@@ -3,6 +3,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Element, Relationship, CsvColumnConfig, CsvColumnMappingType, RelationshipDirection } from '../types';
 import { parseCSV, generateCSV, guessColumnMapping } from '../utils/csvParser';
 import { generateUUID, normalizeTag } from '../utils';
+import { notify } from '../services/dialogs';
 
 interface CsvToolModalProps {
     isOpen: boolean;
@@ -348,11 +349,11 @@ export const CsvToolModal: React.FC<CsvToolModalProps> = ({
 
             // Basic Validation
             if (currentMode === 'nodes' && !fileData.columnConfigs.some(c => c.mappingType === 'name')) {
-                alert(`Skipping ${fileData.file.name}: Missing 'Name' column.`);
+                notify(`Skipping ${fileData.file.name}: Missing 'Name' column.`, 'warning');
                 continue;
             }
             if (currentMode === 'edges' && (!fileData.columnConfigs.some(c => c.mappingType === 'source') || !fileData.columnConfigs.some(c => c.mappingType === 'target'))) {
-                alert(`Skipping ${fileData.file.name}: Missing Source/Target columns.`);
+                notify(`Skipping ${fileData.file.name}: Missing Source/Target columns.`, 'warning');
                 continue;
             }
 
@@ -385,7 +386,7 @@ export const CsvToolModal: React.FC<CsvToolModalProps> = ({
             onImport(finalNodes, finalRels, mergeMode, selectAfterImport);
             onClose();
         } else {
-            alert("No valid data found to import from selected files.");
+            notify("No valid data found to import from selected files.", 'error');
         }
     };
 

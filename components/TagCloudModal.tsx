@@ -4,6 +4,7 @@ import { Element, Relationship } from '../types';
 import { AIConfig, callAI, formatTag } from '../utils';
 import { Type } from '@google/genai';
 import { promptStore } from '../services/PromptStore';
+import { notify } from '../services/dialogs';
 
 interface TagCloudPanelProps {
   mode: 'tags' | 'nodes' | 'words' | 'full_text';
@@ -342,7 +343,7 @@ export const TagCloudPanel: React.FC<TagCloudPanelProps> = ({ mode, elements, re
 
         } catch (e) {
             console.error("Transformation failed", e);
-            alert("Failed to transform words. Please try again.");
+            notify("Failed to transform words. Please try again.", 'error');
         } finally {
             setIsLoading(false);
         }

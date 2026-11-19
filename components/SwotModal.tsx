@@ -6,6 +6,7 @@ import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
 import { promptStore } from '../services/PromptStore';
+import { notify } from '../services/dialogs';
 
 interface SwotModalProps {
   isOpen: boolean;
@@ -553,7 +554,7 @@ const SwotModal: React.FC<SwotModalProps> = ({
           modelActions.moveDocument(newId, folderId!);
           setGeneratedDocId(newId);
       }
-      alert('Saved to Documents!');
+      notify('Saved to Documents!', 'success');
   };
 
   const handleSaveReport = (onlySelected: boolean) => {
@@ -562,7 +563,7 @@ const SwotModal: React.FC<SwotModalProps> = ({
       if (onlySelected) {
           const hasSelection = activeConfig.categories.some(cat => (matrixData[cat.id] || []).some(i => i.selected));
           if (!hasSelection) {
-              alert("No items selected.");
+              notify("No items selected.", 'warning');
               return;
           }
       }
@@ -581,7 +582,7 @@ const SwotModal: React.FC<SwotModalProps> = ({
       const newId = modelActions.createDocument(title, content, 'text');
       modelActions.moveDocument(newId, folderId!);
       
-      alert(`Report saved to Documents: ${title}`);
+      notify(`Report saved to Documents: ${title}`, 'success');
   };
 
   const handleMatrixAI = async (targetCategoryId?: string) => {
@@ -680,7 +681,7 @@ const SwotModal: React.FC<SwotModalProps> = ({
 
       } catch (e) {
           console.error("Matrix AI Error", e);
-          alert("Failed to generate analysis.");
+          notify("Failed to generate analysis.", 'error');
       } finally {
           setIsLoading(false);
       }
@@ -708,10 +709,10 @@ const SwotModal: React.FC<SwotModalProps> = ({
       });
 
       if (actionsCount > 0) {
-          alert(`Created ${actionsCount} new nodes from analysis.`);
+          notify(`Created ${actionsCount} new nodes from analysis.`, 'success');
           onClose();
       } else {
-          alert("No entries selected. Tick the checkboxes of the items you want to add to the graph.");
+          notify("No entries selected. Tick the checkboxes of the items you want to add to the graph.", 'warning');
       }
   };
 
@@ -756,8 +757,8 @@ const SwotModal: React.FC<SwotModalProps> = ({
 
   const handleSaveCustomTool = () => {
       if (!editingTool || !onSaveCustomStrategies || !customStrategies) return;
-      if (!editingTool.name.trim()) { alert("Please provide a name for the tool."); return; }
-      if (editingTool.categories.length === 0) { alert("Please add at least one category."); return; }
+      if (!editingTool.name.trim()) { notify("Please provide a name for the tool.", 'warning'); return; }
+      if (editingTool.categories.length === 0) { notify("Please add at least one category.", 'warning'); return; }
 
       // Check for updates vs new
       const existingIdx = customStrategies.findIndex(s => s.id === editingTool.id);
@@ -792,10 +793,10 @@ const SwotModal: React.FC<SwotModalProps> = ({
               if (json.name && json.categories) {
                   setEditingTool({ ...json, id: generateUUID() }); // Force new ID on import
               } else {
-                  alert("Invalid tool definition.");
+                  notify("Invalid tool definition.", 'error');
               }
           } catch (err) {
-              alert("Failed to parse JSON.");
+              notify("Failed to parse JSON.", 'error');
           }
       };
       reader.readAsText(file);

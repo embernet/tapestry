@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { isInIframe } from '../utils';
+import { notify } from '../services/dialogs';
 
 interface JSONPanelProps {
   initialData: any;
@@ -23,7 +24,7 @@ const JSONPanel: React.FC<JSONPanelProps> = ({ initialData, onApply, onClose, mo
       const parsed = JSON.parse(text);
       onApply(parsed);
     } catch (e) {
-      alert(`Invalid JSON: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      notify(`Invalid JSON: ${e instanceof Error ? e.message : 'Unknown error'}`, 'error');
     }
   };
 
@@ -80,7 +81,7 @@ const JSONPanel: React.FC<JSONPanelProps> = ({ initialData, onApply, onClose, mo
             setText(fileContent);
         } catch (error) {
             console.error("JSON import failed:", error);
-            alert(`Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            notify(`Failed to read file: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
         } finally {
             if (importFileRef.current) {
                 importFileRef.current.value = '';

@@ -1,14 +1,14 @@
 'use strict';
 // House rule: in-page controls for every message and question, never the
-// browser's alert/confirm/prompt dialogs. The server side is clean; the React
-// front end still has legacy calls (being replaced), so for now this test only
-// fails on new ones: files not in LEGACY, or more calls than recorded there.
+// browser's alert/confirm/prompt dialogs or a beforeunload "Leave site?" prompt.
+// Use services/dialogs.ts (notify / confirmDialog / promptDialog) instead.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const BANNED = /\b(?:window\.)?(?:alert|confirm|prompt)\s*\(|onbeforeunload|addEventListener\(\s*['"]beforeunload/;
+// alert( / window.alert( etc., but not someObject.prompt( (the Tapestry script API's ai.prompt).
+const BANNED = /(?:^|[^.\w])(?:alert|confirm|prompt)\s*\(|window\.(?:alert|confirm|prompt)\s*\(|onbeforeunload|addEventListener\(\s*['"]beforeunload/;
 const root = path.join(__dirname, '..');
 
 function files(dir) {
@@ -21,20 +21,17 @@ function files(dir) {
 function hits() {
   const out = {};
   for (const f of files(root)) {
-    fs.readFileSync(f, 'utf8').split('\n').forEach((line) => {
+    fs.readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
       if (BANNED.test(line) && !/^\s*(\/\/|\*)/.test(line)) {
         const k = path.relative(root, f);
-        out[k] = (out[k] || 0) + 1;
+        (out[k] = out[k] || []).push(`line ${i + 1}: ${line.trim().slice(0, 120)}`);
       }
     });
   }
   return out;
 }
 
-const LEGACY = JSON.parse(fs.readFileSync(path.join(__dirname, 'browser-dialogs-legacy.json'), 'utf8'));
-
-test('no new browser dialogs', () => {
-  const now = hits();
-  const worse = Object.entries(now).filter(([f, n]) => n > (LEGACY[f] || 0)).map(([f, n]) => `${f}: ${n} (allowed ${LEGACY[f] || 0})`);
-  assert.deepEqual(worse, [], "use the app's own toast/confirm instead of alert/confirm/prompt");
+test('no browser dialogs in front-end or server code', () => {
+  const found = hits();
+  assert.deepEqual(found, {}, "use notify / confirmDialog / promptDialog from services/dialogs.ts");
 });

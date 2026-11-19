@@ -6,6 +6,7 @@ import { useChatLogic } from './ChatPanel/useChatLogic';
 import { usePlanExecution } from './ChatPanel/usePlanExecution';
 import { ChatMessageItem } from './ChatPanel/ChatMessageItem';
 import { ChatInput } from './ChatPanel/ChatInput';
+import { confirmDialog } from '../services/dialogs';
 
 const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     // Destructure strict props
@@ -105,8 +106,8 @@ const ChatPanel: React.FC<ChatPanelProps> = (props) => {
     useEffect(scrollToBottom, [messages.length, activePlan]); // Optimized dependency
 
     // Clear Chat
-    const handleClearChat = () => {
-        if (confirm("Are you sure you want to start a new chat? This will clear all history.")) {
+    const handleClearChat = async () => {
+        if (await confirmDialog({ title: 'New chat', message: 'Start a new chat? This clears the current conversation.', confirmLabel: 'New chat', danger: true })) {
             setMessages([]);
             handleDiscardPlan();
             setActionDecisions({});

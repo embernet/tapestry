@@ -24,6 +24,7 @@ import { useTools } from './hooks/useTools';
 import { useClickOutside } from './hooks/useClickOutside';
 import AppHeader from './components/AppHeader';
 import SessionBar from './components/SessionBar';
+import DialogHost from './components/DialogHost';
 import { useSelfTest } from './hooks/useSelfTest';
 import { usePersistence } from './hooks/usePersistence';
 import { GuidancePanel } from './components/GuidancePanel';
@@ -62,6 +63,7 @@ import { useRandomWalk } from './hooks/useRandomWalk';
 import { useKanban } from './hooks/useKanban';
 import { useClipboard } from './hooks/useClipboard';
 import { useSearch } from './hooks/useSearch';
+import { notify, confirmDialog, promptDialog } from './services/dialogs';
 
 type Coords = { x: number; y: number };
 
@@ -461,7 +463,7 @@ export default function App() {
             e.tags = e.tags.map(normalizeTag);
             if (e.x === undefined) { const angle = (count * 0.5) + Math.random(); const radius = 100 + (5 * count); e.x = centerX + radius * Math.cos(angle); e.y = centerY + radius * Math.sin(angle); e.fx = e.x; e.fy = e.y; count++; }
         });
-        if (mode === 'replace') { setElements(newElements); setRelationships(newRelationships); alert(`Imported ${newElements.length} nodes and ${newRelationships.length} relationships (Replaced existing model).`); } else { setElements(prev => { const prevMap = new Map(prev.map(e => [e.id, e])); newElements.forEach(e => prevMap.set(e.id, e)); return Array.from(prevMap.values()); }); setRelationships(prev => [...prev, ...newRelationships]); alert(`Imported/Merged ${newElements.length} nodes and ${newRelationships.length} relationships.`); }
+        if (mode === 'replace') { setElements(newElements); setRelationships(newRelationships); notify(`Imported ${newElements.length} nodes and ${newRelationships.length} relationships (Replaced existing model).`, 'success'); } else { setElements(prev => { const prevMap = new Map(prev.map(e => [e.id, e])); newElements.forEach(e => prevMap.set(e.id, e)); return Array.from(prevMap.values()); }); setRelationships(prev => [...prev, ...newRelationships]); notify(`Imported/Merged ${newElements.length} nodes and ${newRelationships.length} relationships.`, 'success'); }
         if (selectAfterImport && newElements.length > 0) { const newIds = new Set(newElements.map(e => e.id)); setMultiSelection(newIds); setSelectedElementId(null); }
     }, []);
 
@@ -517,8 +519,8 @@ export default function App() {
         handleOpenDocument(newDoc.id);
     }, [handleOpenDocument]);
 
-    const handleDeleteDocument = useCallback((docId: string) => { if (confirm("Delete this document?")) { setDocuments(prev => prev.filter(d => d.id !== docId)); setOpenDocIds(prev => prev.filter(id => id !== docId)); } }, []);
-    const handleDeleteFolder = useCallback((folderId: string) => { if (confirm("Delete this folder and all its contents?")) { setFolders(prev => prev.filter(f => f.id !== folderId)); setDocuments(prev => prev.filter(d => d.folderId !== folderId)); } }, []);
+    const handleDeleteDocument = useCallback(async (docId: string) => { if (await confirmDialog({ title: 'Delete document', message: 'Delete this document?', confirmLabel: 'Delete', danger: true })) { setDocuments(prev => prev.filter(d => d.id !== docId)); setOpenDocIds(prev => prev.filter(id => id !== docId)); } }, []);
+    const handleDeleteFolder = useCallback(async (folderId: string) => { if (await confirmDialog({ title: 'Delete folder', message: 'Delete this folder and everything in it?', confirmLabel: 'Delete', danger: true })) { setFolders(prev => prev.filter(f => f.id !== folderId)); setDocuments(prev => prev.filter(d => d.folderId !== folderId)); } }, []);
     const handleUpdateDocument = useCallback((docId: string, updates: Partial<TapestryDocument>) => { setDocuments(prev => prev.map(d => d.id === docId ? { ...d, ...updates, updatedAt: new Date().toISOString() } : d)); }, []);
     const handleCloseContextMenu = useCallback(() => setContextMenu(null), []);
     const handleCloseCanvasContextMenu = useCallback(() => setCanvasContextMenu(null), []);
@@ -588,7 +590,7 @@ export default function App() {
     const handleOpenCommandHistory = useCallback(() => { const cmdFolder = foldersRef.current.find(f => f.name === "CMD" && !f.parentId); let folderId = cmdFolder?.id; if (!folderId) { const id = generateUUID(); const newFolder: TapestryFolder = { id, name: "CMD", parentId: null, createdAt: new Date().toISOString() }; setFolders(prev => [...prev, newFolder]); foldersRef.current.push(newFolder); folderId = id; } let historyDoc = documentsRef.current.find(d => d.folderId === folderId && d.title === "History"); let docId = historyDoc?.id; if (!historyDoc) { docId = generateUUID(); const newDoc: TapestryDocument = { id: docId, title: "History", content: "# Command History\n", folderId: folderId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }; setDocuments(prev => [...prev, newDoc]); documentsRef.current.push(newDoc); } if (docId) { handleOpenDocument(docId, 'report'); } }, [handleOpenDocument]);
     const handleCommandExecution = useCallback((markdown: string) => { handleApplyMarkdown(markdown, true); const timestamp = new Date().toLocaleString(); const logEntry = `\n\n[${timestamp}] \`${markdown}\``; let cmdFolder = foldersRef.current.find(f => f.name === "CMD" && !f.parentId); let folderId = cmdFolder?.id; if (!folderId) { folderId = generateUUID(); const newFolder: TapestryFolder = { id: folderId, name: "CMD", parentId: null, createdAt: new Date().toISOString() }; setFolders(prev => [...prev, newFolder]); foldersRef.current.push(newFolder); } setDocuments(prev => { const historyDoc = prev.find(d => d.folderId === folderId && d.title === "History"); if (historyDoc) { return prev.map(d => d.id === historyDoc.id ? { ...d, content: (d.content || "") + logEntry, updatedAt: new Date().toISOString() } : d); } else { return [...prev, { id: generateUUID(), title: "History", content: `# Command History${logEntry}`, folderId: folderId!, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }]; } }); }, [handleApplyMarkdown]);
     const handleImportInputChangeWrapper = useCallback((event: React.ChangeEvent<HTMLInputElement>) => { persistence.handleImportInputChange(event); }, [persistence]);
-    const handleApplyJSONWrapper = useCallback((data: any) => { try { if (data.elements && Array.isArray(data.elements)) setElements(data.elements); if (data.relationships && Array.isArray(data.relationships)) setRelationships(data.relationships); if (data.colorSchemes && Array.isArray(data.colorSchemes)) setColorSchemes(persistence.migrateLegacySchemes(data.colorSchemes).schemes); panelState.setIsJSONPanelOpen(false); } catch (e) { alert("Failed to apply JSON data"); } }, [persistence, panelState]);
+    const handleApplyJSONWrapper = useCallback((data: any) => { try { if (data.elements && Array.isArray(data.elements)) setElements(data.elements); if (data.relationships && Array.isArray(data.relationships)) setRelationships(data.relationships); if (data.colorSchemes && Array.isArray(data.colorSchemes)) setColorSchemes(persistence.migrateLegacySchemes(data.colorSchemes).schemes); panelState.setIsJSONPanelOpen(false); } catch (e) { notify("Failed to apply JSON data", 'error'); } }, [persistence, panelState]);
     const handleSaveAsImage = useCallback(() => { if (graphCanvasRef.current) { const filename = `${persistence.currentModelName.replace(/ /g, '_')}_view.png`; const bgColor = isDarkMode ? '#111827' : '#f9fafb'; graphCanvasRef.current.exportAsImage(filename, bgColor); setCanvasContextMenu(null); } }, [persistence.currentModelName, isDarkMode]);
     const handleOpenKanban = useCallback(() => { if (!panelState.isKanbanPanelOpen) { const headerHeight = document.getElementById('app-header-container')?.offsetHeight || 64; const height = window.innerHeight - headerHeight; openPanelAt('kanban', { w: window.innerWidth, h: height, x: 0, y: 0 }); panelState.setIsKanbanPanelOpen(true); } else { panelState.setIsKanbanPanelOpen(false); } }, [panelState, openPanelAt]);
 
@@ -781,6 +783,7 @@ export default function App() {
         <div className="w-screen h-screen overflow-hidden flex flex-col relative">
             <input type="file" ref={importFileRef} onChange={handleImportInputChangeWrapper} accept=".json" className="hidden" />
             <SessionBar isDarkMode={isDarkMode} hidden={isPresenting} />
+            <DialogHost isDarkMode={isDarkMode} />
             {isPresenting && (
                 <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[3000] bg-gray-900/90 border border-gray-600 rounded-lg px-6 py-3 shadow-2xl flex items-center gap-4 text-white animate-fade-in-down">
                     <button onClick={() => { if (currentSlideIndex !== null && currentSlideIndex > 0) setCurrentSlideIndex(currentSlideIndex - 1); }} disabled={currentSlideIndex === 0} className="text-gray-400 hover:text-white disabled:opacity-30"><svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
@@ -863,17 +866,17 @@ export default function App() {
                         <>
                             <GraphCanvas ref={graphCanvasRef} elements={filteredElements} relationships={filteredRelationships} onNodeClick={handleNodeClick} onLinkClick={handleLinkClick} onCanvasClick={handleCanvasClickWrapper} onCanvasDoubleClick={handleAddElement} onNodeContextMenu={handleNodeContextMenu} onLinkContextMenu={handleLinkContextMenu} onCanvasContextMenu={handleCanvasContextMenu} onNodeConnect={handleNodeConnect} onNodeConnectToNew={handleNodeConnectToNew} activeColorScheme={activeColorScheme} selectedElementId={selectedElementId} setSelectedElementId={setSelectedElementId} multiSelection={multiSelection} setMultiSelection={setMultiSelection} selectedRelationshipId={selectedRelationshipId} focusMode={focusMode} setElements={setElements} onNodeMove={handleNodeMove} isPhysicsModeActive={isPhysicsModeActive} layoutParams={layoutParams} onJiggleTrigger={jiggleTrigger} isBulkEditActive={isBulkEditActive} isSimulationMode={isSimulationMode} simulationState={simulationState} analysisHighlights={analysisHighlights} isDarkMode={isDarkMode} nodeShape={nodeShape} isHighlightToolActive={isHighlightToolActive} />
                             <ContextMenus contextMenu={contextMenu} relationshipContextMenu={relationshipContextMenu} canvasContextMenu={canvasContextMenu} relationships={relationships} panelState={panelState} persistence={persistence} onCloseContextMenu={handleCloseContextMenu} onCloseRelationshipContextMenu={handleCloseRelationshipContextMenu} onCloseCanvasContextMenu={handleCloseCanvasContextMenu} onDeleteElement={handleDeleteElement} onAddRelationshipFromContext={(id) => { setPanelStateUI({ view: 'addRelationship', sourceElementId: id, targetElementId: null, isNewTarget: false }); setSelectedElementId(null); setMultiSelection(new Set()); setSelectedRelationshipId(null); }} onDeleteRelationship={handleDeleteRelationship} onChangeRelationshipDirection={handleChangeRelationshipDirection} onZoomToFit={handleZoomToFit} onAutoLayout={handleStaticLayout} onSaveAsImage={handleSaveAsImage} importFileRef={importFileRef} isDarkMode={isDarkMode} onToggleNodeHighlight={handleToggleNodeHighlight} elements={elements} onHideFromView={handleHideFromView} multiSelection={multiSelection} onAddToKanban={handleAddToKanbanWrapper} onRemoveFromKanban={handleRemoveFromKanbanWrapper} onMoveToBoard={handleMoveToBoardWrapper} onCreateBoardAndMove={handleCreateBoardAndMoveWrapper} onCreateBoardAndAdd={handleCreateBoardAndAddWrapper} onMoveToColumn={handleMoveToColumnWrapper} kanbanBoards={persistence.kanbanBoards} activeKanbanBoardId={activeKanbanBoardId}
-                                onAddLink={(id) => {
+                                onAddLink={async (id) => {
                                     const element = elements.find(e => e.id === id);
                                     if (!element) return;
-                                    const url = window.prompt("Enter URL:", "");
+                                    const url = await promptDialog({ title: 'Add link', message: 'URL', placeholder: 'https://…', confirmLabel: 'Add' });
                                     if (url !== null) {
                                         const newAttributes = { ...(element.attributes || {}) };
                                         if (url) newAttributes.url = url;
                                         handleUpdateElement({ ...element, attributes: newAttributes });
                                     }
                                 }}
-                                onEditLink={(id) => {
+                                onEditLink={async (id) => {
                                     const element = elements.find(e => e.id === id);
                                     if (!element) return;
                                     let currentUrl = '';
@@ -881,7 +884,7 @@ export default function App() {
                                         const key = Object.keys(element.attributes).find(k => k.toLowerCase() === 'url');
                                         if (key) currentUrl = element.attributes[key];
                                     }
-                                    const url = window.prompt("Edit URL:", currentUrl);
+                                    const url = await promptDialog({ title: 'Edit link', message: 'URL (leave empty to remove the link)', defaultValue: currentUrl, placeholder: 'https://…', confirmLabel: 'Save' });
                                     if (url !== null) {
                                         const newAttributes = { ...(element.attributes || {}) };
                                         // Case-insensitive removal

@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Element, Relationship, RelationshipDirection, ColorScheme } from '../types';
 import ElementEditor from './ElementEditor';
+import { notify } from '../services/dialogs';
 
 // Define a type for the data needed to create a new element.
 type NewElementData = Omit<Element, 'id' | 'createdAt' | 'updatedAt'>;
@@ -119,14 +120,14 @@ const AddRelationshipPanel: React.FC<AddRelationshipPanelProps> = ({
       // Manual Create Mode
       if (isNewTarget && targetElementId) {
         if (!elementEditorData.name?.trim()) {
-          alert("Please provide a name for the new element.");
+          notify("Please provide a name for the new element.", 'warning');
           return;
         }
         onUpdateElement(elementEditorData as Element);
         onCreate({ source: sourceElement.id, target: targetElementId, label: label.trim(), direction });
       } else if (selectedTargetId === 'NEW_ELEMENT') {
         if (!elementEditorData.name?.trim()) {
-          alert("Please provide a name for the new element.");
+          notify("Please provide a name for the new element.", 'warning');
           return;
         }
         onCreate(
