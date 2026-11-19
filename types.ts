@@ -152,7 +152,8 @@ export interface SystemPromptConfig {
   toolPrompts?: Record<string, string>;
 }
 
-export type AIProvider = 'gemini' | 'openai' | 'anthropic' | 'grok' | 'ollama' | 'custom';
+// 'server': the Tapestry server's shared key (server/ai.js); the page never holds that key.
+export type AIProvider = 'gemini' | 'openai' | 'anthropic' | 'grok' | 'ollama' | 'custom' | 'server';
 
 export interface AIConnection {
   provider: AIProvider;

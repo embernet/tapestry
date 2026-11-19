@@ -1,7 +1,8 @@
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { GlobalSettings, SystemPromptConfig, AIConfig, CustomStrategyTool } from '../types';
 import { DEFAULT_SYSTEM_PROMPT_CONFIG, DEFAULT_TOOL_PROMPTS } from '../constants';
+import { useServerSession, SERVER_AI_BASE_URL } from '../services/serverSession';
 
 const GLOBAL_SETTINGS_KEY = 'tapestry_global_settings';
 
@@ -51,6 +52,21 @@ export const useAppSettings = () => {
         }
     });
 
+    // Shared AI from the Tapestry server: the default for anyone who hasn't set up
+    // a provider of their own (no key entered). Not saved, so a user who later adds
+    // a key and picks that provider keeps it.
+    const serverAi = useServerSession()?.ai;
+    useEffect(() => {
+        if (!serverAi?.available) return;
+        setGlobalSettings(prev => {
+            if (prev.activeProvider === 'server') return prev;
+            const conn = prev.aiConnections?.[prev.activeProvider];
+            const ownSetup = prev.activeProvider === 'ollama' || Boolean(conn?.apiKey) ||
+                (prev.activeProvider === 'custom' && Boolean(conn?.baseUrl));
+            return ownSetup ? prev : { ...prev, activeProvider: 'server' };
+        });
+    }, [serverAi?.available]);
+
     const [systemPromptConfig, setSystemPromptConfig] = useState<SystemPromptConfig>(DEFAULT_SYSTEM_PROMPT_CONFIG);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [settingsInitialTab, setSettingsInitialTab] = useState<'general' | 'ai_settings' | 'ai_prompts' | 'ai_tools' | 'prompts'>('general');
@@ -61,6 +77,16 @@ export const useAppSettings = () => {
     const aiConfig = useMemo<AIConfig>(() => {
         const provider = globalSettings.activeProvider;
         const conn = globalSettings.aiConnections[provider];
+        if (provider === 'server') {
+            const models = serverAi?.models || [];
+            return {
+                provider,
+                apiKey: '',
+                modelId: conn?.modelId && models.includes(conn.modelId) ? conn.modelId : (serverAi?.model || ''),
+                baseUrl: SERVER_AI_BASE_URL,
+                language: globalSettings.language || 'British English'
+            };
+        }
         return {
             provider,
             apiKey: conn?.apiKey || '',
@@ -68,7 +94,7 @@ export const useAppSettings = () => {
             baseUrl: conn?.baseUrl,
             language: globalSettings.language || 'British English'
         };
-    }, [globalSettings]);
+    }, [globalSettings, serverAi]);
 
     // --- Handlers ---
 

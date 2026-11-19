@@ -1,28 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useServerSession } from '../services/serverSession';
 
 // Thin bar above the app: optional "← <portal>" back link on the left, the
 // signed-in user and Sign out on the right. Filled from GET /api/session,
 // which only the Tapestry server (server/index.js) provides; when the page is
 // served any other way (e.g. `npm run dev`), the bar is not shown.
 
-interface SessionInfo {
-    user: { username: string; displayName?: string; source: 'local' | 'sso' };
-    sso: boolean;
-    portalUrl: string;
-    portalName: string;
-}
-
 export const SessionBar: React.FC<{ isDarkMode: boolean; hidden?: boolean }> = ({ isDarkMode, hidden }) => {
-    const [session, setSession] = useState<SessionInfo | null>(null);
-
-    useEffect(() => {
-        let cancelled = false;
-        fetch('/api/session', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-            .then(r => (r.ok && (r.headers.get('content-type') || '').includes('json') ? r.json() : null))
-            .then(data => { if (!cancelled && data?.user) setSession(data); })
-            .catch(() => { /* no server session API: run without the bar */ });
-        return () => { cancelled = true; };
-    }, []);
+    const session = useServerSession();
 
     if (!session || hidden) return null;
 

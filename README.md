@@ -28,3 +28,15 @@ scripts/user.sh add <username> "Display Name"   # create a local account (prompt
   people: Vite bakes it into the page.
 - Tests: `npm test` (Node 24).
 - Deploy a release into a separate checkout: `scripts/promote.sh --ref <tag>`.
+
+### Shared AI key (optional)
+
+To give every signed-in user AI without entering a key, put an OpenAI key in a
+file on the host (one line, `chmod 600`, readable by `APP_UID`) and set
+`SERVER_AI_KEY_FILE` to its path in `.env`. Restart the container to pick up a
+new key. The page then offers "Tapestry server" as the AI provider, the
+default for anyone without a key of their own. Requests go through
+`/api/ai/v1/chat/completions`, where the server adds the key, so the browser
+never sees it. Settings: `SERVER_AI_MODEL`, `SERVER_AI_MODELS`,
+`SERVER_AI_RPM` (per user per minute), `SERVER_AI_BASE_URL` (any
+OpenAI-compatible API). Use per day and per user is in the `ai_usage` table.

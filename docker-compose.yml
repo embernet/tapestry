@@ -31,8 +31,17 @@ services:
       LOCAL_ADMIN_USERS: "${LOCAL_ADMIN_USERS:-}"
       SSO_ADMIN_GROUP: "${SSO_ADMIN_GROUP:-}"
       SESSION_DAYS: "${SESSION_DAYS:-7}"
+      # Shared AI for all users (server/ai.js): the key file is mounted below; without one, it's off.
+      SERVER_AI_KEY_FILE: /run/secrets/server-ai-key
+      SERVER_AI_BASE_URL: "${SERVER_AI_BASE_URL:-https://api.openai.com/v1}"
+      SERVER_AI_MODEL: "${SERVER_AI_MODEL:-gpt-4o}"
+      SERVER_AI_MODELS: "${SERVER_AI_MODELS:-}"
+      SERVER_AI_LABEL: "${SERVER_AI_LABEL:-OpenAI}"
+      SERVER_AI_RPM: "${SERVER_AI_RPM:-30}"
       # trust the host's certificate store (e.g. newer roots an SSO issuer may chain to)
       NODE_USE_SYSTEM_CA: "1"
     volumes:
       - ${TAPESTRY_DATA_DIR:-./data}:/data
       - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+      # host file holding the AI key (mode 600, owned by APP_UID); /dev/null = shared AI off
+      - ${SERVER_AI_KEY_FILE:-/dev/null}:/run/secrets/server-ai-key:ro

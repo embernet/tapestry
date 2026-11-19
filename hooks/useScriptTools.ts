@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 import { toolRegistry } from '../services/ToolRegistry';
 import { ToolClient, ActionDescriptor, Element, Relationship, TapestryDocument, AIConfig } from '../types';
 import { generateUUID, generateMarkdownFromGraph, callAI, normalizeTag } from '../utils';
+import { needsApiKey } from '../services/serverSession';
 import { TOOL_REGISTRY, EXECUTION_RESPONSE_SCHEMA } from '../components/ChatPanel/constants';
 import { ChatMessage } from '../types';
 
@@ -370,7 +371,7 @@ export const useScriptTools = ({
 
                 if (action === 'prompt') {
                     // Check API Key
-                    if (!aiConfig.apiKey && aiConfig.provider !== 'ollama') {
+                    if (needsApiKey(aiConfig)) {
                         onShowApiKeyModal();
                         throw new Error("API Key required. Please configure it in Settings.");
                     }
@@ -388,7 +389,7 @@ export const useScriptTools = ({
 
                 if (action === 'propose') {
                     // Check API Key
-                    if (!aiConfig.apiKey && aiConfig.provider !== 'ollama') {
+                    if (needsApiKey(aiConfig)) {
                         onShowApiKeyModal();
                         return "API Key required. Please configure it in Settings.";
                     }

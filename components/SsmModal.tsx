@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship, SsmToolType, ModelActions, TapestryDocument, TapestryFolder } from '../types';
-import { generateMarkdownFromGraph, AIConfig } from '../utils';
+import { generateMarkdownFromGraph, AIConfig, callAI } from '../utils';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
@@ -158,7 +158,6 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
 
       try {
           const graphMarkdown = generateMarkdownFromGraph(elements, relationships);
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
           
           const systemPromptBase = customPrompt || DEFAULT_TOOL_PROMPTS['ssm'];
           
@@ -192,13 +191,12 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
               3. Suggest 'Accommodation' nodes to bridge the gap.`;
           }
 
-          const response = await ai.models.generateContent({
-              model: activeModel || 'gemini-2.5-flash',
-              contents: userPrompt,
-              config: {
-                  systemInstruction: `${systemPromptBase}\nGRAPH CONTEXT:\n${graphMarkdown}`,
-                  responseMimeType: "application/json",
-                  responseSchema: {
+          const response = await callAI(
+              aiConfig,
+              userPrompt,
+              `${systemPromptBase}\nGRAPH CONTEXT:\n${graphMarkdown}`,
+              undefined,
+              {
                       type: Type.OBJECT,
                       properties: {
                           analysis: { type: Type.STRING },
@@ -228,8 +226,7 @@ const SsmModal: React.FC<SsmModalProps> = ({ isOpen, activeTool, elements, relat
                           }
                       }
                   }
-              }
-          });
+          );
 
           const result = JSON.parse(response.text || "{}");
           setAnalysisText(result.analysis);

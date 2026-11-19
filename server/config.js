@@ -3,6 +3,7 @@
 // SESSION_DAYS / LOCAL_ADMIN_USERS) are parsed by ./auth/config.js.
 const path = require('node:path');
 const { loadAuthConfig } = require('./auth/config');
+const { loadAiConfig } = require('./ai');
 
 function trimSlash(u) {
   return u ? String(u).replace(/\/+$/, '') : '';
@@ -23,6 +24,8 @@ function loadConfig(env = process.env) {
     trustProxy: env.TRUST_PROXY || '',
     // Throws on impossible settings (both modes off, SSO without a client ID, ...).
     auth: loadAuthConfig(env),
+    // Shared AI key for all users (server/ai.js); off unless SERVER_AI_KEY_FILE has a key.
+    ai: loadAiConfig(env),
   };
 }
 

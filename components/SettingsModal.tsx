@@ -2,6 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { SystemPromptConfig, GlobalSettings, AIProvider } from '../types';
 import { AVAILABLE_AI_TOOLS, DEFAULT_SYSTEM_PROMPT_CONFIG, DEFAULT_TOOL_PROMPTS } from '../constants';
+import { useServerSession } from '../services/serverSession';
+import { ServerAiFields } from './ServerAiFields';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -105,6 +107,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     globalSettings, onGlobalSettingsChange, 
     modelSettings, onModelSettingsChange, isDarkMode
 }) => {
+  const serverAi = useServerSession()?.ai;
   const [activeTab, setActiveTab] = useState<'general' | 'ai_settings' | 'ai_prompts' | 'ai_tools' | 'prompts'>(initialTab);
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set(initialTool ? [initialTool] : []));
   const [expandedSubPromptTools, setExpandedSubPromptTools] = useState<Set<string>>(new Set());
@@ -345,7 +348,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 <div className="space-y-6">
                     <div className="space-y-4">
                         <p className={`text-sm ${textSub} p-3 rounded border ${isDarkMode ? 'bg-gray-900 border-gray-700' : 'bg-blue-50 border-blue-100 text-blue-800'}`}>
-                            Configure your AI provider. Tapestry connects directly to the provider's API from your browser. 
+                            Configure your AI provider. With your own key, Tapestry connects directly to the provider's API from your browser. 
                             Your API key is stored locally in your browser and is never sent to our servers.
                         </p>
 
@@ -356,6 +359,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
                                 className={`w-full rounded p-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 border ${inputBg}`}
                             >
+                                {serverAi?.available && <option value="server">Tapestry server ({serverAi.label || 'shared'}, no key needed)</option>}
                                 <option value="gemini">Google Gemini</option>
                                 <option value="openai">OpenAI</option>
                                 <option value="anthropic">Anthropic (Claude)</option>
@@ -377,6 +381,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                         </div>
 
                         <div className={`p-4 rounded-lg border space-y-4 ${sectionBg}`}>
+                            {globalSettings.activeProvider === 'server' && serverAi?.available ? (
+                                <ServerAiFields info={serverAi} modelId={activeConnection?.modelId} onModelChange={(m) => handleConnectionChange('modelId', m)} labelClass={textSub} mutedClass={textMuted} inputClass={inputBg} />
+                            ) : (<>
                             {/* Specific Provider Guidance */}
                             {globalSettings.activeProvider === 'gemini' && (
                                 <div className="text-xs text-blue-500 mb-2 flex gap-2 items-center">
@@ -422,6 +429,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 />
                                 <p className={`text-[10px] ${textMuted}`}>Leave empty to use default provider URL. Use full URL (e.g., include /v1).</p>
                             </div>
+                            </>)}
                         </div>
                     </div>
                 </div>

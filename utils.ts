@@ -293,6 +293,17 @@ export const aiLogger = {
   }
 };
 
+// Gemini schemas use upper-case type names (Type.OBJECT = "OBJECT"); JSON Schema wants lower case.
+const toJsonSchema = (schema: any): any => {
+  if (Array.isArray(schema)) return schema.map(toJsonSchema);
+  if (!schema || typeof schema !== 'object') return schema;
+  const out: any = {};
+  for (const [k, v] of Object.entries(schema)) {
+    out[k] = k === 'type' && typeof v === 'string' ? v.toLowerCase() : toJsonSchema(v);
+  }
+  return out;
+};
+
 export const callAI = async (
   config: AIConfig,
   prompt: any, // string or Gemini Content[]
@@ -372,13 +383,19 @@ export const callAI = async (
     return result;
   }
 
-  if (config.provider === 'openai' || config.provider === 'anthropic' || config.provider === 'grok' || config.provider === 'ollama') {
+  if (config.provider === 'openai' || config.provider === 'anthropic' || config.provider === 'grok' || config.provider === 'ollama' || config.provider === 'server') {
     // Basic mapping for OpenAI-compatible endpoints
 
-    if (!config.apiKey && config.provider !== 'ollama') throw new Error(`${config.provider} API Key is missing in settings.`);
+    if (!config.apiKey && config.provider !== 'ollama' && config.provider !== 'server') throw new Error(`${config.provider} API Key is missing in settings.`);
+
+    // JSON mode alone doesn't tell the model the shape wanted, so describe it.
+    let systemText = effectiveSystemInstruction || '';
+    if (responseSchema) {
+      systemText = `${systemText ? systemText + '\n\n' : ''}Respond with a single JSON object that matches this JSON schema:\n${JSON.stringify(toJsonSchema(responseSchema))}`;
+    }
 
     const messages = [];
-    if (effectiveSystemInstruction) messages.push({ role: "system", content: effectiveSystemInstruction });
+    if (systemText) messages.push({ role: "system", content: systemText });
 
     // Map content
     if (typeof prompt === 'string') {
@@ -415,7 +432,8 @@ export const callAI = async (
     // Determine Endpoint
     let baseUrl = config.baseUrl;
     if (!baseUrl) {
-      if (config.provider === 'openai') baseUrl = 'https://api.openai.com/v1';
+      if (config.provider === 'server') baseUrl = '/api/ai/v1';
+      else if (config.provider === 'openai') baseUrl = 'https://api.openai.com/v1';
       else if (config.provider === 'anthropic') baseUrl = 'https://api.anthropic.com/v1'; // Placeholder, Anthropic needs specific handling usually
       else if (config.provider === 'grok') baseUrl = 'https://api.x.ai/v1';
       else if (config.provider === 'ollama') baseUrl = 'http://localhost:11434/v1';
@@ -467,7 +485,7 @@ export const callAI = async (
       return result;
     } catch (e: any) {
       console.error("AI Call Failed", e);
-      throw new Error(`Failed to call ${config.provider}: ${e.message}`);
+      throw new Error(`Failed to call ${config.provider === 'server' ? 'the shared AI' : config.provider}: ${e.message}`);
     }
   }
 

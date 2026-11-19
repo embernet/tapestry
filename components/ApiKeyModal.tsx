@@ -1,6 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GlobalSettings, AIProvider } from '../types';
+import { useServerSession } from '../services/serverSession';
+import { ServerAiFields } from './ServerAiFields';
 
 interface ApiKeyModalProps {
     isOpen: boolean;
@@ -27,6 +29,7 @@ const LOCAL_PROVIDER_DEFAULTS: Record<string, { url: string, model: string }> = 
 export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
     isOpen, onClose, globalSettings, onGlobalSettingsChange, isDarkMode
 }) => {
+    const serverAi = useServerSession()?.ai;
     const modalRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -107,6 +110,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                             onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
                             className={`w-full rounded p-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 border ${inputBg}`}
                         >
+                            {serverAi?.available && <option value="server">Tapestry server ({serverAi.label || 'shared'}, no key needed)</option>}
                             <option value="gemini">Google Gemini (Recommended)</option>
                             <option value="openai">OpenAI</option>
                             <option value="anthropic">Anthropic (Claude)</option>
@@ -117,6 +121,9 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                     </div>
 
                     <div className={`p-4 rounded-lg border space-y-4 ${sectionBg}`}>
+                        {globalSettings.activeProvider === 'server' && serverAi?.available ? (
+                            <ServerAiFields info={serverAi} modelId={activeConnection?.modelId} onModelChange={(m) => handleConnectionChange('modelId', m)} labelClass={textSub} mutedClass={textMuted} inputClass={inputBg} />
+                        ) : (<>
                         {/* Specific Provider Guidance */}
                         {globalSettings.activeProvider === 'gemini' && (
                             <div className="text-xs text-blue-500 mb-2 flex gap-2 items-center bg-blue-50/10 p-2 rounded">
@@ -178,6 +185,7 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
                                 />
                             </div>
                         ) : null}
+                        </>)}
                     </div>
 
                 </div>

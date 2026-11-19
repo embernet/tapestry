@@ -1,6 +1,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { callAI, generateUUID, generateMarkdownFromGraph } from '../../utils';
+import { needsApiKey } from '../../services/serverSession';
 import { promptStore } from '../../services/PromptStore';
 import { ChatMessage, AIConfig, SystemPromptConfig, TapestryDocument, Element, Relationship } from '../../types';
 import { FunctionCall, FunctionResponse, Content } from '@google/genai';
@@ -156,7 +157,7 @@ export const useChatLogic = ({
         setMessages(prev => [...prev, newMessage]);
 
         // Check API Key
-        if (!aiConfig.apiKey && aiConfig.provider !== 'ollama') {
+        if (needsApiKey(aiConfig)) {
             setTimeout(() => {
                 setMessages(prev => [...prev, {
                     role: 'model',

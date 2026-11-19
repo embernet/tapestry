@@ -86,7 +86,7 @@ const ContradictionPanel: React.FC<{ elements: Element[], onGenerate: (p1: strin
     );
 };
 
-const PrinciplesPanel: React.FC<{ elements: Element[], onGenerate: (principleData: string, target: string) => void, isLoading: boolean }> = ({ elements, onGenerate, isLoading }) => {
+const PrinciplesPanel: React.FC<{ elements: Element[], onGenerate: (principleData: string, target: string) => void, isLoading: boolean, aiConfig: AIConfig }> = ({ elements, onGenerate, isLoading, aiConfig }) => {
     const [selectedPrincipleId, setSelectedPrincipleId] = useState<number>(1);
     const [targetNode, setTargetNode] = useState('');
     const [selectedPerspective, setSelectedPerspective] = useState<string>('general');
@@ -112,13 +112,8 @@ const PrinciplesPanel: React.FC<{ elements: Element[], onGenerate: (principleDat
         }
         setIsAutoFilling(true);
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' }); 
             const prompt = `Explain TRIZ Principle "${currentPrinciple.name}" (${currentPrinciple.engineering}) from the problem domain of "${customName}". Provide a concise 2-3 sentence description/analogy with a British English example.`;
-            
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt
-            });
+            const response = await callAI(aiConfig, prompt);
             
             if (response.text) {
                 setCustomDesc(response.text);
@@ -584,7 +579,7 @@ const TrizModal: React.FC<TrizModalProps> = ({
                     {/* Left: Controls */}
                     <div className="w-1/3 p-6 border-r border-gray-800 overflow-y-auto bg-gray-800/50">
                         {activeTool === 'contradiction' && <ContradictionPanel elements={elements} isLoading={isLoading} onGenerate={handleGenerate} />}
-                        {activeTool === 'principles' && <PrinciplesPanel elements={elements} isLoading={isLoading} onGenerate={(payload, target) => handleGenerate(payload, target)} />}
+                        {activeTool === 'principles' && <PrinciplesPanel elements={elements} isLoading={isLoading} aiConfig={aiConfig} onGenerate={(payload, target) => handleGenerate(payload, target)} />}
                         {activeTool === 'ariz' && <ArizPanel elements={elements} isLoading={isLoading} onGenerate={handleGenerate} />}
                         {activeTool === 'sufield' && <SufieldPanel elements={elements} isLoading={isLoading} onGenerate={handleGenerate} />}
                         {activeTool === 'trends' && <TrendsPanel elements={elements} isLoading={isLoading} onGenerate={handleGenerate} />}
