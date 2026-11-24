@@ -4,6 +4,8 @@
 const path = require('node:path');
 const { loadAuthConfig } = require('./auth/config');
 const { loadAiConfig } = require('./ai');
+const { resolveVersion } = require('./health');
+const pkg = require('../package.json');
 
 function trimSlash(u) {
   return u ? String(u).replace(/\/+$/, '') : '';
@@ -14,6 +16,8 @@ function loadConfig(env = process.env) {
   if (!Number.isInteger(port) || port <= 0 || port > 65535) throw new Error('PORT must be a TCP port, got ' + env.PORT);
   return {
     appName: 'tapestry',
+    // The build's `git describe` (APP_VERSION, baked into the image by scripts/compose.sh), else package.json.
+    version: resolveVersion(env.APP_VERSION, pkg.version),
     port,
     host: env.HOST || '0.0.0.0',
     dataDir: path.resolve(env.DATA_DIR || path.join(__dirname, '..', 'data')),

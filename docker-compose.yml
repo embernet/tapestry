@@ -1,7 +1,7 @@
 # Tapestry Studio: host deployment (dev or prod, chosen by .env).
 #
 #   cp .env.example .env        # dev defaults
-#   docker compose up -d --build
+#   scripts/compose.sh up -d --build   # docker compose, with the version from git describe
 #
 # Defaults are the DEV instance (project tapestry-dev, port 8205, ./data), so a
 # fresh clone can never collide with prod. Prod's .env sets
@@ -10,7 +10,10 @@ name: ${COMPOSE_PROJECT_NAME:-tapestry-dev}
 
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        APP_VERSION: "${APP_VERSION:-}"   # set by scripts/compose.sh from git describe
     restart: unless-stopped
     user: "${APP_UID:-1000}:${APP_GID:-1000}"   # host user, so the data dir stays theirs
     ports:

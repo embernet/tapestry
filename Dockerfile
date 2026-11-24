@@ -24,6 +24,11 @@ EXPOSE 8205
 VOLUME ["/data"]
 
 HEALTHCHECK --interval=30s --timeout=4s --start-period=8s \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8205)+'/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8205)+'/readyz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+
+# The version built (git describe, passed by scripts/compose.sh), for the
+# health endpoints. Last, so a new version only rebuilds this layer.
+ARG APP_VERSION=
+ENV APP_VERSION=$APP_VERSION
 
 CMD ["node", "server/index.js"]

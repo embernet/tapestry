@@ -16,11 +16,13 @@ accounts and/or an OpenID Connect provider (see `server/auth/README.md`).
 
 ```bash
 cp .env.example .env              # dev defaults: port 8205, data in ./data, local accounts
-docker compose up -d --build
+scripts/compose.sh up -d --build   # docker compose, with the version from git describe
 scripts/user.sh add <username> "Display Name"   # create a local account (prompts for a password)
 ```
 
-- `GET /healthz` is open; everything else needs a signed-in user.
+- `GET /healthz` (alive) and `GET /readyz` (ready: `database`, built `app`; else 503 with `failing`) are open,
+  uncached, and in the suite's shape (horizon-infra standards §12); the Docker healthcheck and
+  `promote.sh` use `/readyz`. Everything else needs a signed-in user.
 - Models, settings and AI keys stay in the browser (`localStorage`); the server
   keeps only accounts and sessions.
 - Optional back link: set both `PORTAL_URL` and `PORTAL_NAME`.

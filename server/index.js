@@ -2,7 +2,8 @@
 // Tapestry Studio server: serves the built single-page app (dist/) behind a
 // sign-in (local accounts and/or TIG-SSO, see ./auth/README.md).
 //
-//   GET /healthz        open; 200 + JSON when healthy
+//   GET /healthz        open; alive (./health.js, horizon-infra standards §12)
+//   GET /readyz         open; ready: the database and the built app answer, else 503
 //   /login /local /auth/callback /logout   sign-in routes (shared auth module)
 //   GET /api/session    the signed-in user, the optional portal link and whether shared AI is on
 //   POST /api/ai/v1/chat/completions   shared AI with the server's key (./ai.js)
@@ -14,7 +15,7 @@ const express = require('express');
 const { loadConfig } = require('./config');
 const { createAuth } = require('./auth');
 const { createAi } = require('./ai');
-const pkg = require('../package.json');
+const { mountHealth } = require('./health');
 
 function openDb(dataDir) {
   fs.mkdirSync(dataDir, { recursive: true });
@@ -42,13 +43,20 @@ function createApp(config = loadConfig(), { fetchImpl } = {}) {
     next();
   });
 
-  app.get('/healthz', (req, res) => {
-    try {
-      db.prepare('SELECT 1').get();
-      res.json({ ok: true, app: config.appName, version: pkg.version });
-    } catch (e) {
-      res.status(503).json({ ok: false, error: e.message });
-    }
+  // Health (./health.js, standards §12): open, before the sign-in middleware.
+  // One service serves both the page and the API, so its checks cover both.
+  mountHealth(app, {
+    appName: config.appName,
+    version: config.version,
+    checks: {
+      // accounts and sessions: the database answers and its folder is writable
+      database: async () => {
+        db.prepare('SELECT count(*) FROM sqlite_master').get();
+        await fs.promises.access(config.dataDir, fs.constants.W_OK);
+      },
+      // the built single-page app is there to serve
+      app: () => fs.promises.access(indexHtml, fs.constants.R_OK),
+    },
   });
 
   app.use(auth.attachUser);
@@ -102,7 +110,7 @@ if (require.main === module) {
   const { app, db } = createApp(config);
   const server = app.listen(config.port, config.host, () => {
     const a = config.auth;
-    console.log(`tapestry ${pkg.version} on http://${config.host}:${config.port} (data ${config.dataDir}; login: local=${a.local ? 'on' : 'off'}, sso=${a.sso ? 'on' : 'off'}; shared AI ${config.ai.enabled ? `on, ${config.ai.model}` : 'off'})`);
+    console.log(`tapestry ${config.version} on http://${config.host}:${config.port} (data ${config.dataDir}; login: local=${a.local ? 'on' : 'off'}, sso=${a.sso ? 'on' : 'off'}; shared AI ${config.ai.enabled ? `on, ${config.ai.model}` : 'off'})`);
   });
   const stop = () => server.close(() => { db.close(); process.exit(0); });
   process.on('SIGTERM', stop);

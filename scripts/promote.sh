@@ -6,7 +6,7 @@
 #   2. snapshot the login DB (accounts, sessions) (SQLite VACUUM INTO via node:sqlite in the container — no downtime)
 #   3. fetch from origin and check out the requested ref (detached)
 #   4. rebuild + recreate the container
-#   5. wait for /healthz; on failure print the rollback command
+#   5. wait for /readyz; on failure print the rollback command
 #
 # Usage:  scripts/promote.sh [--ref <tag|branch|sha>]   (default: newest tag)
 
@@ -77,16 +77,26 @@ if [[ -f "$DATA_DIR/tapestry.db" ]]; then
 fi
 
 git -c advice.detachedHead=false checkout --detach "$REF"
-docker compose up -d --build
+# scripts/compose.sh bakes in the version (git describe); refs older than it lack it
+if [[ -x scripts/compose.sh ]]; then scripts/compose.sh up -d --build; else docker compose up -d --build; fi
+
+# /readyz (standards §12): 200 ready, 503 not. Refs older than it have only
+# /healthz (their /readyz is behind the sign-in, so neither 200 nor 503).
+ready() {
+  local code
+  code="$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/readyz" 2>/dev/null || true)"
+  [[ "$code" == 200 ]] && return 0
+  [[ "$code" != 503 && "$code" != 000 ]] && curl -fsS -o /dev/null "http://127.0.0.1:$PORT/healthz" 2>/dev/null
+}
 
 for _ in $(seq 1 30); do
-  if curl -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null 2>&1; then
+  if ready; then
     echo "✓ tapestry $REF is up on :$PORT"
     exit 0
   fi
   sleep 2
 done
-echo "✗ tapestry did not come healthy on :$PORT. Roll back with:" >&2
+echo "✗ tapestry did not come ready on :$PORT. Roll back with:" >&2
 echo "    scripts/promote.sh --ref $PREV" >&2
 echo "  (DB snapshot, if taken: ${SNAP:-none})" >&2
 exit 1
