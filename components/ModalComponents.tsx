@@ -11,7 +11,7 @@ export * from './ContextMenu';
 export * from './RelationshipContextMenu';
 export * from './CanvasContextMenu';
 export * from './CreateModelModal';
-export * from './SaveAsModal';
+export * from './SaveCopyModal';
 export * from './OpenModelModal';
 export * from './SchemaUpdateModal';
 export * from './SelfTestModal';

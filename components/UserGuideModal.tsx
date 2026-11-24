@@ -12,7 +12,9 @@ interface ModalProps {
 const INTERFACE_ITEMS = [
     { id: 'interface-new', name: "New Model", desc: "Start a fresh, empty knowledge graph.", icon: <path d="M12 4v16m8-8H4" /> },
     { id: 'interface-open', name: "Open Model", desc: "Load a previously saved JSON model from your computer.", icon: <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /> },
-    { id: 'interface-save', name: "Save to Disk", desc: "Download the current model state as a JSON file.", icon: <path d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /> },
+    { id: 'interface-save', name: "Save", desc: "Ctrl+S (⌘S on a Mac). The first time, choose a folder and a name for the model's .json file; after that, Save writes straight back to that file. A model opened from a file saves back to it.", icon: <path d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /> },
+    { id: 'interface-saveas', name: "Save As", desc: "In the main menu. Always asks where to save, and Save writes to the new file from then on.", icon: <path d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /> },
+    { id: 'interface-savecopy', name: "Save a copy in this browser", desc: "In the main menu. Makes a copy of the model, under a new name, in this browser's model list. No file is saved.", icon: <path d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /> },
     { id: 'interface-copy', name: "Copy Selection", desc: "Copy selected nodes and relationships to clipboard (as text/internal data).", icon: <path d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" /> },
     { id: 'interface-paste', name: "Paste", desc: "Paste nodes from clipboard into the current graph.", icon: <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /> },
     { id: 'interface-tools', name: "Tools Panel", desc: "Toggle the main toolbar for analysis and editing tools.", icon: <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.9 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" /> },
@@ -295,6 +297,18 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                                     Tapestry was created to bridge this gap, allowing users to model causal relationships and leverage AI to analyze structure,
                                     detect contradictions, and generate solutions.
                                 </div>
+                            </div>
+
+                            {/* Saving */}
+                            <div className="space-y-3">
+                                <h4 className={`text-xl font-bold ${textHeader}`}>Saving your work</h4>
+                                <ul className={`list-disc pl-5 space-y-2 text-sm leading-relaxed ${textDesc}`}>
+                                    <li><strong>Save</strong> (the save icon, the main menu, or Ctrl+S / ⌘S): the first time, choose a folder and a name for the model's .json file. After that, Save writes straight back to the same file and says "Saved to" its name. A model opened with Open Model saves back to the file it came from.</li>
+                                    <li><strong>Save As</strong> (main menu): always asks where to save. From then on, Save writes to the new file.</li>
+                                    <li><strong>Save a copy in this browser</strong> (main menu): a copy under a new name in this browser's model list, with no file.</li>
+                                    <li>Browsers that can't choose a folder (Firefox, Safari, or Tapestry opened at a plain http address) save the file to your Downloads folder instead.</li>
+                                    <li>Tapestry also keeps each model in this browser as you work. A model changed since it was last saved is listed under Recovered Models on the start screen; once saved, it leaves that list.</li>
+                                </ul>
                             </div>
 
                             {/* Scenarios */}

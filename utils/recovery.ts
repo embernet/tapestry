@@ -29,3 +29,12 @@ export function markSaved<T extends RecoveryMeta>(meta: T, hash: string, where: 
         ? { ...meta, contentHash: hash, lastDiskHash: hash }
         : { ...meta, contentHash: hash, lastSavedHash: hash };
 }
+
+/**
+ * Metadata after the model was written to a file (Save, Save As, or a download): the
+ * file's name, and the saved hash is the content's, so the model leaves the recovered
+ * list and shows no unsaved changes until it changes again.
+ */
+export function markSavedToFile<T extends RecoveryMeta & { filename?: string; updatedAt?: string }>(meta: T, hash: string, filename: string, now: string): T {
+    return markSaved({ ...meta, filename, updatedAt: now }, hash, 'disk');
+}

@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 
-interface SaveAsModalProps { 
+// "Save a copy in this browser": a new model in this browser's list, under a new name.
+// No file is written; Save As (services/fileSave.ts) is the one that asks where to save a file.
+
+interface SaveCopyModalProps { 
     currentName: string; 
     currentDesc: string; 
     onSave: (name: string, desc: string) => void; 
     onClose: () => void; 
 }
 
-export const SaveAsModal: React.FC<SaveAsModalProps> = ({ currentName, currentDesc, onSave, onClose }) => {
+export const SaveCopyModal: React.FC<SaveCopyModalProps> = ({ currentName, currentDesc, onSave, onClose }) => {
     const [name, setName] = useState(`Copy of ${currentName}`);
     const [desc, setDesc] = useState(currentDesc);
 
@@ -20,7 +23,8 @@ export const SaveAsModal: React.FC<SaveAsModalProps> = ({ currentName, currentDe
     return (
         <div className="fixed inset-0 bg-black bg-opacity-90 flex justify-center items-center z-50 p-4">
             <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 shadow-2xl border border-gray-600 text-white">
-                <h2 className="text-2xl font-bold mb-6">Save As...</h2>
+                <h2 className="text-2xl font-bold mb-2">Save a copy in this browser</h2>
+                <p className="text-sm text-gray-400 mb-6">Makes a new model in this browser's list and opens it. No file is saved; use Save or Save As for that.</p>
                 
                 <div className="space-y-4 mb-6">
                     <div>

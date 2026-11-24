@@ -38,16 +38,25 @@ test('Save writes back only with a picker handle; else save picker or download',
   assert.equal(s({ inIframe: true, hasWritableHandle: true }), 'download');
 });
 
-test('only services/fileOpen.ts calls showOpenFilePicker', () => {
+// Source files (not tests, server or builds) whose text matches re.
+const sourcesMatching = (re) => {
   const hits = [];
   const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).forEach((e) => {
     if (['node_modules', 'dist', 'data', '.git', 'test', 'server'].includes(e.name)) return;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) return walk(p);
-    if (/\.(ts|tsx)$/.test(e.name) && /showOpenFilePicker\s*\(/.test(fs.readFileSync(p, 'utf8'))) hits.push(path.relative(root, p));
+    if (/\.(ts|tsx|js|jsx)$/.test(e.name) && re.test(fs.readFileSync(p, 'utf8'))) hits.push(path.relative(root, p));
   });
   walk(root);
-  assert.deepEqual(hits, [path.join('services', 'fileOpen.ts')]);
+  return hits;
+};
+
+test('only services/fileOpen.ts calls showOpenFilePicker', () => {
+  assert.deepEqual(sourcesMatching(/showOpenFilePicker\s*\(/), [path.join('services', 'fileOpen.ts')]);
+});
+
+test('only services/fileSave.ts calls showSaveFilePicker', () => {
+  assert.deepEqual(sourcesMatching(/showSaveFilePicker\s*\(/), [path.join('services', 'fileSave.ts')]);
 });
 
 test('the model file input is mounted unconditionally at the root of App', () => {

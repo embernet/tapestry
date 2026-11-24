@@ -2,11 +2,12 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { ModelMetadata, ColorScheme, SystemPromptConfig, Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, DateFilterState, PanelLayout, Script, GraphView, KanbanBoard } from '../types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, DEFAULT_TOOL_PROMPTS, CORE_TOOL_IDS } from '../constants';
-import { generateUUID, computeContentHash, isInIframe, createDefaultView } from '../utils';
+import { generateUUID, computeContentHash, createDefaultView } from '../utils';
 import { notify } from '../services/dialogs';
-import { openFile, isPickerBlocked, markPickerBlocked } from '../services/fileOpen';
-import { chooseSaveTarget, classifyPickerFailure } from '../utils/filePicker';
-import { recoverableModels, markSaved } from '../utils/recovery';
+import { openFile } from '../services/fileOpen';
+import { saveFile } from '../services/fileSave';
+import { modelFileName } from '../utils/filePicker';
+import { recoverableModels, markSaved, markSavedToFile } from '../utils/recovery';
 
 // Keys
 const MODELS_INDEX_KEY = 'tapestry_models_index';
@@ -81,7 +82,7 @@ export const usePersistence = ({
     const [modelsIndex, setModelsIndex] = useState<ModelMetadata[]>([]);
     const [currentModelId, setCurrentModelId] = useState<string | null>(null);
     const [isCreateModelModalOpen, setIsCreateModelModalOpen] = useState(false);
-    const [isSaveAsModalOpen, setIsSaveAsModalOpen] = useState(false);
+    const [isSaveCopyModalOpen, setIsSaveCopyModalOpen] = useState(false);   // "Save a copy in this browser"
     const [isOpenModelModalOpen, setIsOpenModelModalOpen] = useState(false);
     const [isExitModalOpen, setIsExitModalOpen] = useState(false);
 
@@ -398,11 +399,14 @@ export const usePersistence = ({
         setIsCreateModelModalOpen(false);
     }, [handleLoadModel, currentFileHandleRef, safeSetItem]);
 
-    const handleDiskSave = useCallback(async () => {
-        if (!currentModelId) { notify("No active model to save.", 'warning'); return; }
-        const modelMetadata = modelsIndex.find(m => m.id === currentModelId);
-        if (!modelMetadata) { notify("Could not find model metadata to save.", 'error'); return; }
-        const now = new Date().toISOString();
+    // Save (mode 'save') writes back to the model's file when it has one, else asks where;
+    // Save As always asks where (services/fileSave.ts). Call straight from a click or
+    // keydown. Resolves true once the model is in a file (written or downloaded).
+    const saveModelToFile = useCallback(async (mode: 'save' | 'saveAs'): Promise<boolean> => {
+        if (!currentModelId) { notify("No active model to save.", 'warning'); return false; }
+        const modelId = currentModelId;
+        const modelMetadata = modelsIndex.find(m => m.id === modelId);
+        if (!modelMetadata) { notify("Could not find model metadata to save.", 'error'); return false; }
         const modelData = {
             elements: elementsRef.current,
             relationships: relationshipsRef.current,
@@ -420,72 +424,29 @@ export const usePersistence = ({
             activeViewId
         };
         const currentHash = computeContentHash(modelData);
-        const updatedMetadata = markSaved({ ...modelMetadata, updatedAt: now, filename: modelMetadata.filename || `${modelMetadata.name.replace(/ /g, '_')}.json` }, currentHash, 'disk');
-        const exportData = { metadata: updatedMetadata, data: modelData, };
-        const jsonString = JSON.stringify(exportData, null, 2);
-        const saveEnv = () => ({
-            hasWritableHandle: !!currentFileHandleRef.current && 'createWritable' in currentFileHandleRef.current,
-            hasSaveFilePicker: 'showSaveFilePicker' in window,
-            isSecureContext: window.isSecureContext === true,
-            inIframe: isInIframe(),
-            pickerBlocked: isPickerBlocked(),
-        });
+        const suggestedName = modelFileName(modelMetadata.name);
+        const handle = currentFileHandleRef.current && 'createWritable' in currentFileHandleRef.current ? currentFileHandleRef.current : null;
+        // The file's metadata holds the name it is saved under, known once the picker returns.
+        const now = new Date().toISOString();
+        const text = (filename: string) => JSON.stringify({ metadata: markSavedToFile(modelMetadata, currentHash, filename, now), data: modelData }, null, 2);
+        let result;
         try {
-            let saved = false, sameFileFailed = false;
-            if (chooseSaveTarget(saveEnv()) === 'same-file') {
-                // Only a file opened or saved through the File System Access picker has a handle.
-                try {
-                    const writable = await currentFileHandleRef.current.createWritable();
-                    await writable.write(jsonString);
-                    await writable.close();
-                    saved = true;
-                } catch (err: any) {
-                    // Write permission refused or the file is gone. This click's gesture
-                    // has been used, so a save picker would be refused too: download.
-                    console.warn("Couldn't write to the opened file; downloading it instead.", err);
-                    currentFileHandleRef.current = null;
-                    sameFileFailed = true;
-                }
-            }
-            if (!saved) {
-                if (!sameFileFailed && chooseSaveTarget(saveEnv()) === 'save-picker') {
-                    const started = Date.now();
-                    try {
-                        const options = { suggestedName: updatedMetadata.filename, types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] }, }], };
-                        const fileHandle = await (window as any).showSaveFilePicker(options);
-                        currentFileHandleRef.current = fileHandle;
-                        const writable = await fileHandle.createWritable();
-                        await writable.write(jsonString);
-                        await writable.close();
-                        saved = true;
-                    } catch (err: any) {
-                        if (classifyPickerFailure(err, Date.now() - started) === 'cancelled') throw err;   // user cancelled
-                        console.warn("Save picker unavailable; downloading the file instead.", err);
-                        markPickerBlocked();
-                    }
-                }
-                if (!saved) {
-                    const blob = new Blob([jsonString], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = updatedMetadata.filename!;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    notify(`Downloaded ${updatedMetadata.filename}. Your browser saves it in its downloads folder.`, 'info');
-                }
-            }
-            setModelsIndex(prev => prev.map(m => m.id === currentModelId ? updatedMetadata : m));
-            safeSetItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
+            result = await saveFile({ mode, handle, suggestedName, text });
         } catch (err: any) {
-            if (err.name !== 'AbortError') {
-                console.error("Save failed:", err);
-                notify("Failed to save file.", 'error');
-            }
+            console.error("Save failed:", err);
+            notify(`Couldn't save the model: ${err?.message || err}. Your changes are still kept in this browser.`, 'error');
+            return false;
         }
+        if (result.status === 'cancelled' || result.status === 'failed') return false;
+        if (result.status === 'written') currentFileHandleRef.current = result.handle;
+        // The saved hash is the content's: the model leaves the recovered list and is clean.
+        setModelsIndex(prev => prev.map(m => m.id === modelId ? markSavedToFile(m, currentHash, result.name, now) : m));
+        safeSetItem(`${MODEL_DATA_PREFIX}${modelId}`, JSON.stringify(modelData));
+        return true;
     }, [currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, kanbanBoards, views, activeViewId, currentFileHandleRef, safeSetItem]);
+
+    const handleDiskSave = useCallback(() => saveModelToFile('save'), [saveModelToFile]);
+    const handleSaveFileAs = useCallback(() => saveModelToFile('saveAs'), [saveModelToFile]);
 
     const handleSaveToGist = useCallback(async () => {
         if (!githubToken) {
@@ -575,7 +536,9 @@ export const usePersistence = ({
     }, [githubToken, currentModelId, modelsIndex, colorSchemes, activeSchemeId, systemPromptConfig, history, slides, mermaidDiagrams, scripts, kanbanBoards, views, activeViewId, safeSetItem]);
 
 
-    const handleSaveAs = useCallback((name: string, description: string) => {
+    // "Save a copy in this browser": a new model in this browser's list, opened in place of
+    // this one (no file). Save As (handleSaveFileAs) is the one that writes a file.
+    const handleSaveCopyInBrowser = useCallback((name: string, description: string) => {
         if (!currentModelId) return;
         const now = new Date().toISOString();
         const newId = generateUUID();
@@ -601,7 +564,7 @@ export const usePersistence = ({
             safeSetItem(`${MODEL_DATA_PREFIX}${newId}`, JSON.stringify(modelData));
             setModelsIndex(prev => [...prev, newMetadata]);
             setCurrentModelId(newId);
-            setIsSaveAsModalOpen(false);
+            setIsSaveCopyModalOpen(false);
             currentFileHandleRef.current = null;
         } catch (e) {
             console.error("Save As failed", e);
@@ -827,7 +790,8 @@ export const usePersistence = ({
     }, [hasUnsavedChanges]);
 
     const handleExitSave = useCallback(async () => {
-        await handleDiskSave();
+        // Leave only once the model is in a file: a cancelled or failed save stays here.
+        if (!(await handleDiskSave())) return;
         setIsExitModalOpen(false);
 
         if (pendingUnsavedAction === 'createNew') {
@@ -863,8 +827,8 @@ export const usePersistence = ({
         setCurrentModelId,
         isCreateModelModalOpen,
         setIsCreateModelModalOpen,
-        isSaveAsModalOpen,
-        setIsSaveAsModalOpen,
+        isSaveCopyModalOpen,
+        setIsSaveCopyModalOpen,
         isOpenModelModalOpen,
         setIsOpenModelModalOpen,
         isExitModalOpen,
@@ -886,7 +850,8 @@ export const usePersistence = ({
         handleCreateModel,
         handleDiskSave,
         handleSaveToGist,
-        handleSaveAs,
+        handleSaveFileAs,
+        handleSaveCopyInBrowser,
         handleImportClick,
         handleImportInputChange,
         handleNewModelClick,

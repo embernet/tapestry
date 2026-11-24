@@ -75,3 +75,19 @@ add an explicit install step to deploy tooling — never vendor it into git. The
   the bundle.
 - Gemini schemas and a single structured-output call can't also take native tools on every
   provider, so the script `ai.propose` returns its graph changes in the schema's `actions`.
+
+## 2026-11-24 — Save writes back to its file; Save As always asks; the decisions are in one place
+
+- **Every save to a file goes through `services/fileSave.ts` (`saveFile`)**, whose decisions are in
+  `utils/saveFlow.ts` (`runSave`, the browser passed in, so `test/file-save.test.cjs` runs every
+  path). Save with a handle writes back silently ("Saved to <name>"); Save with no handle, and
+  Save As always, open `showSaveFilePicker`; no picker (Firefox, Safari, http, a frame, refused)
+  downloads, and says once why. A cancelled picker says nothing. `test/file-open.test.cjs` fails
+  if anything else calls `showSaveFilePicker`.
+- **A failed write back to the file must not lose the save.** Revoked or refused access: ask in
+  the page, and the click on its button is the user gesture `requestPermission` needs; still
+  refused, or the file has gone: offer the picker (another in-page click), and where it can't
+  work, download. Save & Exit leaves only once the model is in a file.
+- "Save As" used to copy the model into the browser's own list. That is now "Save a copy in this
+  browser…"; a name that means "file" elsewhere must mean a file here.
+- Don't bind Ctrl+Shift+S: it is Firefox's screenshot.

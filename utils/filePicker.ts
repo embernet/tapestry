@@ -42,16 +42,41 @@ export function classifyPickerFailure(err: { name?: string; message?: string } |
 
 export type SaveTarget = 'same-file' | 'save-picker' | 'download';
 
+export interface SaveEnv {
+    hasWritableHandle: boolean;   // a handle from the File System Access picker (Open, Save, Save As)
+    hasSaveFilePicker: boolean;   // 'showSaveFilePicker' in window
+    isSecureContext: boolean;
+    inIframe: boolean;
+    pickerBlocked: boolean;       // a picker already failed at once this session
+}
+
 /**
- * Where "Save to disk" writes. Back to the same file only with a handle from the File
- * System Access picker; a file from <input type="file"> has no handle, so Save asks
- * where to save (save picker) or downloads the file.
+ * Where Save and Save As write. Save goes back to the same file when the model has a
+ * handle (opened, saved or saved-as through the picker); without one, and always for
+ * Save As, the save picker asks where. Where no picker can work (Firefox, Safari,
+ * http://<host IP>, a frame, a refused picker) the file is downloaded.
  */
-export function chooseSaveTarget(env: { hasWritableHandle: boolean; hasSaveFilePicker: boolean; isSecureContext: boolean; inIframe: boolean; pickerBlocked: boolean }): SaveTarget {
+export function chooseSaveTarget(env: SaveEnv, mode: 'save' | 'saveAs' = 'save'): SaveTarget {
     if (env.inIframe) return 'download';
-    if (env.hasWritableHandle) return 'same-file';
+    if (mode === 'save' && env.hasWritableHandle) return 'same-file';
     if (env.hasSaveFilePicker && env.isSecureContext && !env.pickerBlocked) return 'save-picker';
     return 'download';
+}
+
+/**
+ * Why writing back to a file failed: 'gone' when the file was moved or deleted,
+ * 'permission' when write access was refused or revoked (or anything else that
+ * re-asking might fix).
+ */
+export function classifyWriteFailure(err: { name?: string } | null | undefined): 'gone' | 'permission' {
+    return err?.name === 'NotFoundError' ? 'gone' : 'permission';
+}
+
+/** A file name for a model: its name, without characters file systems refuse, plus .json. */
+export function modelFileName(name: string | undefined | null): string {
+    const base = (name || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^\.+/, '');
+    const stem = base || 'Tapestry model';
+    return /\.json$/i.test(stem) ? stem : `${stem}.json`;
 }
 
 /** No sign of a file window (no change, cancel or window blur) this long after a click means it never opened. */

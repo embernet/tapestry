@@ -438,7 +438,15 @@ export default function App() {
     }, [persistence.kanbanBoards, activeKanbanBoardId]);
 
     useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); if (persistence.currentModelId) { persistence.handleDiskSave(); } } };
+        // Ctrl/Cmd+S: Save (the browser's own "Save page" is not wanted here). Called in the
+        // keydown, so the save picker has the user gesture. No Save As shortcut: Ctrl+Shift+S
+        // is Firefox's screenshot.
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                if (persistence.currentModelId && !e.repeat) { void persistence.handleDiskSave(); }
+            }
+        };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [persistence.handleDiskSave, persistence.currentModelId]);
@@ -824,7 +832,8 @@ export default function App() {
                 <AppHeader
                     currentModelName={persistence.currentModelId ? persistence.currentModelName : ''}
                     onNewModel={persistence.handleNewModelClick}
-                    onSaveAs={() => persistence.setIsSaveAsModalOpen(true)}
+                    onSaveAs={persistence.handleSaveFileAs}
+                    onSaveCopy={() => persistence.setIsSaveCopyModalOpen(true)}
                     onOpenModel={() => persistence.handleImportClick(importFileRef)}
                     onSaveDisk={persistence.handleDiskSave}
                     onCopy={handleCopy}

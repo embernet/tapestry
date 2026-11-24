@@ -6,7 +6,7 @@ interface CanvasContextMenuProps {
     onZoomToFit: () => void; onAutoLayout: () => void;
     onToggleReport: () => void; onToggleMarkdown: () => void; onToggleJSON: () => void;
     onToggleFilter: () => void; onToggleMatrix: () => void; onToggleTable: () => void; onToggleGrid: () => void;
-    onOpenModel: () => void; onSaveModel: () => void; onCreateModel: () => void; onSaveAs: () => void;
+    onOpenModel: () => void; onSaveModel: () => void; onCreateModel: () => void; onSaveAs: () => void; onSaveCopy: () => void;
     onSaveAsImage: () => void;
     isReportOpen: boolean; isMarkdownOpen: boolean; isJSONOpen: boolean; isFilterOpen: boolean; isMatrixOpen: boolean; isTableOpen: boolean; isGridOpen: boolean;
     isDarkMode: boolean;
@@ -108,8 +108,9 @@ export const CanvasContextMenu: React.FC<CanvasContextMenuProps> = (props) => {
 
             <div className={`border-t my-1 ${dividerClass}`}></div>
             <div className={`px-4 py-1 text-xs font-bold uppercase ${labelClass}`}>File</div>
-            <button onClick={props.onSaveModel} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Save to Disk</button>
-            <button onClick={props.onSaveAs} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Save As...</button>
+            <button onClick={props.onSaveModel} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Save</button>
+            <button onClick={props.onSaveAs} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Save As…</button>
+            <button onClick={props.onSaveCopy} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Save a copy in this browser…</button>
             <button onClick={props.onOpenModel} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Open Model...</button>
             <button onClick={props.onCreateModel} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>New Model...</button>
         </div>

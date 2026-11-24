@@ -10,7 +10,7 @@ import SettingsModal from './SettingsModal';
 import { SchemaUpdateModal } from './SchemaUpdateModal';
 import { SelfTestModal } from './SelfTestModal';
 import { UserGuideModal } from './UserGuideModal';
-import { AboutModal, PatternGalleryModal, ConflictResolutionModal, CreateModelModal, SaveAsModal, OpenModelModal } from './ModalComponents';
+import { AboutModal, PatternGalleryModal, ConflictResolutionModal, CreateModelModal, SaveCopyModal, OpenModelModal } from './ModalComponents';
 import { CsvToolModal } from './CsvToolModal';
 import { Element, Relationship, ModelActions, TapestryDocument, TapestryFolder, SystemPromptConfig, GlobalSettings, CustomStrategyTool } from '../types';
 
@@ -124,7 +124,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
             
             {/* Persistence Modals */}
             {persistence.isCreateModelModalOpen && <CreateModelModal onCreate={persistence.handleCreateModel} onClose={() => persistence.setIsCreateModelModalOpen(false)} isInitialSetup={false} />}
-            {persistence.isSaveAsModalOpen && <SaveAsModal currentName={persistence.modelsIndex.find((m:any) => m.id === persistence.currentModelId)?.name || ''} currentDesc={persistence.modelsIndex.find((m:any) => m.id === persistence.currentModelId)?.description || ''} onSave={persistence.handleSaveAs} onClose={() => persistence.setIsSaveAsModalOpen(false)} />}
+            {persistence.isSaveCopyModalOpen && <SaveCopyModal currentName={persistence.modelsIndex.find((m:any) => m.id === persistence.currentModelId)?.name || ''} currentDesc={persistence.modelsIndex.find((m:any) => m.id === persistence.currentModelId)?.description || ''} onSave={persistence.handleSaveCopyInBrowser} onClose={() => persistence.setIsSaveCopyModalOpen(false)} />}
             {persistence.isOpenModelModalOpen && <OpenModelModal models={persistence.modelsIndex} onLoad={persistence.handleLoadModel} onClose={() => persistence.setIsOpenModelModalOpen(false)} onTriggerCreate={() => { persistence.setIsOpenModelModalOpen(false); persistence.setIsCreateModelModalOpen(true); }} />}
             {persistence.pendingImport && (
                 <ConflictResolutionModal localMetadata={persistence.pendingImport.localMetadata} diskMetadata={persistence.pendingImport.diskMetadata} localData={persistence.pendingImport.localData} diskData={persistence.pendingImport.diskData} onCancel={() => persistence.setPendingImport(null)} onChooseLocal={() => { persistence.handleLoadModel(persistence.pendingImport!.localMetadata.id); persistence.setPendingImport(null); }} onChooseDisk={() => { persistence.loadModelData(persistence.pendingImport!.diskData, persistence.pendingImport!.diskMetadata.id, persistence.pendingImport!.diskMetadata); persistence.setPendingImport(null); }} />

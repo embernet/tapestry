@@ -6,10 +6,15 @@ import { ViewSelect } from './ViewSelect';
 import { GraphView } from '../types';
 import { AutoLayoutIcon } from '../icons/AutoLayoutIcon';
 
+const SAVE_KEY = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘S' : 'Ctrl+S';
+
 interface AppHeaderProps {
     currentModelName: string;
     onNewModel: () => void;
+    /** Save As: always asks where to save the file. */
     onSaveAs: () => void;
+    /** Save a copy in this browser's model list (no file). */
+    onSaveCopy: () => void;
     onOpenModel: () => void;
     onSaveDisk: () => void;
     onCopy: () => void;
@@ -100,6 +105,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     currentModelName,
     onNewModel,
     onSaveAs,
+    onSaveCopy,
     onOpenModel,
     onSaveDisk,
     onCopy,
@@ -200,17 +206,22 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                                 <svg className="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                                 New Model...
                             </button>
-                            <button onClick={() => { onSaveAs(); setIsMainMenuOpen(false); }} className={`w-full text-left px-4 py-2 flex items-center gap-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} ${menuItemHover}`}>
-                                <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                                Save As...
-                            </button>
                             <button onClick={() => { onOpenModel(); setIsMainMenuOpen(false); }} className={`w-full text-left px-4 py-2 flex items-center gap-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} ${menuItemHover}`}>
                                 <svg className="w-4 h-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
                                 Open Model...
                             </button>
                             <button onClick={() => { onSaveDisk(); setIsMainMenuOpen(false); }} className={`w-full text-left px-4 py-2 flex items-center gap-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} ${menuItemHover}`}>
                                 <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-                                Save to Disk
+                                <span className="flex-1">Save</span>
+                                <span className={`text-xs ${labelClass}`}>{SAVE_KEY}</span>
+                            </button>
+                            <button onClick={() => { onSaveAs(); setIsMainMenuOpen(false); }} className={`w-full text-left px-4 py-2 flex items-center gap-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} ${menuItemHover}`}>
+                                <svg className="w-4 h-4 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                                Save As…
+                            </button>
+                            <button onClick={() => { onSaveCopy(); setIsMainMenuOpen(false); }} className={`w-full text-left px-4 py-2 flex items-center gap-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} ${menuItemHover}`}>
+                                <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>
+                                Save a copy in this browser…
                             </button>
                             <button onClick={() => { onOpenCsvTool(); setIsMainMenuOpen(false); }} className={`w-full text-left px-4 py-2 flex items-center gap-3 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} ${menuItemHover}`}>
                                 <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
@@ -328,7 +339,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 <button onClick={onOpenModel} title="Open Model..." className={`p-2 rounded-md transition ${textClass}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
                 </button>
-                <button onClick={onSaveDisk} title={hasUnsavedChanges ? "Save changes to disk" : "No unsaved changes"} className={`p-2 rounded-md transition ${textClass}`}>
+                <button onClick={onSaveDisk} title={hasUnsavedChanges ? `Save (${SAVE_KEY})` : `Save (${SAVE_KEY}): no unsaved changes`} aria-label="Save" className={`p-2 rounded-md transition ${textClass}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 ${saveColorClass}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
                 </button>
                 <div className={`border-l h-6 mx-1 ${dividerClass}`}></div>

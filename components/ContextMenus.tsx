@@ -123,7 +123,8 @@ export const ContextMenus: React.FC<ContextMenusProps> = (props) => {
                     onOpenModel={() => persistence.handleImportClick(props.importFileRef)}
                     onSaveModel={persistence.handleDiskSave}
                     onCreateModel={persistence.handleNewModelClick}
-                    onSaveAs={() => persistence.setIsSaveAsModalOpen(true)}
+                    onSaveAs={persistence.handleSaveFileAs}
+                    onSaveCopy={() => persistence.setIsSaveCopyModalOpen(true)}
                     onSaveAsImage={props.onSaveAsImage}
                     isReportOpen={panelState.isReportPanelOpen}
                     isMarkdownOpen={panelState.isMarkdownPanelOpen}
