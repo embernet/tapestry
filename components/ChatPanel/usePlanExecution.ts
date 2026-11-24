@@ -5,7 +5,7 @@ import { callAI, generateUUID, generateMarkdownFromGraph } from '../../utils';
 import { promptStore } from '../../services/PromptStore';
 import { EXECUTION_RESPONSE_SCHEMA, TOOL_REGISTRY } from './constants';
 import { parseParameters } from './utils';
-import { FunctionCall, FunctionResponse } from '@google/genai';
+import { type FunctionCall, type FunctionResponse } from '../../services/aiSchema';
 
 interface UsePlanExecutionProps {
     messages: ChatMessage[];

@@ -5,9 +5,9 @@
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Run the app:
    `npm run dev`
+3. Enter your own AI provider and key in Settings (they stay in the browser).
 
 ## Run with sign-in (Docker)
 
@@ -26,8 +26,8 @@ scripts/user.sh add <username> "Display Name"   # create a local account (prompt
 - Models, settings and AI keys stay in the browser (`localStorage`); the server
   keeps only accounts and sessions.
 - Optional back link: set both `PORTAL_URL` and `PORTAL_NAME`.
-- Do not set `API_KEY`/`GEMINI_API_KEY` when building an image for other
-  people: Vite bakes it into the page.
+- The build refuses to run with `API_KEY` or `GEMINI_API_KEY` set: anything
+  Vite defines is in the page every user downloads.
 - Tests: `npm test` (Node 24).
 - Deploy a release into a separate checkout: `scripts/promote.sh --ref <tag>`.
 
@@ -39,6 +39,9 @@ file on the host (one line, `chmod 600`, readable by `APP_UID`) and set
 new key. The page then offers "Tapestry server" as the AI provider, the
 default for anyone without a key of their own. Requests go through
 `/api/ai/v1/chat/completions`, where the server adds the key, so the browser
-never sees it. Settings: `SERVER_AI_MODEL`, `SERVER_AI_MODELS`,
+never sees it. Every AI feature goes through `callAI` (`utils.ts`); for this
+provider it sends structured output as `response_format` json_schema and tools
+as OpenAI tools (`services/aiRequest.ts`). The server forwards only those parts
+of the API (`server/ai.js`, `validate`) and only to `SERVER_AI_BASE_URL`. Settings: `SERVER_AI_MODEL`, `SERVER_AI_MODELS`,
 `SERVER_AI_RPM` (per user per minute), `SERVER_AI_BASE_URL` (any
 OpenAI-compatible API). Use per day and per user is in the `ai_usage` table.

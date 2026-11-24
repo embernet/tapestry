@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship } from '../types';
 import { AIConfig, callAI, formatTag } from '../utils';
-import { Type } from '@google/genai';
+import { Type } from '../services/aiSchema';
 import { promptStore } from '../services/PromptStore';
 import { notify } from '../services/dialogs';
 

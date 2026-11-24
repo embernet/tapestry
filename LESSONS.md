@@ -55,3 +55,23 @@ add an explicit install step to deploy tooling — never vendor it into git. The
 - A blocked window can't be detected for certain: no `change`, `cancel` or window `blur`
   within 1.5 s of the click is the signal (`watchChooser`), and then the step explains it.
   The drop zone stays visible regardless.
+
+## 2026-11-24 — Every AI feature through callAI; the shared key never leaves the server
+
+- **One way in:** every AI feature calls `callAI` (`utils.ts`). Components describe output
+  and tools with `services/aiSchema.ts` (`Type`, `Schema`), never a provider SDK. For the
+  server provider, `services/aiRequest.ts` sends structured output as `response_format`
+  json_schema (strict off; an array schema is wrapped as `{ result }` and unwrapped) and
+  function declarations as OpenAI tools. The Gemini SDK is only in `services/geminiClient.ts`,
+  loaded with a dynamic import for a user's own Gemini key. `test/ai-provider-guard.test.cjs`
+  fails if a component goes round this.
+- **gpt-5.x takes function tools on chat completions only with `reasoning_effort: 'none'`**
+  (400 otherwise). Other models reject the parameter, so `server/ai.js` retries once with it
+  only when the 400 names `reasoning_effort`.
+- **Upstream errors can quote a key without its `sk-`:** `redact(s, key)` removes any run that
+  is part of the key or holds 12 of its characters in a row. `test/key-leak.test.cjs` checks the
+  bundle, a running instance and a worst-case echoing upstream against the real key file.
+- The build refuses `API_KEY`/`GEMINI_API_KEY` (`vite.config.ts`): Vite's `define` ends up in
+  the bundle.
+- Gemini schemas and a single structured-output call can't also take native tools on every
+  provider, so the script `ai.propose` returns its graph changes in the schema's `actions`.

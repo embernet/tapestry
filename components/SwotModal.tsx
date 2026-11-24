@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Element, Relationship, SwotToolType, ModelActions, TapestryDocument, TapestryFolder, CustomStrategyTool, CustomStrategyCategory } from '../types';
 import { generateMarkdownFromGraph, generateUUID, callAI } from '../utils';
-import { GoogleGenAI, Type } from '@google/genai';
+import { Type } from '../services/aiSchema';
 import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
 import { promptStore } from '../services/PromptStore';

@@ -5,6 +5,7 @@ import { ToolClient, ActionDescriptor, Element, Relationship, TapestryDocument, 
 import { generateUUID, generateMarkdownFromGraph, callAI, normalizeTag } from '../utils';
 import { needsApiKey } from '../services/serverSession';
 import { TOOL_REGISTRY, EXECUTION_RESPONSE_SCHEMA } from '../components/ChatPanel/constants';
+import { parseParameters } from '../components/ChatPanel/utils';
 import { ChatMessage } from '../types';
 
 export interface UseScriptToolsProps {
@@ -397,22 +398,21 @@ export const useScriptTools = ({
                     const promptText = args.text as string;
                     const elementsMarkdown = generateMarkdownFromGraph(elementsRef.current, relationshipsRef.current);
 
-                    // Transform TOOL_REGISTRY to array for callAI
-                    const tools = Object.entries(TOOL_REGISTRY).map(([name, def]) => {
-                        return {
-                            name,
-                            description: def.description,
-                            parameters: def.parameters
-                        };
-                    });
+                    // The graph tools are described in the prompt and returned in the
+                    // schema's 'actions' array, as in the chat: structured output and
+                    // native tools can't be combined on every provider.
+                    const toolsContext = Object.entries(TOOL_REGISTRY).map(([name, def]) => {
+                        const required = def.parameters.required?.join(', ') || 'none';
+                        return `- ${name}: ${def.description} (Params: ${Object.keys(def.parameters.properties).join(', ')}. Required: ${required})`;
+                    }).join('\n');
 
-                    const fullSystemPrompt = `${systemPrompt}\n\nCONTEXT:\n${elementsMarkdown}\n\nINSTRUCTION: You MUST respond with a JSON object. If you have specific changes to propose, YOU MUST populate the 'actions' array with tool calls (e.g. addElement, addRelationship). DO NOT describe the changes in the 'message' field; use the 'message' only for a very brief summary (max 1 sentence). If you suggest adding a node or relationship, you MUST generate the corresponding tool call.`;
+                    const fullSystemPrompt = `${systemPrompt}\n\nCONTEXT:\n${elementsMarkdown}\n\nAVAILABLE TOOLS:\n${toolsContext}\n\nINSTRUCTION: You MUST respond with a JSON object. If you have specific changes to propose, YOU MUST populate the 'actions' array with tool calls (e.g. addElement, addRelationship), each with 'parameters' as a JSON string of the tool's arguments. DO NOT describe the changes in the 'message' field; use the 'message' only for a very brief summary (max 1 sentence). If you suggest adding a node or relationship, you MUST generate the corresponding tool call.`;
 
                     const response = await callAI(
                         aiConfig,
                         [{ role: 'user', parts: [{ text: promptText }] }],
                         fullSystemPrompt,
-                        tools as any[],
+                        undefined,
                         EXECUTION_RESPONSE_SCHEMA,
                         false
                     );
@@ -441,7 +441,8 @@ export const useScriptTools = ({
                         // Convert to functionCalls format
                         const functionCalls = actions.map((a: any) => ({
                             name: a.tool,
-                            args: a.parameters
+                            args: parseParameters(a.parameters),
+                            id: generateUUID()
                         }));
 
                         // Inject into Chat

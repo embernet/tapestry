@@ -1,6 +1,6 @@
 
 import { useRef, useEffect, useCallback } from 'react';
-import { FunctionCall, FunctionResponse } from '@google/genai';
+import { type FunctionCall, type FunctionResponse } from '../../services/aiSchema';
 import { ModelActions, Element, Relationship, KanbanBoard } from '../../types';
 import { createKanbanBoard, generateUUID } from '../../utils';
 import { parseParameters } from './utils';

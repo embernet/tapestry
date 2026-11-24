@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ScamperSuggestion, Element, Relationship, ModelActions, TapestryDocument, TapestryFolder, RelationshipDirection } from '../types';
 import { generateUUID, callAI } from '../utils';
-import { GoogleGenAI, Type } from '@google/genai';
+import { Type } from '../services/aiSchema';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
 import { promptStore } from '../services/PromptStore';
 import { notify } from '../services/dialogs';

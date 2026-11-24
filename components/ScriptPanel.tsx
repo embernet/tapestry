@@ -6,7 +6,7 @@ import { toolRegistry } from '../services/ToolRegistry';
 import { toolEventBus } from '../services/ToolEventBus';
 import { DEFAULT_SNIPPETS, TSCRIPT_DOCS } from '../constants';
 import { generateUUID, callAI, AIConfig } from '../utils';
-import { Type } from '@google/genai';
+import { Type } from '../services/aiSchema';
 import { confirmDialog, promptDialog } from '../services/dialogs';
 
 interface ScriptPanelProps {

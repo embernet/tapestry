@@ -20,7 +20,7 @@ export interface ServerSession {
 }
 
 // Where the page sends AI requests for the 'server' provider (OpenAI-compatible).
-export const SERVER_AI_BASE_URL = '/api/ai/v1';
+export { SERVER_AI_BASE_URL } from './aiRequest';
 
 let cached: ServerSession | null = null;
 let pending: Promise<ServerSession | null> | null = null;

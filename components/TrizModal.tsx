@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Element, Relationship, TrizToolType, ModelActions, TapestryDocument, TapestryFolder } from '../types';
 import { generateMarkdownFromGraph, AIConfig, callAI } from '../utils';
-import { GoogleGenAI, Type } from '@google/genai';
+import { Type } from '../services/aiSchema';
 import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
 import { TRIZ_PRINCIPLES_FULL } from '../documentation';

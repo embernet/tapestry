@@ -2,7 +2,7 @@
 import React from 'react';
 import { ChatMessage, PlanStep } from '../../types';
 import { PlanDAG } from './PlanDAG';
-import { FunctionCall } from '@google/genai';
+import { type FunctionCall } from '../../services/aiSchema';
 import { parseParameters } from './utils';
 
 interface ChatMessageItemProps {

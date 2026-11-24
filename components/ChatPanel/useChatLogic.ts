@@ -4,7 +4,7 @@ import { callAI, generateUUID, generateMarkdownFromGraph } from '../../utils';
 import { needsApiKey } from '../../services/serverSession';
 import { promptStore } from '../../services/PromptStore';
 import { ChatMessage, AIConfig, SystemPromptConfig, TapestryDocument, Element, Relationship } from '../../types';
-import { FunctionCall, FunctionResponse, Content } from '@google/genai';
+import { type FunctionCall, type FunctionResponse, type Content } from '../../services/aiSchema';
 import { ToolDefinition } from './types';
 import { TOOL_REGISTRY, CHAT_RESPONSE_SCHEMA } from './constants';
 import { parseParameters } from './utils';

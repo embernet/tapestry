@@ -6,7 +6,7 @@
 //
 // The browser never sees the key: the page calls this route with no key, and the
 // server adds it. Only a safe subset of the request is forwarded (model from the
-// allowlist, messages, JSON mode, temperature). Per-user rate limit, per-user
+// allowlist, messages, tools, structured output, temperature; see validate). Per-user rate limit, per-user
 // daily usage in the app DB (table ai_usage).
 //
 // Settings (environment):
@@ -20,8 +20,11 @@ const fs = require('node:fs');
 const express = require('express');
 
 const MAX_MESSAGES = 200;
-const MAX_CHARS = 1_500_000;
-const ROLES = new Set(['system', 'user', 'assistant']);
+const MAX_CHARS = 1_500_000;      // message text, tool definitions, tool arguments and schemas together
+const MAX_TOOLS = 32;
+const MAX_TOOL_CALLS = 32;        // per assistant message
+const NAME = /^[A-Za-z0-9_-]{1,64}$/;
+const CALL_ID = /^[A-Za-z0-9_.:-]{1,100}$/;
 
 function loadAiConfig(env = process.env) {
   if (env.SERVER_AI_KEY || env.OPENAI_API_KEY) {
@@ -51,28 +54,118 @@ function loadAiConfig(env = process.env) {
 }
 
 // Never let anything that looks like a key reach the browser or the logs.
-function redact(s) {
-  return String(s || '').replace(/sk-[A-Za-z0-9_\-*.]{4,}/g, 'sk-…').slice(0, 500);
+// With `key`, any run of 8+ key-like characters that is part of the key, or holds
+// 12 characters of it in a row, goes too (an upstream message may quote a
+// key's tail without its "sk-").
+function redact(s, key) {
+  let out = String(s || '');
+  if (key) {
+    out = out.split(key).join('[key]');
+    const windows = [];
+    for (let i = 0; i + 12 <= key.length; i++) windows.push(key.slice(i, i + 12));
+    out = out.replace(/[A-Za-z0-9_\-*.]{8,}/g, (t) => (key.includes(t) || windows.some((w) => t.includes(w)) ? '[key]' : t));
+  }
+  return out.replace(/sk-[A-Za-z0-9_\-*.]{4,}/g, 'sk-…').replace(/Bearer\s+\S+/gi, 'Bearer …').slice(0, 500);
 }
 
+const FINISH = new Set(['stop', 'length', 'tool_calls', 'content_filter', 'function_call']);
+const num = (v) => (Number.isFinite(Number(v)) && v !== null && v !== undefined ? Number(v) : undefined);
+const isPlainObject = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+const jsonSize = (v) => JSON.stringify(v).length;
+
+// Only the parts of the OpenAI chat completions API that Tapestry uses are
+// forwarded: model (from the allowlist), messages (text, tool calls and tool
+// results), tools (functions), tool_choice, response_format (json_object or
+// json_schema) and temperature. Everything else is dropped.
 function validate(body, cfg) {
-  if (!body || typeof body !== 'object') return { error: 'send a JSON body' };
+  if (!isPlainObject(body)) return { error: 'send a JSON body' };
   const { messages } = body;
   if (!Array.isArray(messages) || messages.length === 0) return { error: 'messages must be a non-empty array' };
   if (messages.length > MAX_MESSAGES) return { error: `at most ${MAX_MESSAGES} messages` };
   let chars = 0;
   const clean = [];
+  const callIds = new Set();
   for (const m of messages) {
-    if (!m || !ROLES.has(m.role) || typeof m.content !== 'string') return { error: 'each message needs role system|user|assistant and string content' };
-    chars += m.content.length;
-    clean.push({ role: m.role, content: m.content });
+    if (!isPlainObject(m)) return { error: 'each message must be an object' };
+    if (m.role === 'system' || m.role === 'user') {
+      if (typeof m.content !== 'string') return { error: 'each message needs role system|user|assistant|tool and string content' };
+      chars += m.content.length;
+      clean.push({ role: m.role, content: m.content });
+    } else if (m.role === 'assistant') {
+      const hasCalls = Array.isArray(m.tool_calls) && m.tool_calls.length > 0;
+      if (!(typeof m.content === 'string' || (hasCalls && (m.content === null || m.content === undefined)))) {
+        return { error: 'an assistant message needs string content or tool_calls' };
+      }
+      const out = { role: 'assistant', content: typeof m.content === 'string' ? m.content : null };
+      if (typeof m.content === 'string') chars += m.content.length;
+      if (hasCalls) {
+        if (m.tool_calls.length > MAX_TOOL_CALLS) return { error: `at most ${MAX_TOOL_CALLS} tool calls a message` };
+        out.tool_calls = [];
+        for (const c of m.tool_calls) {
+          if (!isPlainObject(c) || typeof c.id !== 'string' || !CALL_ID.test(c.id) || !isPlainObject(c.function)
+            || typeof c.function.name !== 'string' || !NAME.test(c.function.name) || typeof c.function.arguments !== 'string') {
+            return { error: 'each tool call needs an id and a function with a name and string arguments' };
+          }
+          chars += c.function.arguments.length;
+          callIds.add(c.id);
+          out.tool_calls.push({ id: c.id, type: 'function', function: { name: c.function.name, arguments: c.function.arguments } });
+        }
+      }
+      clean.push(out);
+    } else if (m.role === 'tool') {
+      if (typeof m.tool_call_id !== 'string' || !callIds.has(m.tool_call_id) || typeof m.content !== 'string') {
+        return { error: 'a tool message needs string content and the tool_call_id of an earlier tool call' };
+      }
+      chars += m.content.length;
+      clean.push({ role: 'tool', tool_call_id: m.tool_call_id, content: m.content });
+    } else {
+      return { error: 'each message needs role system|user|assistant|tool and string content' };
+    }
   }
-  if (chars > MAX_CHARS) return { error: 'request too large' };
   const out = {
     model: cfg.models.includes(body.model) ? body.model : cfg.model,
     messages: clean,
   };
-  if (body.response_format && body.response_format.type === 'json_object') out.response_format = { type: 'json_object' };
+
+  if (body.tools !== undefined) {
+    if (!Array.isArray(body.tools) || body.tools.length > MAX_TOOLS) return { error: `tools must be an array of at most ${MAX_TOOLS} functions` };
+    if (body.tools.length) {
+      out.tools = [];
+      for (const t of body.tools) {
+        const f = isPlainObject(t) && t.type === 'function' ? t.function : null;
+        if (!isPlainObject(f) || typeof f.name !== 'string' || !NAME.test(f.name)
+          || (f.description !== undefined && typeof f.description !== 'string')
+          || (f.parameters !== undefined && !isPlainObject(f.parameters))) {
+          return { error: 'each tool must be { type: "function", function: { name, description?, parameters? } }' };
+        }
+        const fn = { name: f.name };
+        if (f.description) fn.description = f.description.slice(0, 1024);
+        if (f.parameters) fn.parameters = f.parameters;
+        chars += jsonSize(fn);
+        out.tools.push({ type: 'function', function: fn });
+      }
+      const tc = body.tool_choice;
+      if (tc === 'auto' || tc === 'none' || tc === 'required') out.tool_choice = tc;
+      else if (isPlainObject(tc) && tc.type === 'function' && isPlainObject(tc.function) && out.tools.some((t) => t.function.name === tc.function.name)) {
+        out.tool_choice = { type: 'function', function: { name: tc.function.name } };
+      }
+    }
+  }
+
+  const rf = body.response_format;
+  if (isPlainObject(rf) && rf.type === 'json_object') out.response_format = { type: 'json_object' };
+  else if (isPlainObject(rf) && rf.type === 'json_schema') {
+    const js = rf.json_schema;
+    if (!isPlainObject(js) || typeof js.name !== 'string' || !NAME.test(js.name) || !isPlainObject(js.schema)) {
+      return { error: 'response_format json_schema needs a name and a schema object' };
+    }
+    const schema = { name: js.name, schema: js.schema };
+    if (typeof js.strict === 'boolean') schema.strict = js.strict;
+    if (typeof js.description === 'string') schema.description = js.description.slice(0, 1024);
+    chars += jsonSize(schema);
+    out.response_format = { type: 'json_schema', json_schema: schema };
+  }
+  if (chars > MAX_CHARS) return { error: 'request too large' };
   if (typeof body.temperature === 'number' && body.temperature >= 0 && body.temperature <= 2) out.temperature = body.temperature;
   return { value: out };
 }
@@ -114,22 +207,30 @@ function createAi({ db, config, fetchImpl = fetch, log = console }) {
     }
 
     const started = Date.now();
-    let upstream;
+    const send = (body) => fetchImpl(`${cfg.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(180_000),
+    });
+    let upstream, data;
     try {
-      upstream = await fetchImpl(`${cfg.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.key}` },
-        body: JSON.stringify(check.value),
-        signal: AbortSignal.timeout(180_000),
-      });
+      upstream = await send(check.value);
+      data = await upstream.json().catch(() => null);
+      // Reasoning models (e.g. gpt-5.x) take function tools on chat completions
+      // only with reasoning switched off; other models reject the parameter, so
+      // it is added only when the service asks for it, and only once.
+      if (upstream.status === 400 && check.value.tools && /reasoning_effort/.test(String(data?.error?.message || ''))) {
+        upstream = await send({ ...check.value, reasoning_effort: 'none' });
+        data = await upstream.json().catch(() => null);
+      }
     } catch (e) {
-      log.error(`[ai] ${req.user.username}: upstream unreachable: ${redact(e.message)}`);
+      log.error(`[ai] ${req.user.username}: upstream unreachable: ${redact(e.message, cfg.key)}`);
       return res.status(502).json({ error: { message: 'The AI service could not be reached. Try again later.' } });
     }
 
-    const data = await upstream.json().catch(() => null);
     if (!upstream.ok) {
-      const detail = redact(data?.error?.message || upstream.statusText);
+      const detail = redact(data?.error?.message || upstream.statusText, cfg.key);
       log.error(`[ai] ${req.user.username}: upstream ${upstream.status}: ${detail}`);
       let message = `The AI service returned an error (${upstream.status}): ${detail}`;
       if (upstream.status === 401 || upstream.status === 403) message = 'The server\'s AI key was refused. Ask the administrator to check it.';
@@ -142,15 +243,23 @@ function createAi({ db, config, fetchImpl = fetch, log = console }) {
       record.run(new Date().toISOString().slice(0, 10), req.user.id, req.user.username,
         Number(usage.prompt_tokens) || 0, Number(usage.completion_tokens) || 0);
     } catch (e) {
-      log.error(`[ai] usage not recorded: ${e.message}`);
+      log.error(`[ai] usage not recorded: ${redact(e.message, cfg.key)}`);
     }
-    log.log(`[ai] ${req.user.username} ${check.value.model} ${usage.prompt_tokens ?? '?'}+${usage.completion_tokens ?? '?'} tokens ${Date.now() - started} ms`);
+    log.log(`[ai] ${req.user.username} ${check.value.model} ${num(usage.prompt_tokens) ?? '?'}+${num(usage.completion_tokens) ?? '?'} tokens ${Date.now() - started} ms`);
 
+    // Rebuilt field by field: nothing else from the upstream reply is passed on.
     const msg = data?.choices?.[0]?.message || {};
+    const message = { role: 'assistant', content: typeof msg.content === 'string' ? msg.content : '' };
+    if (typeof msg.refusal === 'string' && msg.refusal) message.refusal = redact(msg.refusal, cfg.key);
+    const toolCalls = (Array.isArray(msg.tool_calls) ? msg.tool_calls : [])
+      .filter((c) => c && c.function && typeof c.function.name === 'string')
+      .slice(0, MAX_TOOL_CALLS)
+      .map((c) => ({ id: redact(c.id, cfg.key).slice(0, 100), type: 'function', function: { name: c.function.name, arguments: typeof c.function.arguments === 'string' ? c.function.arguments : '{}' } }));
+    if (toolCalls.length) message.tool_calls = toolCalls;
     res.json({
-      model: data?.model || check.value.model,
-      choices: [{ index: 0, message: { role: 'assistant', content: typeof msg.content === 'string' ? msg.content : '' }, finish_reason: data?.choices?.[0]?.finish_reason || null }],
-      usage: { prompt_tokens: usage.prompt_tokens, completion_tokens: usage.completion_tokens, total_tokens: usage.total_tokens },
+      model: typeof data?.model === 'string' ? redact(data.model, cfg.key).slice(0, 100) : check.value.model,
+      choices: [{ index: 0, message, finish_reason: FINISH.has(data?.choices?.[0]?.finish_reason) ? data.choices[0].finish_reason : null }],
+      usage: { prompt_tokens: num(usage.prompt_tokens), completion_tokens: num(usage.completion_tokens), total_tokens: num(usage.total_tokens) },
     });
   });
 

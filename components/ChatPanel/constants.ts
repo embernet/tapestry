@@ -1,5 +1,5 @@
 import { ToolDefinition } from './types';
-import { Type, Schema } from '@google/genai';
+import { Type, type Schema } from '../../services/aiSchema';
 
 export const TOOL_REGISTRY: Record<string, ToolDefinition> = {
     addElement: {

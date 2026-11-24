@@ -1,5 +1,5 @@
 
-import { FunctionCall, FunctionResponse } from '@google/genai';
+import { type FunctionCall, type FunctionResponse } from './services/aiSchema';
 
 export enum RelationshipDirection {
   None = 'NONE',

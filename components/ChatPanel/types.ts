@@ -1,6 +1,6 @@
 
 import { Element, Relationship, ColorScheme, ModelActions, AIConfig, SystemPromptConfig, TapestryDocument, TapestryFolder, KanbanBoard, ChatMessage } from '../../types';
-import { Type, Schema } from '@google/genai';
+import { Type, type Schema } from '../../services/aiSchema';
 
 export interface ChatPanelProps {
     elements: Element[];
