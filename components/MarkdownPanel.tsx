@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { isInIframe } from '../utils';
+import { openFile } from '../services/fileOpen';
 import { notify } from '../services/dialogs';
 
 interface MarkdownPanelProps {
@@ -99,41 +99,22 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
     URL.revokeObjectURL(url);
   };
 
-  const handleSelectFile = async (shouldAppend: boolean) => {
+  const handleSelectFile = (shouldAppend: boolean) => {
     isAppendingRef.current = shouldAppend;
     setIsImportModalOpen(false);
 
-    // Try File System Access API first for better UX (start in Documents)
-    if (!isInIframe() && 'showOpenFilePicker' in window) {
-        try {
-            const pickerOptions = {
-                types: [{
-                    description: 'Markdown/Text Files',
-                    accept: { 'text/markdown': ['.md', '.txt'] }
-                }],
-                startIn: 'documents',
-            };
-            
-            // @ts-ignore - showOpenFilePicker is not yet in all TS definitions
-            const [fileHandle] = await window.showOpenFilePicker(pickerOptions);
-            const file = await fileHandle.getFile();
+    // In this click: the file input fallback must open in the same user gesture.
+    void openFile({
+        input: importFileRef.current,
+        startIn: 'documents',
+        types: [{ description: 'Markdown/Text Files', accept: { 'text/markdown': ['.md', '.txt'] } }],
+        title: 'Import Markdown',
+        message: 'Choose a Markdown or text file from your computer.',
+        onPicked: async (file) => {
             const content = await file.text();
-            
-            if (shouldAppend) {
-                setText(prev => `${prev}\n${content}`);
-            } else {
-                setText(content);
-            }
-        } catch (err: any) {
-            if (err.name !== 'AbortError') {
-                console.warn("File System Access API failed, falling back to input:", err);
-                importFileRef.current?.click();
-            }
-        }
-    } else {
-        // Fallback for browsers without File System Access API
-        importFileRef.current?.click();
-    }
+            setText(prev => shouldAppend ? `${prev}\n${content}` : content);
+        },
+    });
   };
 
   const handleImportFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {

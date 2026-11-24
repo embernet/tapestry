@@ -3,11 +3,10 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { ModelMetadata, ColorScheme, SystemPromptConfig, Element, Relationship, TapestryDocument, TapestryFolder, HistoryEntry, StorySlide, MermaidDiagram, DateFilterState, PanelLayout, Script, GraphView, KanbanBoard } from '../types';
 import { DEFAULT_COLOR_SCHEMES, DEFAULT_SYSTEM_PROMPT_CONFIG, DEFAULT_TOOL_PROMPTS, CORE_TOOL_IDS } from '../constants';
 import { generateUUID, computeContentHash, isInIframe, createDefaultView } from '../utils';
-import { notify, confirmDialog } from '../services/dialogs';
-
-// File System Access pickers failing at once (blocked or unavailable) are not used again this session.
-const PICKER_MIN_MS = 500;
-let fileSystemPickerBlocked = false;
+import { notify } from '../services/dialogs';
+import { openFile, isPickerBlocked, markPickerBlocked } from '../services/fileOpen';
+import { chooseSaveTarget, classifyPickerFailure } from '../utils/filePicker';
+import { recoverableModels, markSaved } from '../utils/recovery';
 
 // Keys
 const MODELS_INDEX_KEY = 'tapestry_models_index';
@@ -93,6 +92,11 @@ export const usePersistence = ({
     const [isSchemaUpdateModalOpen, setIsSchemaUpdateModalOpen] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [isQuotaExceeded, setIsQuotaExceeded] = useState(false);
+
+    // A model just opened from a file matches that file, but loading normalises it (key
+    // order, default view and board, merged schemas), so its hash changes once. The
+    // first autosave after such a load takes the loaded hash as the saved one.
+    const adoptSavedBaselineRef = useRef<string | null>(null);
 
     const safeSetItem = useCallback((key: string, value: string) => {
         try {
@@ -359,7 +363,13 @@ export const usePersistence = ({
             const currentContentHash = computeContentHash(modelData);
             const currentMeta = modelsIndex.find(m => m.id === currentModelId);
 
-            if (!currentMeta || currentMeta.contentHash !== currentContentHash) {
+            const adoptBaseline = adoptSavedBaselineRef.current === currentModelId;
+            if (adoptBaseline) adoptSavedBaselineRef.current = null;
+
+            if (adoptBaseline && currentMeta && currentMeta.lastDiskHash !== currentContentHash) {
+                safeSetItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
+                setModelsIndex(prevIndex => prevIndex.map(m => m.id === currentModelId ? markSaved(m, currentContentHash, 'disk') : m));
+            } else if (!currentMeta || currentMeta.contentHash !== currentContentHash) {
                 safeSetItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
                 setModelsIndex(prevIndex => {
                     const now = new Date().toISOString();
@@ -410,17 +420,35 @@ export const usePersistence = ({
             activeViewId
         };
         const currentHash = computeContentHash(modelData);
-        const updatedMetadata = { ...modelMetadata, updatedAt: now, filename: modelMetadata.filename || `${modelMetadata.name.replace(/ /g, '_')}.json`, contentHash: currentHash, lastDiskHash: currentHash };
+        const updatedMetadata = markSaved({ ...modelMetadata, updatedAt: now, filename: modelMetadata.filename || `${modelMetadata.name.replace(/ /g, '_')}.json` }, currentHash, 'disk');
         const exportData = { metadata: updatedMetadata, data: modelData, };
         const jsonString = JSON.stringify(exportData, null, 2);
+        const saveEnv = () => ({
+            hasWritableHandle: !!currentFileHandleRef.current && 'createWritable' in currentFileHandleRef.current,
+            hasSaveFilePicker: 'showSaveFilePicker' in window,
+            isSecureContext: window.isSecureContext === true,
+            inIframe: isInIframe(),
+            pickerBlocked: isPickerBlocked(),
+        });
         try {
-            if (!isInIframe() && currentFileHandleRef.current && 'createWritable' in currentFileHandleRef.current) {
-                const writable = await currentFileHandleRef.current.createWritable();
-                await writable.write(jsonString);
-                await writable.close();
-            } else {
-                let saved = false;
-                if (!isInIframe() && 'showSaveFilePicker' in window && !fileSystemPickerBlocked) {
+            let saved = false, sameFileFailed = false;
+            if (chooseSaveTarget(saveEnv()) === 'same-file') {
+                // Only a file opened or saved through the File System Access picker has a handle.
+                try {
+                    const writable = await currentFileHandleRef.current.createWritable();
+                    await writable.write(jsonString);
+                    await writable.close();
+                    saved = true;
+                } catch (err: any) {
+                    // Write permission refused or the file is gone. This click's gesture
+                    // has been used, so a save picker would be refused too: download.
+                    console.warn("Couldn't write to the opened file; downloading it instead.", err);
+                    currentFileHandleRef.current = null;
+                    sameFileFailed = true;
+                }
+            }
+            if (!saved) {
+                if (!sameFileFailed && chooseSaveTarget(saveEnv()) === 'save-picker') {
                     const started = Date.now();
                     try {
                         const options = { suggestedName: updatedMetadata.filename, types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] }, }], };
@@ -431,9 +459,9 @@ export const usePersistence = ({
                         await writable.close();
                         saved = true;
                     } catch (err: any) {
-                        if (err?.name === 'AbortError' && Date.now() - started >= PICKER_MIN_MS) throw err;   // user cancelled
+                        if (classifyPickerFailure(err, Date.now() - started) === 'cancelled') throw err;   // user cancelled
                         console.warn("Save picker unavailable; downloading the file instead.", err);
-                        fileSystemPickerBlocked = true;
+                        markPickerBlocked();
                     }
                 }
                 if (!saved) {
@@ -536,8 +564,8 @@ export const usePersistence = ({
             window.open(gistUrl, '_blank');
             notify("Successfully saved to GitHub Gist!", 'success');
 
-            // Sync local index
-            setModelsIndex(prev => prev.map(m => m.id === currentModelId ? updatedMetadata : m));
+            // Sync local index; a model saved to a Gist is not a recovered model until it changes
+            setModelsIndex(prev => prev.map(m => m.id === currentModelId ? markSaved(updatedMetadata, currentHash, 'other') : m));
             safeSetItem(`${MODEL_DATA_PREFIX}${currentModelId}`, JSON.stringify(modelData));
 
         } catch (e: any) {
@@ -669,6 +697,7 @@ export const usePersistence = ({
                 activeViewId: dataToImport.activeViewId || (dataToImport.views && dataToImport.views.length > 0 ? dataToImport.views[0].id : null)
             };
 
+            adoptSavedBaselineRef.current = newModelId;
             loadModelData(newModelData, newModelId, newMetadata);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'An unknown error occurred.';
@@ -677,41 +706,18 @@ export const usePersistence = ({
         }
     }, [modelsIndex, loadModelData]);
 
-    const handleImportClick = useCallback(async (fileInputRef: any) => {
-        const openFileInput = () => {
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-                fileInputRef.current.click();
-            }
-        };
-        // The File System Access picker is preferred (Save can then write back to the same
-        // file), but a browser may block it: by policy, inside a preview pane, or under
-        // automation. It then fails at once, often with the same AbortError as a user's
-        // Cancel. A real Cancel takes the user longer than PICKER_MIN_MS.
-        if (!isInIframe() && 'showOpenFilePicker' in window && !fileSystemPickerBlocked) {
-            const started = Date.now();
-            try {
-                const pickerOptions = { types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }], };
-                const [fileHandle] = await (window as any).showOpenFilePicker(pickerOptions);
-                currentFileHandleRef.current = fileHandle;
-                const file = await fileHandle.getFile();
-                const text = await file.text();
-                processImportedData(text, file.name);
-                return;
-            } catch (err: any) {
-                if (err?.name === 'AbortError' && Date.now() - started >= PICKER_MIN_MS) return;   // user cancelled
-                console.warn("File picker unavailable; using the browser's file chooser instead.", err);
-                fileSystemPickerBlocked = true;
-                // The failed picker used up this click's permission to open a file chooser,
-                // so ask for one more click, which opens it.
-                if (await confirmDialog({ title: 'Open a model', message: "Choose a Tapestry model file (.json) from your computer.", confirmLabel: 'Choose file…' })) {
-                    openFileInput();
-                }
-                return;
-            }
-        }
-        openFileInput();
-    }, [processImportedData, currentFileHandleRef]);
+    // Call straight from a click handler: the file input fallback must be clicked in the
+    // same user gesture (services/fileOpen.ts). The input is mounted once in App.
+    const handleImportClick = useCallback((fileInputRef: React.RefObject<HTMLInputElement>) => openFile({
+        input: fileInputRef.current,
+        types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
+        title: 'Open a model',
+        message: 'Choose a Tapestry model file (.json) from your computer.',
+        onPicked: async (file, handle) => {
+            currentFileHandleRef.current = handle;
+            processImportedData(await file.text(), file.name);
+        },
+    }), [processImportedData, currentFileHandleRef]);
 
     const handleImportInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -779,14 +785,14 @@ export const usePersistence = ({
     }, [modelsIndex, currentModelId]);
 
     const handleDeleteAllModels = useCallback(() => {
-        // Remove all data
-        modelsIndex.forEach(model => {
-            localStorage.removeItem(`${MODEL_DATA_PREFIX}${model.id}`);
-        });
+        // Remove the recovered models (the ones listed); saved, unchanged models stay
+        const toDelete = new Set(recoverableModels(modelsIndex).map(m => m.id));
+        toDelete.forEach(id => localStorage.removeItem(`${MODEL_DATA_PREFIX}${id}`));
 
-        // Clear Index
-        setModelsIndex([]);
-        localStorage.removeItem(MODELS_INDEX_KEY);
+        const newIndex = modelsIndex.filter(m => !toDelete.has(m.id));
+        setModelsIndex(newIndex);
+        safeSetItem(MODELS_INDEX_KEY, JSON.stringify(newIndex));
+        if (currentModelId && toDelete.has(currentModelId)) setCurrentModelId(null);
 
         // Clear current ID if it was one of them (which it likely is if it's recovered)
         // If the user is currently "in" a model that was just recovered, deleting all "recovered" versions from disk
@@ -794,7 +800,11 @@ export const usePersistence = ({
         // aren't considering the *active* unsaved work as "in the list" unless we are reloading page.
         // But to be safe, we just clear the list.
         // We don't force unload the current canvas.
-    }, [modelsIndex]);
+    }, [modelsIndex, currentModelId, safeSetItem]);
+
+    // Models changed since they were last saved. Saved, unchanged ones (including entries
+    // left by saves before this list was filtered) are not listed.
+    const recoveredModels = useMemo(() => recoverableModels(modelsIndex), [modelsIndex]);
 
     const hasUnsavedChanges = useMemo(() => {
         const currentMeta = modelsIndex.find(m => m.id === currentModelId);
@@ -847,6 +857,7 @@ export const usePersistence = ({
 
     return {
         modelsIndex,
+        recoveredModels,
         currentModelId,
         setCurrentModelId,
         isCreateModelModalOpen,
@@ -887,6 +898,7 @@ export const usePersistence = ({
         loadModelData,
         handleOverwriteLocal: useCallback((diskData: any, diskMetadata: ModelMetadata) => {
             safeSetItem(`${MODEL_DATA_PREFIX}${diskMetadata.id}`, JSON.stringify(diskData));
+            adoptSavedBaselineRef.current = diskMetadata.id;   // the file's copy: saved, not recovered
             loadModelData(diskData, diskMetadata.id, diskMetadata);
         }, [safeSetItem, loadModelData]),
         migrateLegacySchemes,

@@ -8,9 +8,11 @@ interface OpenModelModalProps {
     onTriggerCreate: () => void;
     onDelete: (id: string) => void;
     onDeleteAll: () => void;
+    /** Open a model file from disk instead (must open the file chooser in this click). */
+    onOpenFile?: () => void;
 }
 
-export const OpenModelModal: React.FC<OpenModelModalProps> = ({ models, onLoad, onClose, onTriggerCreate, onDelete, onDeleteAll }) => {
+export const OpenModelModal: React.FC<OpenModelModalProps> = ({ models, onLoad, onClose, onTriggerCreate, onDelete, onDeleteAll, onOpenFile }) => {
     const [confirmDeleteId, setConfirmDeleteId] = React.useState<string | null>(null);
     const [isConfirmingDeleteAll, setIsConfirmingDeleteAll] = React.useState(false);
 
@@ -116,6 +118,14 @@ export const OpenModelModal: React.FC<OpenModelModalProps> = ({ models, onLoad, 
                         </p>
                     </div>
                     <div className="flex items-center gap-4">
+                        {onOpenFile && (
+                            <button
+                                onClick={onOpenFile}
+                                className="text-sm text-blue-400 hover:text-blue-300 hover:underline transition-colors"
+                            >
+                                Open a file…
+                            </button>
+                        )}
                         {models.length > 0 && (
                             <button
                                 onClick={handleDeleteAllClick}
@@ -131,11 +141,11 @@ export const OpenModelModal: React.FC<OpenModelModalProps> = ({ models, onLoad, 
                 <div className="flex-grow overflow-y-auto mb-6 space-y-2">
                     {models.length === 0 ? (
                         <div className="text-center text-gray-500 py-10">
-                            <p className="mb-4">No models found in browser storage.</p>
+                            <p className="mb-4">No unsaved models in browser storage.</p>
                             <button onClick={onTriggerCreate} className="text-blue-400 underline">Create a new model</button>
                         </div>
                     ) : (
-                        models.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).map(m => (
+                        [...models].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).map(m => (
                             <div
                                 key={m.id}
                                 onClick={() => onLoad(m.id)}

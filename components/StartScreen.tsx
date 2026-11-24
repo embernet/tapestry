@@ -10,6 +10,7 @@ interface StartScreenProps {
     setIsCreateModelModalOpen: (open: boolean) => void;
     handleImportClick: (ref: React.RefObject<HTMLInputElement>) => void;
     modelsIndex: ModelMetadata[];
+    recoveredModels: ModelMetadata[];   // changed since last saved (utils/recovery.ts)
     handleLoadModel: (id: string) => void;
     setIsOpenModelModalOpen: (open: boolean) => void;
   };
@@ -50,7 +51,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
             <span className="text-sm text-gray-500 mt-2 text-center px-4 group-hover:text-gray-400">Open a JSON file from Disk</span>
           </button>
 
-          {persistence.modelsIndex.length > 0 && (
+          {persistence.recoveredModels.length > 0 && (
             <button onClick={() => persistence.setIsOpenModelModalOpen(true)} className={`relative flex flex-col items-center justify-center w-56 h-56 border-2 rounded-2xl hover:border-yellow-500 hover:scale-105 hover:shadow-lg hover:shadow-yellow-500/20 transition-all group ${isDarkMode ? 'bg-gray-800 border-gray-700 hover:bg-gray-750' : 'bg-white border-gray-200 hover:bg-gray-50'}`}>
               <div className="absolute top-2 right-2 group/info">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400 hover:text-blue-400 cursor-help" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -66,7 +67,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
                 </svg>
               </div>
               <span className={`text-xl font-semibold group-hover:text-yellow-500 transition-colors ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Recovered Models</span>
-              <span className="text-sm text-gray-500 mt-2 text-center px-4 group-hover:text-gray-400">{persistence.modelsIndex.length} recovered models available</span>
+              <span className="text-sm text-gray-500 mt-2 text-center px-4 group-hover:text-gray-400">{persistence.recoveredModels.length} recovered {persistence.recoveredModels.length === 1 ? 'model' : 'models'} available</span>
             </button>
           )}
         </div>

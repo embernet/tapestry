@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { isInIframe } from '../utils';
+import { openFile } from '../services/fileOpen';
 import { notify } from '../services/dialogs';
 
 interface JSONPanelProps {
@@ -41,33 +41,16 @@ const JSONPanel: React.FC<JSONPanelProps> = ({ initialData, onApply, onClose, mo
     URL.revokeObjectURL(url);
   };
 
-  const handleOpen = async () => {
-    // Try File System Access API first for better UX (start in Documents)
-    if (!isInIframe() && 'showOpenFilePicker' in window) {
-        try {
-            const pickerOptions = {
-                types: [{
-                    description: 'JSON Files',
-                    accept: { 'application/json': ['.json'] }
-                }],
-                startIn: 'documents',
-            };
-            
-            // @ts-ignore - showOpenFilePicker is not yet in all TS definitions
-            const [fileHandle] = await window.showOpenFilePicker(pickerOptions);
-            const file = await fileHandle.getFile();
-            const content = await file.text();
-            setText(content);
-        } catch (err: any) {
-            if (err.name !== 'AbortError') {
-                console.warn("File System Access API failed, falling back to input:", err);
-                importFileRef.current?.click();
-            }
-        }
-    } else {
-        // Fallback for browsers without File System Access API
-        importFileRef.current?.click();
-    }
+  const handleOpen = () => {
+    // In this click: the file input fallback must open in the same user gesture.
+    void openFile({
+        input: importFileRef.current,
+        startIn: 'documents',
+        types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
+        title: 'Open JSON',
+        message: 'Choose a JSON file from your computer.',
+        onPicked: async (file) => setText(await file.text()),
+    });
   };
 
   const handleImportFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
