@@ -35,3 +35,23 @@ add an explicit install step to deploy tooling — never vendor it into git. The
 - Check a "fixed" picker bug in all three Playwright engines, at localhost **and** the host
   IP (not a secure context: no File System Access API). Playwright refuses the Chromium
   picker at once, which exercises the refused-picker path, not a real dialog.
+
+## 2026-11-24 — A file window can be intercepted; always offer a label and a drop zone
+
+- **"Intercepted by Page.setInterceptFileChooserDialog()"** means the browser is driven over
+  the DevTools protocol (an automation tool, an embedded browser pane). Every file window,
+  the picker's and the `<input type="file">`'s, goes to the automation tool, not the user,
+  and nothing in the page shows. Playwright's own Chromium gives the same AbortError, so a
+  Playwright run reproduces it. `classifyPickerFailure` treats any "intercept" message as
+  blocked, whatever the timing.
+- **Clicking "Choose file…" after an `await` is not reliable**: the step is now a
+  `<label htmlFor>` for the always-mounted input (`components/FileChooser.tsx`), which opens
+  the file window within the user's own click; Enter and Space call `input.click()` in the
+  keydown.
+- **Drag-and-drop works when no file window can open.** Dropped files are handed to the same
+  input (`dropFiles` → `deliverToInput`: set `input.files`, fire `change`), so they take the
+  exact import path of a chosen file; non-matching files are refused in the page. The start
+  screen takes a model dropped anywhere.
+- A blocked window can't be detected for certain: no `change`, `cancel` or window `blur`
+  within 1.5 s of the click is the signal (`watchChooser`), and then the step explains it.
+  The drop zone stays visible regardless.

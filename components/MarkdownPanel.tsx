@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { openFile } from '../services/fileOpen';
+import { useFileDrop } from './FileChooser';
 import { notify } from '../services/dialogs';
 
 interface MarkdownPanelProps {
@@ -76,6 +77,8 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
   const [text, setText] = useState(initialText);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const importFileRef = useRef<HTMLInputElement>(null);
+  // A file dropped on the panel goes through the file input's onChange.
+  const { dropProps: panelDropProps } = useFileDrop(importFileRef);
   const isAppendingRef = useRef(false);
 
   useEffect(() => {
@@ -110,6 +113,7 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
         types: [{ description: 'Markdown/Text Files', accept: { 'text/markdown': ['.md', '.txt'] } }],
         title: 'Import Markdown',
         message: 'Choose a Markdown or text file from your computer.',
+        fileKind: 'Markdown or text file (.md, .txt)',
         onPicked: async (file) => {
             const content = await file.text();
             setText(prev => shouldAppend ? `${prev}\n${content}` : content);
@@ -147,7 +151,7 @@ const MarkdownPanel: React.FC<MarkdownPanelProps> = ({ initialText, onApply, onC
   const textareaBg = isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-gray-50 border-gray-300 text-gray-900';
 
   return (
-    <div className={`w-full h-full flex flex-col ${bgClass}`}>
+    <div {...panelDropProps} className={`w-full h-full flex flex-col ${bgClass}`}>
        <input
         type="file"
         ref={importFileRef}

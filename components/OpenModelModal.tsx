@@ -1,5 +1,6 @@
 import React from 'react';
 import { ModelMetadata } from '../types';
+import { FileChooser } from './FileChooser';
 
 interface OpenModelModalProps {
     models: ModelMetadata[];
@@ -10,9 +11,11 @@ interface OpenModelModalProps {
     onDeleteAll: () => void;
     /** Open a model file from disk instead (must open the file chooser in this click). */
     onOpenFile?: () => void;
+    /** The page's always-mounted model file input: "Choose file…" is a label for it, and drops go to it. */
+    fileInputRef?: React.RefObject<HTMLInputElement>;
 }
 
-export const OpenModelModal: React.FC<OpenModelModalProps> = ({ models, onLoad, onClose, onTriggerCreate, onDelete, onDeleteAll, onOpenFile }) => {
+export const OpenModelModal: React.FC<OpenModelModalProps> = ({ models, onLoad, onClose, onTriggerCreate, onDelete, onDeleteAll, onOpenFile, fileInputRef }) => {
     const [confirmDeleteId, setConfirmDeleteId] = React.useState<string | null>(null);
     const [isConfirmingDeleteAll, setIsConfirmingDeleteAll] = React.useState(false);
 
@@ -118,14 +121,6 @@ export const OpenModelModal: React.FC<OpenModelModalProps> = ({ models, onLoad, 
                         </p>
                     </div>
                     <div className="flex items-center gap-4">
-                        {onOpenFile && (
-                            <button
-                                onClick={onOpenFile}
-                                className="text-sm text-blue-400 hover:text-blue-300 hover:underline transition-colors"
-                            >
-                                Open a file…
-                            </button>
-                        )}
                         {models.length > 0 && (
                             <button
                                 onClick={handleDeleteAllClick}
@@ -137,6 +132,13 @@ export const OpenModelModal: React.FC<OpenModelModalProps> = ({ models, onLoad, 
                         <button onClick={onClose} className="text-gray-400 hover:text-white"><svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg></button>
                     </div>
                 </div>
+
+                {fileInputRef && (
+                    <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-gray-300 mb-2">Open a model file</h3>
+                        <FileChooser inputRef={fileInputRef} fileKind="Tapestry model file (.json)" onFile={onClose} onUsePicker={onOpenFile} />
+                    </div>
+                )}
 
                 <div className="flex-grow overflow-y-auto mb-6 space-y-2">
                     {models.length === 0 ? (

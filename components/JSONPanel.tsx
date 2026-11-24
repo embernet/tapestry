@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { openFile } from '../services/fileOpen';
+import { useFileDrop } from './FileChooser';
 import { notify } from '../services/dialogs';
 
 interface JSONPanelProps {
@@ -14,6 +15,8 @@ interface JSONPanelProps {
 const JSONPanel: React.FC<JSONPanelProps> = ({ initialData, onApply, onClose, modelName, isDarkMode }) => {
   const [text, setText] = useState('');
   const importFileRef = useRef<HTMLInputElement>(null);
+  // A file dropped on the panel goes through the file input's onChange.
+  const { dropProps: panelDropProps } = useFileDrop(importFileRef);
 
   useEffect(() => {
     setText(JSON.stringify(initialData, null, 2));
@@ -49,6 +52,7 @@ const JSONPanel: React.FC<JSONPanelProps> = ({ initialData, onApply, onClose, mo
         types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
         title: 'Open JSON',
         message: 'Choose a JSON file from your computer.',
+        fileKind: 'JSON file (.json)',
         onPicked: async (file) => setText(await file.text()),
     });
   };
@@ -79,7 +83,7 @@ const JSONPanel: React.FC<JSONPanelProps> = ({ initialData, onApply, onClose, mo
   const textareaBg = isDarkMode ? 'bg-gray-900 border-gray-600 text-white' : 'bg-gray-50 border-gray-300 text-gray-900';
 
   return (
-    <div className={`w-full h-full flex flex-col ${bgClass}`}>
+    <div {...panelDropProps} className={`w-full h-full flex flex-col ${bgClass}`}>
        <input
         type="file"
         ref={importFileRef}

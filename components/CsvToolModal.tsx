@@ -4,6 +4,7 @@ import { Element, Relationship, CsvColumnConfig, CsvColumnMappingType, Relations
 import { parseCSV, generateCSV, guessColumnMapping } from '../utils/csvParser';
 import { generateUUID, normalizeTag } from '../utils';
 import { notify } from '../services/dialogs';
+import { ChooseFileLabel, useFileDrop } from './FileChooser';
 
 interface CsvToolModalProps {
     isOpen: boolean;
@@ -43,6 +44,7 @@ export const CsvToolModal: React.FC<CsvToolModalProps> = ({
     const [inspectContent, setInspectContent] = useState<string | null>(null);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { isDragging: isDraggingCsv, dropProps: csvDropProps } = useFileDrop(fileInputRef);
 
     const readFileContent = (file: File): Promise<string> => {
         return new Promise((resolve, reject) => {
@@ -474,7 +476,7 @@ export const CsvToolModal: React.FC<CsvToolModalProps> = ({
                     {activeTab === 'import' && (
                         <div className="space-y-6">
                             {/* Upload Area */}
-                            <div className={`border-2 border-dashed rounded-lg p-6 text-center ${detectedFiles.length > 0 ? 'border-green-500 bg-green-900/10' : 'border-gray-500'} transition-colors`}>
+                            <div {...csvDropProps} className={`border-2 border-dashed rounded-lg p-6 text-center ${isDraggingCsv ? 'border-blue-400 bg-blue-500/10' : detectedFiles.length > 0 ? 'border-green-500 bg-green-900/10' : 'border-gray-500'} transition-colors`}>
                                 <input 
                                     type="file" 
                                     ref={fileInputRef}
@@ -489,7 +491,7 @@ export const CsvToolModal: React.FC<CsvToolModalProps> = ({
                                             <svg xmlns="http://www.w3.org/2000/svg" className={`h-12 w-12 mx-auto ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                             </svg>
-                                            <p className={textClass}>Drag and drop CSV files here, or <button onClick={() => fileInputRef.current?.click()} className="text-blue-500 hover:underline">browse</button></p>
+                                            <p className={textClass}>Drag and drop CSV files here, or <ChooseFileLabel inputRef={fileInputRef} className="text-blue-500 hover:underline">browse</ChooseFileLabel></p>
                                             <p className="text-xs text-gray-500">Tip: Select both <strong>_nodes.csv</strong> and <strong>_edges.csv</strong> to import a full model.</p>
                                         </>
                                     ) : (
@@ -528,10 +530,10 @@ export const CsvToolModal: React.FC<CsvToolModalProps> = ({
                                                 </div>
                                             ))}
                                             <div className="pt-2 text-center">
-                                                <button onClick={() => fileInputRef.current?.click()} className="text-blue-500 text-xs hover:underline flex items-center justify-center gap-1 mx-auto">
+                                                <ChooseFileLabel inputRef={fileInputRef} className="text-blue-500 text-xs hover:underline flex items-center justify-center gap-1 mx-auto w-fit">
                                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                                                     Add more files
-                                                </button>
+                                                </ChooseFileLabel>
                                             </div>
                                         </div>
                                     )}

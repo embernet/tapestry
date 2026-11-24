@@ -32,8 +32,21 @@ export interface PromptOptions {
     multiline?: boolean;
 }
 
+/** The in-page "choose a file" step: a label for the page's file input, and a drop zone. */
+export interface FileStepOptions {
+    title?: string;
+    message: string;
+    /** The always-mounted <input type="file"> whose onChange takes the file. */
+    input: HTMLInputElement | null;
+    /** What to drop, e.g. "Tapestry model file (.json)". */
+    fileKind?: string;
+    /** Show the "no file window opened" help at once (a direct click already opened nothing). */
+    showBlockedHelp?: boolean;
+}
+
 export type DialogRequest =
     | { id: number; type: 'confirm'; options: ConfirmOptions; resolve: (ok: boolean) => void }
+    | { id: number; type: 'file'; options: FileStepOptions; resolve: (gotFile: boolean) => void }
     | { id: number; type: 'prompt'; options: PromptOptions; resolve: (value: string | null) => void };
 
 type Listener = () => void;
@@ -80,6 +93,11 @@ function open<T>(make: (id: number, resolve: (v: T) => void) => DialogRequest): 
 export function confirmDialog(options: ConfirmOptions | string): Promise<boolean> {
     const opts = typeof options === 'string' ? { message: options } : options;
     return open<boolean>((id, resolve) => ({ id, type: 'confirm', options: opts, resolve }));
+}
+
+/** Ask for a file in the page. Resolves true once a file reached the input, false on cancel. */
+export function chooseFileDialog(options: FileStepOptions): Promise<boolean> {
+    return open<boolean>((id, resolve) => ({ id, type: 'file', options, resolve }));
 }
 
 /** Ask for a value in the page. Resolves the text, or null when cancelled. */

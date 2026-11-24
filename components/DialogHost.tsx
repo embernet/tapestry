@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { subscribe, getNotices, getDialogs, dismissNotice, DialogRequest, NoticeKind } from '../services/dialogs';
+import { subscribe, getNotices, getDialogs, dismissNotice, DialogRequest, NoticeKind, FileStepOptions } from '../services/dialogs';
+import { FileChooser } from './FileChooser';
 
 // Renders the app's toasts and in-page confirm / prompt dialogs (services/dialogs.ts).
 
@@ -8,6 +9,46 @@ const KIND_STYLE: Record<NoticeKind, { dark: string; light: string; icon: string
     success: { dark: 'bg-gray-800 border-green-500 text-gray-100',  light: 'bg-white border-green-600 text-gray-900',  icon: '✓' },
     warning: { dark: 'bg-gray-800 border-yellow-500 text-gray-100', light: 'bg-white border-yellow-500 text-gray-900', icon: '!' },
     error:   { dark: 'bg-gray-800 border-red-500 text-gray-100',    light: 'bg-white border-red-600 text-gray-900',    icon: '✕' },
+};
+
+// The in-page "choose a file" step: a drop zone with a <label> for the page's file input,
+// so the user's own click opens the file window (services/fileOpen.ts).
+const FileStepDialog: React.FC<{ request: Extract<DialogRequest, { type: 'file' }>; isDarkMode: boolean }> = ({ request, isDarkMode }) => {
+    const opts: FileStepOptions = request.options;
+    const inputRef = useRef<HTMLInputElement>(opts.input);
+    inputRef.current = opts.input;
+    useEffect(() => {
+        const previous = document.activeElement as HTMLElement | null;
+        return () => { previous?.focus?.(); };
+    }, []);
+    const panel = isDarkMode ? 'bg-gray-800 border-gray-600 text-gray-100' : 'bg-white border-gray-300 text-gray-900';
+    const cancelBtn = isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-100' : 'bg-gray-200 hover:bg-gray-300 text-gray-900';
+    const titleId = `dlg-title-${request.id}`, msgId = `dlg-msg-${request.id}`;
+    const onKeyDown = (e: React.KeyboardEvent) => {
+        e.stopPropagation();
+        if (e.key === 'Escape') { e.preventDefault(); request.resolve(false); return; }
+        if (e.key === 'Tab') {
+            const f = (e.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('button, [tabindex="0"]');
+            if (f.length === 0) return;
+            const first = f[0], last = f[f.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+    };
+    return (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4" onMouseDown={e => { if (e.target === e.currentTarget) request.resolve(false); }}
+            onDragOver={e => e.preventDefault()} onDrop={e => e.preventDefault()}>
+            <div role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={msgId} data-file-step=""
+                onKeyDown={onKeyDown} className={`w-full max-w-md rounded-lg border shadow-2xl p-5 ${panel}`}>
+                <h2 id={titleId} className="text-lg font-semibold mb-2">{opts.title || 'Open a file'}</h2>
+                <p id={msgId} className={`text-sm mb-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>{opts.message}</p>
+                <FileChooser inputRef={inputRef} isDarkMode={isDarkMode} showBlockedHelp={opts.showBlockedHelp} fileKind={opts.fileKind} onFile={() => request.resolve(true)} autoFocus />
+                <div className="mt-5 flex justify-end">
+                    <button type="button" onClick={() => request.resolve(false)} className={`px-4 py-2 rounded text-sm font-medium ${cancelBtn}`}>Cancel</button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 const Dialog: React.FC<{ request: DialogRequest; isDarkMode: boolean }> = ({ request, isDarkMode }) => {
@@ -78,7 +119,9 @@ export const DialogHost: React.FC<{ isDarkMode: boolean }> = ({ isDarkMode }) =>
 
     return (
         <>
-            {top && <Dialog key={top.id} request={top} isDarkMode={isDarkMode} />}
+            {top && (top.type === 'file'
+                ? <FileStepDialog key={top.id} request={top} isDarkMode={isDarkMode} />
+                : <Dialog key={top.id} request={top} isDarkMode={isDarkMode} />)}
             <div className="fixed bottom-10 right-4 z-[10001] flex flex-col gap-2 w-[min(24rem,calc(100vw-2rem))] pointer-events-none">
                 {notices.map(n => {
                     const s = KIND_STYLE[n.kind];

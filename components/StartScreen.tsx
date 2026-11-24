@@ -3,6 +3,7 @@ import React from 'react';
 import { TapestryBanner, TextAnimator, AiDisclaimer, CreatorInfo } from './ModalComponents';
 import { ModelMetadata } from '../types';
 import { APP_VERSION } from '../constants';
+import { useFileDrop } from './FileChooser';
 
 interface StartScreenProps {
   isDarkMode: boolean;
@@ -26,8 +27,16 @@ export const StartScreen: React.FC<StartScreenProps> = ({
   onAbout,
   onUserGuide
 }) => {
+  // A model file dropped anywhere here goes to the model file input, so it opens through
+  // the same onChange as a chosen file. Works where file windows are blocked.
+  const { isDragging, dropProps } = useFileDrop(importFileRef);
   return (
-    <div className={`w-full h-full relative overflow-auto ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
+    <div {...dropProps} data-start-screen="" className={`w-full h-full relative overflow-auto ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
+      {isDragging && (
+        <div className="pointer-events-none fixed inset-0 z-40 flex items-center justify-center bg-blue-900/40 border-4 border-dashed border-blue-400">
+          <p className="text-2xl font-semibold text-white bg-gray-900/80 px-6 py-4 rounded-lg">Drop a Tapestry model file (.json) to open it</p>
+        </div>
+      )}
       <div className="min-h-full w-full flex flex-col items-center justify-center p-4 md:p-8">
         <div className="text-center space-y-4 w-full max-w-4xl flex flex-col items-center">
           <div className="flex items-center justify-center w-full"><TapestryBanner /></div>
@@ -71,6 +80,8 @@ export const StartScreen: React.FC<StartScreenProps> = ({
             </button>
           )}
         </div>
+
+        <p className="hidden md:block mt-4 text-sm text-gray-500">or drag a Tapestry model file (.json) anywhere onto this page</p>
 
         {/* Mobile Message */}
         <div className="flex md:hidden flex-col items-center mt-8 p-6 rounded-lg border border-yellow-500/30 bg-yellow-500/10 text-center max-w-xs">

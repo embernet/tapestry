@@ -713,6 +713,7 @@ export const usePersistence = ({
         types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
         title: 'Open a model',
         message: 'Choose a Tapestry model file (.json) from your computer.',
+        fileKind: 'Tapestry model file (.json)',
         onPicked: async (file, handle) => {
             currentFileHandleRef.current = handle;
             processImportedData(await file.text(), file.name);

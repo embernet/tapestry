@@ -7,6 +7,7 @@ import { DocumentEditorPanel } from './DocumentPanel';
 import { DEFAULT_TOOL_PROMPTS } from '../constants';
 import { promptStore } from '../services/PromptStore';
 import { notify } from '../services/dialogs';
+import { useFileDrop } from './FileChooser';
 
 interface SwotModalProps {
   isOpen: boolean;
@@ -192,6 +193,7 @@ const SwotModal: React.FC<SwotModalProps> = ({
   // Custom Tool Editing State
   const [editingTool, setEditingTool] = useState<CustomStrategyTool | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { dropProps: toolDropProps } = useFileDrop(fileInputRef);
   
   // Guidance Drafts Ref to store text per tool
   const guidanceDrafts = useRef<Record<string, string>>({});
@@ -914,7 +916,7 @@ const SwotModal: React.FC<SwotModalProps> = ({
                     <div className="flex gap-2">
                         <button onClick={handleExportTool} className="text-xs text-blue-400 hover:text-blue-300 underline">Export JSON</button>
                         <span className="text-gray-600">|</span>
-                        <label className="text-xs text-blue-400 hover:text-blue-300 underline cursor-pointer">
+                        <label {...toolDropProps} role="button" tabIndex={0} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }} title="Import JSON (or drop a .json file here)" className="text-xs text-blue-400 hover:text-blue-300 underline cursor-pointer">
                             Import JSON
                             <input type="file" ref={fileInputRef} onChange={handleImportTool} className="hidden" accept=".json" />
                         </label>
