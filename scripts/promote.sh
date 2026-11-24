@@ -77,7 +77,7 @@ if [[ -f "$DATA_DIR/tapestry.db" ]]; then
 fi
 
 git -c advice.detachedHead=false checkout --detach "$REF"
-# scripts/compose.sh bakes in the version (git describe); refs older than it lack it
+# scripts/compose.sh bakes in the version (git describe), commit and build time; refs older than it lack it
 if [[ -x scripts/compose.sh ]]; then scripts/compose.sh up -d --build; else docker compose up -d --build; fi
 
 # /readyz (standards §12): 200 ready, 503 not. Refs older than it have only

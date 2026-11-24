@@ -14,6 +14,8 @@ services:
       context: .
       args:
         APP_VERSION: "${APP_VERSION:-}"   # set by scripts/compose.sh from git describe
+        APP_COMMIT: "${APP_COMMIT:-}"     # set by scripts/compose.sh: git rev-parse --short HEAD
+        APP_BUILT_AT: "${APP_BUILT_AT:-}" # set by scripts/compose.sh: build time, UTC
     restart: unless-stopped
     user: "${APP_UID:-1000}:${APP_GID:-1000}"   # host user, so the data dir stays theirs
     ports:

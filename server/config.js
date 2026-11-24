@@ -4,7 +4,7 @@
 const path = require('node:path');
 const { loadAuthConfig } = require('./auth/config');
 const { loadAiConfig } = require('./ai');
-const { resolveVersion } = require('./health');
+const { resolveVersion, resolveBuild } = require('./health');
 const pkg = require('../package.json');
 
 function trimSlash(u) {
@@ -18,6 +18,8 @@ function loadConfig(env = process.env) {
     appName: 'tapestry',
     // The build's `git describe` (APP_VERSION, baked into the image by scripts/compose.sh), else package.json.
     version: resolveVersion(env.APP_VERSION, pkg.version),
+    // Its commit and build time (APP_COMMIT, APP_BUILT_AT, also baked in), else left out.
+    ...resolveBuild(env),
     port,
     host: env.HOST || '0.0.0.0',
     dataDir: path.resolve(env.DATA_DIR || path.join(__dirname, '..', 'data')),

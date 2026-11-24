@@ -26,9 +26,14 @@ VOLUME ["/data"]
 HEALTHCHECK --interval=30s --timeout=4s --start-period=8s \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8205)+'/readyz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
 
-# The version built (git describe, passed by scripts/compose.sh), for the
-# health endpoints. Last, so a new version only rebuilds this layer.
+# The version built (git describe), its commit and build time, passed by
+# scripts/compose.sh, for the health endpoints. Last, so a new version only
+# rebuilds these layers.
 ARG APP_VERSION=
 ENV APP_VERSION=$APP_VERSION
+ARG APP_COMMIT=
+ENV APP_COMMIT=$APP_COMMIT
+ARG APP_BUILT_AT=
+ENV APP_BUILT_AT=$APP_BUILT_AT
 
 CMD ["node", "server/index.js"]

@@ -4,7 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
-const { mountHealth, resolveVersion } = require('../server/health.js');
+const { mountHealth, resolveVersion, resolveBuild } = require('../server/health.js');
 
 async function serve(opts) {
   const app = express();
@@ -74,4 +74,28 @@ test('resolveVersion strips the v and falls back to the package version', () => 
   assert.equal(resolveVersion(' abc1234-dirty ', '0.1.0'), 'abc1234-dirty');
   assert.equal(resolveVersion('', '0.1.0'), '0.1.0');
   assert.equal(resolveVersion(undefined, '0.1.0'), '0.1.0');
+});
+
+test('commit and builtAt sit alongside version when given, and are left out when not', async (t) => {
+  const s = await serve({ commit: '3cc67d2', builtAt: '2026-11-24T10:00:00Z' });
+  t.after(s.close);
+  for (const path of ['/healthz', '/readyz']) {
+    const j = await (await fetch(s.base + path)).json();
+    assert.equal(j.version, '1.2.3');
+    assert.equal(j.commit, '3cc67d2');
+    assert.equal(j.builtAt, '2026-11-24T10:00:00Z');
+  }
+  const u = await serve({});
+  t.after(u.close);
+  for (const path of ['/healthz', '/readyz']) {
+    const j = await (await fetch(u.base + path)).json();
+    assert.equal('commit' in j, false);
+    assert.equal('builtAt' in j, false);
+  }
+});
+
+test('resolveBuild takes APP_COMMIT and APP_BUILT_AT, and drops unset or malformed ones', () => {
+  assert.deepEqual(resolveBuild({ APP_COMMIT: '3cc67d2', APP_BUILT_AT: '2026-11-24T10:00:00Z' }), { commit: '3cc67d2', builtAt: '2026-11-24T10:00:00Z' });
+  assert.deepEqual(resolveBuild({}), { commit: undefined, builtAt: undefined });
+  assert.deepEqual(resolveBuild({ APP_COMMIT: 'not a sha', APP_BUILT_AT: 'yesterday' }), { commit: undefined, builtAt: undefined });
 });

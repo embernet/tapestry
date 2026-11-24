@@ -50,6 +50,8 @@ test('healthz is open, uncached, in the suite shape (standards §12)', async () 
   assert.equal(j.status, 'ok');
   assert.equal(j.app, 'tapestry');
   assert.equal(j.version, require('../package.json').version); // no APP_VERSION in tests
+  assert.equal('commit' in j, false); // nor APP_COMMIT / APP_BUILT_AT: left out
+  assert.equal('builtAt' in j, false);
   assert.equal(typeof j.uptimeSeconds, 'number');
 });
 
@@ -93,6 +95,15 @@ test('readyz is 503 without the built app, with no details', async () => {
 test('APP_VERSION (git describe) is the version, without the leading v', () => {
   assert.equal(loadConfig({ DATA_DIR: dataDir, APP_VERSION: 'v0.7.0-1-g9af513a-dirty' }).version, '0.7.0-1-g9af513a-dirty');
   assert.equal(loadConfig({ DATA_DIR: dataDir, APP_VERSION: '9af513a' }).version, '9af513a');
+});
+
+test('APP_COMMIT and APP_BUILT_AT are the commit and build time, else left out', () => {
+  const c = loadConfig({ DATA_DIR: dataDir, APP_COMMIT: '9af513a', APP_BUILT_AT: '2026-11-24T10:00:00Z' });
+  assert.equal(c.commit, '9af513a');
+  assert.equal(c.builtAt, '2026-11-24T10:00:00Z');
+  const u = loadConfig({ DATA_DIR: dataDir });
+  assert.equal(u.commit, undefined);
+  assert.equal(u.builtAt, undefined);
 });
 
 test('the app and its assets need a sign-in', async () => {

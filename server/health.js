@@ -2,7 +2,7 @@
 // Health endpoints, the suite standard (horizon-infra standards.md §12).
 // The same file is in tapestry (server/health.js) and breakthrough (src/health.js).
 //
-//   GET /healthz  alive: 200 { status: 'ok', app, version, uptimeSeconds } while the process runs
+//   GET /healthz  alive: 200 { status: 'ok', app, version, commit, builtAt, uptimeSeconds } while the process runs
 //   GET /readyz   ready: 200 { status: 'ok', ..., checks: { <name>: { ok, ms } } }, or
 //                 503 { status: 'unavailable', ..., checks, failing: [<name>, ...] }
 //
@@ -20,6 +20,18 @@ function resolveVersion(appVersion, pkgVersion) {
   return v || String(pkgVersion || '');
 }
 
+// The build's commit (`git rev-parse --short HEAD`, APP_COMMIT) and build time
+// (ISO-8601 UTC, APP_BUILT_AT), baked in like the version. Unset or malformed
+// (a plain `docker compose` build, tests): undefined, so left out, never guessed.
+function resolveBuild(env = process.env) {
+  const commit = String(env.APP_COMMIT || '').trim();
+  const builtAt = String(env.APP_BUILT_AT || '').trim();
+  return {
+    commit: /^[0-9a-f]{4,40}$/.test(commit) ? commit : undefined,
+    builtAt: /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(builtAt) ? builtAt : undefined,
+  };
+}
+
 function withTimeout(fn, ms) {
   let timer;
   return Promise.race([
@@ -28,9 +40,9 @@ function withTimeout(fn, ms) {
   ]).finally(() => clearTimeout(timer));
 }
 
-function mountHealth(app, { appName, version, checks = {}, timeoutMs = 3000, cacheMs = 2000, log = console.warn } = {}) {
+function mountHealth(app, { appName, version, commit, builtAt, checks = {}, timeoutMs = 3000, cacheMs = 2000, log = console.warn } = {}) {
   const startedAt = Date.now();
-  const base = () => ({ app: appName, version, uptimeSeconds: Math.round((Date.now() - startedAt) / 1000) });
+  const base = () => ({ app: appName, version, commit, builtAt, uptimeSeconds: Math.round((Date.now() - startedAt) / 1000) });
 
   let last = null; // { at, promise }; at = Infinity while in flight
   function runChecks() {
@@ -68,4 +80,4 @@ function mountHealth(app, { appName, version, checks = {}, timeoutMs = 3000, cac
   });
 }
 
-module.exports = { mountHealth, resolveVersion };
+module.exports = { mountHealth, resolveVersion, resolveBuild };

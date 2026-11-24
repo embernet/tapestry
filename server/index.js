@@ -48,6 +48,8 @@ function createApp(config = loadConfig(), { fetchImpl } = {}) {
   mountHealth(app, {
     appName: config.appName,
     version: config.version,
+    commit: config.commit,
+    builtAt: config.builtAt,
     checks: {
       // accounts and sessions: the database answers and its folder is writable
       database: async () => {
