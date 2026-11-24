@@ -1,5 +1,5 @@
 'use strict';
-// Tapestry Studio server: serves the built single-page app (dist/) behind a
+// Tapestry server: serves the built single-page app (dist/) behind a
 // sign-in (local accounts and/or TIG-SSO, see ./auth/README.md).
 //
 //   GET /healthz        open; alive (./health.js, horizon-infra standards §12)

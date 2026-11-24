@@ -1,4 +1,4 @@
-# Tapestry Studio: host deployment (dev or prod, chosen by .env).
+# Tapestry: host deployment (dev or prod, chosen by .env).
 #
 #   cp .env.example .env        # dev defaults
 #   scripts/compose.sh up -d --build   # docker compose, with the version from git describe

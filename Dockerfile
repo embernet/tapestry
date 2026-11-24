@@ -1,4 +1,4 @@
-# Tapestry Studio: Vite-built React app served by a small Express server with sign-in.
+# Tapestry: Vite-built React app served by a small Express server with sign-in.
 # Build stage
 FROM node:24-bookworm AS builder
 WORKDIR /app
@@ -9,7 +9,7 @@ RUN npm run build
 
 # Run stage (Node 24 for node:sqlite, used by the login module)
 FROM node:24-bookworm
-LABEL org.opencontainers.image.title="Tapestry Studio" \
+LABEL org.opencontainers.image.title="Tapestry" \
       org.opencontainers.image.description="AI-powered knowledge graph editor and problem-solving studio"
 ENV NODE_ENV=production \
     PORT=8205 \

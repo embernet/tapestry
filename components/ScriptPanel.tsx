@@ -466,7 +466,7 @@ export const ScriptPanel: React.FC<ScriptPanelProps> = ({
         setAiInput('');
 
         try {
-            const systemPrompt = `You are an expert TScript developer for the Tapestry Studio application.
+            const systemPrompt = `You are an expert TScript developer for the Tapestry application.
           
           ${TSCRIPT_DOCS}
           

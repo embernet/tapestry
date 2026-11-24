@@ -532,7 +532,7 @@ export const usePersistence = ({
         const filename = updatedMetadata.filename || "tapestry_model.json";
 
         const payload = {
-            description: `Tapestry Studio Model: ${modelMetadata.name}`,
+            description: `Tapestry Model: ${modelMetadata.name}`,
             public: false,
             files: {
                 [filename]: {

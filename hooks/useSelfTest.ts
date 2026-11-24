@@ -624,7 +624,7 @@ export const useSelfTest = ({
             // --- 5. Help & Menu ---
             // 5.1 About
             { id: '5.1.1', description: 'Modal(About).Open', action: () => setIsAboutModalOpen(true), wait: 600 },
-            { id: '5.1.2', description: 'Modal(About).Check(Title)', selector: 'text:Tapestry Studio', prerequisite: 'text:Tapestry Studio' },
+            { id: '5.1.2', description: 'Modal(About).Check(Title)', selector: 'text:Tapestry', prerequisite: 'text:Tapestry' },
             { id: '5.1.3', description: 'Modal(About).Close', action: () => setIsAboutModalOpen(false), wait: 300 },
 
             // 5.2 Pattern Gallery
@@ -650,11 +650,11 @@ export const useSelfTest = ({
 
         // 2. Create Root
         modelActions.addElement({
-            name: "Tapestry Studio",
+            name: "Tapestry",
             tags: ["System"],
             x: 0, y: 0
         });
-        createdNodes.add("Tapestry Studio");
+        createdNodes.add("Tapestry");
 
         // 3. Build Graph from Test Definitions
         for (const step of testSteps) {
@@ -670,7 +670,7 @@ export const useSelfTest = ({
                     x: featureInfo.x,
                     y: featureInfo.y
                 });
-                modelActions.addRelationship("Tapestry Studio", componentName, "contains", "TO");
+                modelActions.addRelationship("Tapestry", componentName, "contains", "TO");
                 createdComponents.add(componentName);
                 createdNodes.add(componentName);
             }

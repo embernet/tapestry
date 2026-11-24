@@ -45,7 +45,7 @@ export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true, o
                             <TapestryAnimator />
                         </div>
                         <div>
-                            <h2 className={`text-4xl font-bold ${headerClass} tracking-tight`}>Tapestry Studio</h2>
+                            <h2 className={`text-4xl font-bold ${headerClass} tracking-tight`}>Tapestry</h2>
                             <div className="flex items-center gap-2 mt-1">
                                 <p className="text-blue-400 text-xs font-bold uppercase tracking-[0.2em]">Visual Knowledge Graph</p>
                                 <span className={`text-xs px-2 py-0.5 rounded font-mono ${isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700'}`}>v{APP_VERSION}</span>
@@ -56,7 +56,7 @@ export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true, o
 
                     {/* Description */}
                     <p className={`${textClass} text-lg mb-8 leading-relaxed`}>
-                        Tapestry Studio is a tool for creating and exploring knowledge graphs. It helps you understand the relationships between ideas, people, organisations, and actions to find ways to improve situations and plan what to do next. It is a space for reflection, communication, and innovation.
+                        Tapestry is a tool for creating and exploring knowledge graphs. It helps you understand the relationships between ideas, people, organisations, and actions to find ways to improve situations and plan what to do next. It is a space for reflection, communication, and innovation.
                     </p>
 
                     <div className="grid grid-cols-2 gap-4 mb-8">
@@ -99,7 +99,7 @@ export const AboutModal: React.FC<ModalProps> = ({ onClose, isDarkMode = true, o
                     <div className={`flex flex-col items-center gap-2 mt-8`}>
                         <p className={`${textClass} font-medium text-sm`}>Created by Mark Burnett (c) 2025</p>
                         <p className={`text-center max-w-lg text-xs leading-relaxed my-2 ${textClass} px-4`}>
-                            Tapestry Studio is free to use and copy under the MIT licence. The GitHub link is below if you want to deploy it yourself. Use the settings panel to add your own API key for the AI of your choice.
+                            Tapestry is free to use and copy under the MIT licence. The GitHub link is below if you want to deploy it yourself. Use the settings panel to add your own API key for the AI of your choice.
                         </p>
                         <div className="flex gap-4 mt-2">
                             <a href="https://www.linkedin.com/in/markburnett" target="_blank" rel="noopener noreferrer" className={`flex items-center gap-1 ${textClass} ${hoverClass} transition-colors group text-sm`}>

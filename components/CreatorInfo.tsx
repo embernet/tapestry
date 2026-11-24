@@ -16,7 +16,7 @@ export const CreatorInfo: React.FC<CreatorInfoProps> = ({ className = "", isDark
         <div className={`flex flex-col items-center gap-2 ${className}`}>
             {onAboutClick && (
                 <p className={`text-center max-w-lg text-xs leading-relaxed my-2 ${textClass} px-4`}>
-                    Tapestry Studio is free to use and copy under the MIT licence. The GitHub link is below if you want to deploy it yourself. Use the settings panel to add your own API key for the AI of your choice. You can read more in the <button onClick={onAboutClick} className={`underline hover:text-blue-400 font-medium transition-colors cursor-pointer`}>About page</button>.
+                    Tapestry is free to use and copy under the MIT licence. The GitHub link is below if you want to deploy it yourself. Use the settings panel to add your own API key for the AI of your choice. You can read more in the <button onClick={onAboutClick} className={`underline hover:text-blue-400 font-medium transition-colors cursor-pointer`}>About page</button>.
                 </p>
             )}
 

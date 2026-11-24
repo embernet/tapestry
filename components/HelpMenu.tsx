@@ -21,7 +21,7 @@ export const HelpMenu: React.FC<HelpMenuProps> = ({ onClose, onAbout, onPatternG
             <button onClick={() => { onUserGuide(); onClose(); }} className={`block w-full text-left px-4 py-2 text-sm font-bold text-blue-400 ${hoverClass} ${isDarkMode ? 'hover:text-white' : ''}`}>User Guide</button>
             <div className={`border-t ${dividerClass} my-1`}></div>
             <button onClick={() => { onPatternGallery(); onClose(); }} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>Pattern Gallery</button>
-            <button onClick={() => { onAbout(); onClose(); }} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>About Tapestry Studio</button>
+            <button onClick={() => { onAbout(); onClose(); }} className={`block w-full text-left px-4 py-2 text-sm ${textClass} ${hoverClass}`}>About Tapestry</button>
             {onSelfTest && (
                 <>
                     <div className={`border-t ${dividerClass} my-1`}></div>

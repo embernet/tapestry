@@ -285,9 +285,9 @@ export const UserGuideModal: React.FC<ModalProps> = ({ onClose, isDarkMode = tru
                         <div className="max-w-4xl mx-auto space-y-10">
                             {/* Introduction Hero */}
                             <div className="space-y-4 border-b pb-8 border-gray-700/50">
-                                <h3 className={`text-3xl font-bold ${textHeader}`}>Welcome to Tapestry Studio</h3>
+                                <h3 className={`text-3xl font-bold ${textHeader}`}>Welcome to Tapestry</h3>
                                 <p className={`text-lg leading-relaxed ${highlightText}`}>
-                                    Tapestry Studio is an AI-powered knowledge graph environment designed for systems thinking.
+                                    Tapestry is an AI-powered knowledge graph environment designed for systems thinking.
                                     It combines a flexible node-link canvas with structured analytical frameworks.
                                 </p>
                                 <div className={`p-4 rounded-lg text-sm leading-relaxed border ${isDarkMode ? 'bg-blue-900/20 border-blue-800 text-blue-200' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>

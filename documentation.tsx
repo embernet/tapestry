@@ -702,7 +702,7 @@ export const TOOL_DOCUMENTATION: ToolDocumentationItem[] = [
         name: "TRIZ",
         color: "text-indigo-400",
         desc: "Inventive Problem Solving.",
-        summary: "Created by Genrich Altshuller in 1946, TRIZ was originally conceived and used to solve engineering problems. However, the principles have proved so fundamental that over the years they have been extended to apply to many other domains including business, strategy, software engineering, and science in general. Tapestry Studio includes re-interpretations of the original engineering principles for these other disciplines.",
+        summary: "Created by Genrich Altshuller in 1946, TRIZ was originally conceived and used to solve engineering problems. However, the principles have proved so fundamental that over the years they have been extended to apply to many other domains including business, strategy, software engineering, and science in general. Tapestry includes re-interpretations of the original engineering principles for these other disciplines.",
         icon: <path d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />,
         subItems: [
             { name: "Contradiction Matrix", desc: "Solve technical conflicts.", icon: <rect x="4" y="4" width="16" height="16" rx="2" /> },
@@ -722,7 +722,7 @@ export const TOOL_DOCUMENTATION: ToolDocumentationItem[] = [
                     title: "Available Tools",
                     items: [
                         "**Contradiction Matrix:** Maps 39 engineering parameters to 40 inventive principles to solve trade-offs.",
-                        "**40 Principles:** A collection of abstract solutions (e.g. Segmentation, Asymmetry) that can be applied to nodes. Tapestry Studio provides definitions for Engineering, Business, and Software contexts.",
+                        "**40 Principles:** A collection of abstract solutions (e.g. Segmentation, Asymmetry) that can be applied to nodes. Tapestry provides definitions for Engineering, Business, and Software contexts.",
                         "**Su-Field Analysis:** Models systems as two substances and a field. If a system is incomplete, TRIZ suggests how to complete the triangle.",
                         "**Trends of Evolution:** Predicts how systems mature (e.g., towards micro-levels, towards increased dynamism)."
                     ]
@@ -764,7 +764,7 @@ export const TOOL_DOCUMENTATION: ToolDocumentationItem[] = [
             sections: [
                 {
                     title: "Direct Application",
-                    text: "Apply abstract inventive patterns directly to a node to spark innovation. Tapestry Studio offers re-interpretations of these principles for different domains.",
+                    text: "Apply abstract inventive patterns directly to a node to spark innovation. Tapestry offers re-interpretations of these principles for different domains.",
                     items: [
                         "Select a **Principle** from the dropdown (e.g., Segmentation, Local Quality).",
                         "Select a **Problem Domain** (e.g., Business, Engineering, Software) to see the principle defined in that context.",

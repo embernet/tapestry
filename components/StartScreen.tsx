@@ -89,7 +89,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
           <p className={`text-sm mb-6 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-            Tapestry Studio is designed for desktop use however you can browse the user guide.
+            Tapestry is designed for desktop use however you can browse the user guide.
           </p>
           {onUserGuide && (
             <button
@@ -103,7 +103,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
 
         <div className="w-full max-w-[600px] text-center space-y-4 mt-8">
           <p className="font-bold text-blue-400 text-xs md:text-base">This project is in Alpha release and is in active development.</p>
-          <p className={`text-sm md:text-lg leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Tapestry Studio is an AI-powered knowledge graph editor, creativity, and problem solving tool that brings together many Science, Engineering, Business, and Innovation tools and uses AI to bring them to life.</p>
+          <p className={`text-sm md:text-lg leading-relaxed ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Tapestry is an AI-powered knowledge graph editor, creativity, and problem solving tool that brings together many Science, Engineering, Business, and Innovation tools and uses AI to bring them to life.</p>
 
           {/* Hide disclaimer on mobile to save space */}
           <div className="hidden md:block">

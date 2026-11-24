@@ -453,7 +453,7 @@ export default function App() {
         if (persistence.currentModelId) {
             document.title = `TS: ${persistence.currentModelName}`;
         } else {
-            document.title = "Tapestry Studio";
+            document.title = "Tapestry";
         }
     }, [persistence.currentModelId, persistence.currentModelName]);
 
